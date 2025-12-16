@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Question, Submission } from '../types';
+import { Question, Submission } from '../../types';
 import { getAITutorResponse } from "../../services/geminiService";
 import { saveSubmission } from '../../services/storageService';
 import { Timer, CheckCircle, Loader2, X } from 'lucide-react';

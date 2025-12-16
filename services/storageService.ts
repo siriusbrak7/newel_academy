@@ -1,5 +1,5 @@
 // storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
-import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement } from './types';
+import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement } from '../types';
 import { supabase } from './supabaseClient';
 
 // =====================================================

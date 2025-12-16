@@ -31,7 +31,8 @@ const Navbar: React.FC<NavbarProps> = ({
       bgColor: 'bg-cyan-500/10',
       borderColor: 'border-cyan-500/30',
       label: 'Cosmic',
-      iconColor: 'text-cyan-300'
+      iconColor: 'text-cyan-300',
+      font: ''
     },
     'Cyber-Dystopian': {
       icon: Cpu,
