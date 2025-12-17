@@ -191,32 +191,34 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </div>
         </div>
 
-        {/* Value Proposition */}
+                {/* Value Proposition */}
         <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 ${
           theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : ''
         } p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm`}>
           {[
             { 
-              icon: '🎯', 
+              icon: 'https://img.icons8.com/color/96/000000/book-stack.png',
               title: 'Course Mastery', 
               description: 'Complete coverage of Biology, Chemistry, and Physics syllabi' 
             },
             { 
-              icon: '🤖', 
+              icon: 'https://img.icons8.com/color/96/000000/artificial-intelligence.png',
               title: '24/7 Learning Assistant', 
               description: 'Instant help with homework and concept clarification anytime' 
             },
             { 
-              icon: '👨‍🏫', 
+              icon: 'https://img.icons8.com/color/96/000000/teacher.png',
               title: 'Expert Tutor Access', 
               description: 'Schedule sessions with certified science tutor for personalized guidance' 
             }
           ].map((feature, index) => (
             <div key={index} className="text-center p-6">
-              <div className={`text-4xl mb-4 ${
-                theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'
-              }`}>
-                {feature.icon}
+              <div className="mb-4 flex justify-center">
+                <img 
+                  src={feature.icon} 
+                  alt={feature.title}
+                  className="w-16 h-16 object-contain filter drop-shadow-lg"
+                />
               </div>
               <h3 className={`text-xl font-bold mb-3 font-['Poppins'] ${
                 theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
@@ -243,39 +245,39 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               {
-                icon: '🎯',
+                icon: 'https://img.icons8.com/color/96/000000/curriculum.png',
                 title: 'Guided Course Mastery',
-                description: 'Standard Science Curriculum',
+                description: 'Standard Science Curriculum with structured learning paths',
                 color: 'from-cyan-500 to-blue-500'
               },
               {
-                icon: '🤖',
+                icon: 'https://img.icons8.com/color/96/000000/ai-assistant.png',
                 title: '24/7 Learning Assistant',
                 description: 'Get instant help with homework, assignments, and concept questions',
                 color: 'from-purple-500 to-pink-500'
               },
               {
-                icon: '👨‍🏫',
+                icon: 'https://img.icons8.com/color/96/000000/online-class.png',
                 title: 'Expert Tutor Available',
                 description: 'Direct access to certified science tutor for personalized sessions',
                 color: 'from-green-500 to-emerald-500'
               },
               {
-                icon: '📊',
+                icon: 'https://img.icons8.com/color/96/000000/analytics.png',
                 title: 'Progress Analytics',
                 description: 'Track improvement with detailed performance reports and insights',
                 color: 'from-yellow-500 to-orange-500'
               },
               {
-                icon: '⚡',
+                icon: 'https://img.icons8.com/color/96/000000/quiz.png',
                 title: 'Interactive Challenges',
                 description: 'Engaging quizzes and games to reinforce learning',
                 color: 'from-pink-500 to-rose-500'
               },
               {
-                icon: '📚',
+                icon: 'https://img.icons8.com/color/96/000000/book-shelf.png',
                 title: 'Comprehensive Resources',
-                description: 'Access to study materials and revision guides',
+                description: 'Access to study materials, past papers, and revision guides',
                 color: 'from-blue-500 to-indigo-500'
               }
             ].map((feature, index) => (
@@ -287,8 +289,12 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     : 'bg-white/5 border border-white/10 hover:border-white/30 backdrop-blur-sm'
                 }`}
               >
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-r ${feature.color} flex items-center justify-center mb-6 mx-auto text-2xl`}>
-                  {feature.icon}
+                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-white/10 to-transparent flex items-center justify-center mb-6 mx-auto">
+                  <img 
+                    src={feature.icon} 
+                    alt={feature.title}
+                    className="w-10 h-10 object-contain filter drop-shadow-lg"
+                  />
                 </div>
                 <h3 className={`text-xl font-bold mb-3 text-center font-['Poppins'] ${
                   theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
