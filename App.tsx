@@ -8,7 +8,8 @@ import {
   StudentCourseList,
   CourseManager,
   AssessmentManager,
-  StudentAssessmentList
+  StudentAssessmentList,
+  TopicDetail
 } from './components/CourseSystem';
 import { TeacherAssessmentReview } from './components/TeacherAssessmentReview';
 import { SprintChallenge, LeaderboardView } from './components/Gamification';
@@ -16,7 +17,6 @@ import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
-import { TopicDetail } from './components/CourseSystem';
 
 /* ------------------------------------
    Route Guard
@@ -41,7 +41,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
       <div className="p-10 text-center text-red-500 text-2xl font-bold">
-        Access Denied â€” Required role: {allowedRoles.join(', ')}
+        Access Denied — Required role: {allowedRoles.join(', ')}
       </div>
     );
   }
@@ -168,8 +168,8 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <p className={`text-xl md:text-2xl mb-8 max-w-3xl mx-auto font-['Inter'] font-light leading-relaxed ${
             theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white/90'
           }`}>
-            Comprehensive IGCSE & A-Level science tutoring combining smart learning technology 
-            with direct access to certified science educators.
+            Comprehensive science tutoring combining smart learning technology 
+            with direct access to certified science tutor.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
@@ -197,17 +197,17 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
         } p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm`}>
           {[
             { 
-              icon: 'ðŸŽ¯', 
+              icon: '🎯', 
               title: 'Course Mastery', 
               description: 'Complete coverage of IGCSE & A-Level Biology, Chemistry, and Physics syllabi' 
             },
             { 
-              icon: 'ðŸ¤–', 
+              icon: '🤖', 
               title: '24/7 Learning Assistant', 
               description: 'Instant help with homework and concept clarification anytime' 
             },
             { 
-              icon: 'ðŸ‘¨â€ðŸ«', 
+              icon: '👨‍🏫', 
               title: 'Expert Tutor Access', 
               description: 'Schedule sessions with certified science educators for personalized guidance' 
             }
@@ -243,37 +243,37 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               {
-                icon: 'ðŸŽ¯',
+                icon: '🎯',
                 title: 'Guided Course Mastery',
                 description: 'Step-by-step progress through IGCSE & A-Level science curriculum',
                 color: 'from-cyan-500 to-blue-500'
               },
               {
-                icon: 'ðŸ¤–',
+                icon: '🤖',
                 title: '24/7 Learning Assistant',
                 description: 'Get instant help with homework, assignments, and concept questions',
                 color: 'from-purple-500 to-pink-500'
               },
               {
-                icon: 'ðŸ‘¨â€ðŸ«',
+                icon: '👨‍🏫',
                 title: 'Expert Human Tutors',
                 description: 'Direct access to certified science educators for personalized sessions',
                 color: 'from-green-500 to-emerald-500'
               },
               {
-                icon: 'ðŸ“Š',
+                icon: '📊',
                 title: 'Progress Analytics',
                 description: 'Track improvement with detailed performance reports and insights',
                 color: 'from-yellow-500 to-orange-500'
               },
               {
-                icon: 'âš¡',
+                icon: '⚡',
                 title: 'Interactive Challenges',
                 description: 'Engaging quizzes and games to reinforce learning',
                 color: 'from-pink-500 to-rose-500'
               },
               {
-                icon: 'ðŸ“š',
+                icon: '📚',
                 title: 'Comprehensive Resources',
                 description: 'Access to study materials, past papers, and revision guides',
                 color: 'from-blue-500 to-indigo-500'
@@ -379,7 +379,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                2 expert tutor sessions per month
+                4 expert tutor sessions per month
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -410,7 +410,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <p className={`mt-6 text-sm font-['Inter'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300/40' : 'text-white/40'
           }`}>
-            Launch fee: $120 per term (3 months) â€¢ Start learning in 30 seconds
+            Launch fee: $120 per term (3 months) • Start learning in 30 seconds
           </p>
         </div>
       </div>
@@ -460,7 +460,7 @@ const App: React.FC = () => {
     };
 
     init();
-    document.title = 'Newel Academy â€¢ Expert IGCSE & A-Level Science Tutoring'; 
+    document.title = 'Newel Academy • Ace Scientific Concepts with Your Science Wingman'; 
   }, []);
 
   /* Theme handling with proper background effects */
@@ -532,7 +532,7 @@ const App: React.FC = () => {
       });
       
       // Initialize matrix rain
-      const chars = 'ï¾Šï¾ï¾‹ï½°ï½³ï½¼ï¾…ï¾“ï¾†ï½»ï¾œï¾‚ï½µï¾˜ï½±ï¾Žï¾ƒï¾ï½¹ï¾’ï½´ï½¶ï½·ï¾‘ï¾•ï¾—ï½¾ï¾ˆï½½ï¾€ï¾‡ï¾01';
+      const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
       const columns = Math.floor(window.innerWidth / 20);
       
       for (let i = 0; i < columns; i++) {
@@ -750,7 +750,7 @@ const App: React.FC = () => {
                 <Link to="/" className={`text-xl hover:underline font-['Inter'] ${
                   theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'
                 }`}>
-                  â† Return to Home
+                  ← Return to Home
                 </Link>
               </div>
             }
@@ -771,7 +771,7 @@ const App: React.FC = () => {
               }`}>
                 Newel Academy
               </div>
-              <p className="text-sm">Expert IGCSE & A-Level Science Tutoring</p>
+              <p className="text-sm">Expert Science Tutoring</p>
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/" className="hover:underline">Home</Link>
@@ -784,7 +784,7 @@ const App: React.FC = () => {
               </button>
             </div>
           </div>
-          <p className="text-sm">Â© 2025 Newel Academy â€¢ Premium Science Education Platform</p>
+          <p className="text-sm">© 2025 Newel Academy • Premium Science Education Platform</p>
         </div>
       </footer>
 
