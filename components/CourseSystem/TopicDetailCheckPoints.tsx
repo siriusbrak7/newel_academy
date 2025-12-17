@@ -1,4 +1,4 @@
-// components/CourseSystem/TopicDetailCheckpoints.tsx
+﻿// components/CourseSystem/TopicDetailCheckpoints.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Add this import at the top with your other imports
@@ -141,7 +141,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
       });
 
       setActiveFinalQuiz(false);
-      alert(passed ? '🎉 Congratulations! You passed the final assessment!' : 'Keep practicing and try again.');
+      alert(passed ? 'ðŸŽ‰ Congratulations! You passed the final assessment!' : 'Keep practicing and try again.');
     } catch (error) {
       console.error('Error updating final assessment:', error);
     }
@@ -191,7 +191,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         difficulty: q.difficulty || 'IGCSE',
         topic: topic?.title || '',
         options: q.options || [],
-        correctAnswer: q.correct_answer || ''
+        correctAnswer: (q as any).correct_answer || q.correctAnswer || ''
       }));
       
       setActiveCheckpoint({
@@ -392,7 +392,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             <p className="text-white/60 text-lg mb-4">{topic.description}</p>
             <div className="flex items-center gap-4 text-sm">
               <span className="text-white/50">Grade {topic.gradeLevel}</span>
-              <span className="text-white/50">•</span>
+              <span className="text-white/50">â€¢</span>
               <span className="text-white/50">{subject}</span>
             </div>
           </div>
@@ -468,7 +468,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                     rel="noreferrer"
                     className="inline-block bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold"
                   >
-                    Open Biolens →
+                    Open Biolens â†’
                   </a>
                 </div>
               )}
@@ -499,11 +499,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
                       <div>
                         <h4 className="text-white font-semibold">{cp.title}</h4>
                         <p className="text-xs text-white/40">
-                          Checkpoint {cp.checkpoint_number} • {cp.question_count} questions
+                          Checkpoint {cp.checkpoint_number} â€¢ {cp.question_count} questions
                         </p>
                         {score !== undefined && (
                           <p className="text-xs text-white/50 mt-1">
-                            Score: {Math.round(score)}% {score >= 85 ? '✓' : '✗'}
+                            Score: {Math.round(score)}% {score >= 85 ? 'âœ“' : 'âœ—'}
                           </p>
                         )}
                       </div>
@@ -601,7 +601,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                   <div className="flex justify-between">
                     <span>Prerequisite:</span>
                     <span className={checkpointProgress['6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e']?.passed ? "text-green-400" : "text-red-400"}>
-                      {checkpointProgress['6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e']?.passed ? "✓ MCQ Passed" : "✗ MCQ Required"}
+                      {checkpointProgress['6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e']?.passed ? "âœ“ MCQ Passed" : "âœ— MCQ Required"}
                     </span>
                   </div>
                 </div>

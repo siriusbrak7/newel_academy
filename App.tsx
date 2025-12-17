@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -6,7 +6,6 @@ import AuthModal from './components/AuthModal';
 import { AdminDashboard, StudentDashboard, TeacherDashboard } from './components/Dashboards';
 import {
   StudentCourseList,
-  TopicDetail,
   CourseManager,
   AssessmentManager,
   StudentAssessmentList
@@ -17,7 +16,7 @@ import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
-import { TopicDetailCheckpoints } from './components/CourseSystem/TopicDetailCheckPoints';
+import { TopicDetail } from './components/CourseSystem';
 
 /* ------------------------------------
    Route Guard
@@ -42,7 +41,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
       <div className="p-10 text-center text-red-500 text-2xl font-bold">
-        Access Denied — Required role: {allowedRoles.join(', ')}
+        Access Denied â€” Required role: {allowedRoles.join(', ')}
       </div>
     );
   }
@@ -92,7 +91,7 @@ const App: React.FC = () => {
     };
 
     init();
-    document.title = 'Newel Academy • Learn Effectively with AI-Powered Learning Platform and Expert Tutor Available!'; 
+    document.title = 'Newel Academy â€¢ Learn Effectively with AI-Powered Learning Platform and Expert Tutor Available!'; 
   }, []);
 
   /* Theme handling with proper background effects */
@@ -144,7 +143,7 @@ const App: React.FC = () => {
       });
       
       // Initialize matrix rain
-      const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
+      const chars = 'ï¾Šï¾ï¾‹ï½°ï½³ï½¼ï¾…ï¾“ï¾†ï½»ï¾œï¾‚ï½µï¾˜ï½±ï¾Žï¾ƒï¾ï½¹ï¾’ï½´ï½¶ï½·ï¾‘ï¾•ï¾—ï½¾ï¾ˆï½½ï¾€ï¾‡ï¾01';
       const columns = Math.floor(window.innerWidth / 20);
       
       for (let i = 0; i < columns; i++) {
@@ -394,7 +393,7 @@ const App: React.FC = () => {
             path="/topic/:subject/:topicId"
             element={
               <RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}>
-                <TopicDetailCheckpoints />
+                <TopicDetail />
               </RequireAuth>
             }
           />
@@ -456,7 +455,7 @@ const App: React.FC = () => {
                 <Link to="/" className={`text-xl hover:underline ${
                   theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'
                 }`}>
-                  ← Return to Home
+                  â† Return to Home
                 </Link>
               </div>
             }
@@ -469,7 +468,7 @@ const App: React.FC = () => {
           ? 'text-green-300/30 border-green-500/10' 
           : 'text-white/30 border-white/10'
       }`}>
-        Newel Academy © 2025 • Mastering Science with AI-Powered Learning
+        Newel Academy Â© 2025 â€¢ Mastering Science with AI-Powered Learning
       </footer>
 
       {auth.loggedIn && auth.user?.role === 'student' && <AITutorChat />}

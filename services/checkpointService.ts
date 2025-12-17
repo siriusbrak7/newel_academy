@@ -1,5 +1,6 @@
 // services/checkpointService.ts
 import { supabase } from './supabaseClient';
+import { Checkpoint, Question } from '../types';
 
 export const getTopicCheckpoints = async (topicId: string): Promise<Checkpoint[]> => {
   const { data, error } = await supabase

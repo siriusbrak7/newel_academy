@@ -1,6 +1,13 @@
+// =======================
+// GLOBAL TYPES
+// =======================
 
 export type Role = 'admin' | 'teacher' | 'student';
 export type Theme = 'Cosmic' | 'Cyber-Dystopian';
+
+// =======================
+// USER & AUTH
+// =======================
 
 export interface User {
   username: string;
@@ -9,10 +16,10 @@ export interface User {
   approved: boolean;
   securityQuestion: string;
   securityAnswer: string;
-  gradeLevel?: string; // '9', '10', '11', '12'
+  gradeLevel?: string;
   assignedStudents?: string[];
   lastLogin?: number;
-  loginHistory?: number[]; // Array of timestamps for streak calculation
+  loginHistory?: number[];
 }
 
 export interface AuthState {
@@ -20,40 +27,108 @@ export interface AuthState {
   user: User | null;
 }
 
+// =======================
+// CHAT
+// =======================
+
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
 }
 
+// =======================
+// QUESTIONS
+// =======================
+
 export interface Question {
   id: string;
   text: string;
-  options: string[]; // for MCQ
-  correctAnswer: string; // text match
+  options: string[];
+  correctAnswer: string;
   type: 'MCQ' | 'THEORY';
   difficulty: 'IGCSE' | 'AS' | 'A_LEVEL';
   topic: string;
-  modelAnswer?: string; // For AI grading of theory
+  modelAnswer?: string;
+
+  // DB compatibility
+  topic_id?: string;
+  subtopic_name?: string;
+  explanation?: string;
+  sort_order?: number;
 }
+
+// =======================
+// CHECKPOINTS (DATABASE)
+// =======================
+
+export interface Checkpoint {
+  id: string;
+  topic_id: string;
+  checkpoint_number: number;
+  title: string;
+  description?: string;
+  required_score: number;
+  question_count: number;
+  created_at?: string;
+  is_final_assessment?: boolean;
+  time_limit_per_question?: number;
+  prerequisite_checkpoint_id?: string;
+}
+
+// =======================
+// CHECKPOINTS (FRONTEND)
+// =======================
+
+export interface FrontendCheckpoint {
+  id: string;
+  title: string;
+  checkpointNumber: number;
+  requiredScore: number;
+  questionCount: number;
+  description?: string;
+  isFinalAssessment?: boolean;
+  timeLimitPerQuestion?: number;
+}
+
+// =======================
+// CHECKPOINT QUESTIONS
+// =======================
+
+export interface CheckpointQuestion {
+  id: string;
+  checkpoint_id: string;
+  question_id: string;
+  order: number;
+  question?: Question;
+}
+
+// =======================
+// MATERIALS
+// =======================
 
 export interface Material {
   id: string;
   title: string;
   type: 'text' | 'file' | 'link';
-  content: string; // Text content or Base64/URL
+  content: string;
 }
 
+// =======================
+// TOPICS & COURSES
+// =======================
+
 export interface Topic {
-   id?: string; // optional for new topics
-  title: string; // e.g., 'Cell Biology'
+  id?: string;
+  title: string;
   gradeLevel: string;
   description: string;
-  subtopics: string[]; // List of subtopic names
+  subtopics: string[];
   materials: Material[];
   subtopicQuestions?: Record<string, Question[]>;
   checkpoints_required?: number;
   checkpoint_pass_percentage?: number;
-  final_assessment_required?: boolean; // Map subtopic name to list of questions
+  final_assessment_required?: boolean;
+  checkpoints?: FrontendCheckpoint[];
 }
 
 export interface CourseStructure {
@@ -62,35 +137,53 @@ export interface CourseStructure {
   };
 }
 
+// =======================
+// ASSESSMENTS
+// =======================
+
 export interface Assessment {
   id: string;
   title: string;
   subject: string;
   topic?: string;
   questions: Question[];
-  assignedTo: string[]; // usernames or 'all'
-  targetGrade: string; // '9', '10', '11', '12', 'all'
+  assignedTo: string[];
+  targetGrade: string;
   createdBy: string;
   dueDate?: number;
 }
 
+// =======================
+// SUBMISSIONS
+// =======================
+
 export interface Submission {
   assessmentId: string;
   username: string;
-  answers: Record<string, string>; // questionId -> answer
+  answers: Record<string, string>;
   submittedAt: number;
   graded: boolean;
-  score?: number; // percentage
+  score?: number;
   feedback?: string;
   aiGraded?: boolean;
 }
 
+// =======================
+// PROGRESS TRACKING
+// =======================
+
+export interface CheckpointProgress {
+  score?: number;
+  passed?: boolean;
+  completedAt?: string;
+}
+
 export interface TopicProgress {
-  subtopics: { [subtopicName: string]: boolean }; // true if passed
+  subtopics: { [subtopicName: string]: boolean };
   checkpointScores: { [subtopicName: string]: number };
   mainAssessmentScore?: number;
   mainAssessmentPassed: boolean;
-  lastAccessed?: number; // timestamp
+  lastAccessed?: number;
 }
 
 export interface UserProgress {
@@ -99,18 +192,14 @@ export interface UserProgress {
   };
 }
 
+// =======================
+// LEADERBOARD & STATS
+// =======================
+
 export interface LeaderboardEntry {
   username: string;
-  score: number; // % completion or raw score
+  score: number;
   gradeLevel?: string;
-}
-
-export interface Notification {
-  id: string;
-  text: string;
-  type: 'info' | 'success' | 'warning';
-  read: boolean;
-  timestamp: number;
 }
 
 export interface StudentStats {
@@ -123,6 +212,10 @@ export interface StudentStats {
   activeDays: number;
 }
 
+// =======================
+// ANNOUNCEMENTS & NOTIFICATIONS
+// =======================
+
 export interface Announcement {
   id: string;
   title: string;
@@ -131,7 +224,18 @@ export interface Announcement {
   author: string;
 }
 
-// Add these to your existing types.ts file
+export interface Notification {
+  id: string;
+  text: string;
+  type: 'info' | 'success' | 'warning';
+  read: boolean;
+  timestamp: number;
+}
+
+// =======================
+// DATABASE MODELS
+// =======================
+
 export interface DbUser {
   id: string;
   username: string;
