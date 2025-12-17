@@ -268,9 +268,11 @@ export const getCourses = async (): Promise<CourseStructure> => {
       .select(`
         *,
         materials (*),
+        subtopics (*),
         subject:subject_id (name)
       `)
-      .order('sort_order', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .order('title', { ascending: true });
 
     if (topicsError) throw topicsError;
 
@@ -288,16 +290,10 @@ export const getCourses = async (): Promise<CourseStructure> => {
         courses[subjectName] = {};
       }
 
-      // Get materials
-      const materials = (topic.materials || []).map((m: any) => ({
-        id: m.id,
-        title: m.title,
-        type: m.type,
-        content: m.content || m.storage_path || ''
-      }));
-
       // Get subtopics from subtopics table
-      const subtopics: string[] = [];
+      const subtopics: string[] = (topic.subtopics || [])
+        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map((s: any) => s.name);
 
       // Organize questions by subtopic
       const topicQuestions = (questionsData || []).filter(q => q.topic_id === topic.id);
@@ -326,9 +322,17 @@ export const getCourses = async (): Promise<CourseStructure> => {
         title: topic.title,
         gradeLevel: topic.grade_level || '9',
         description: topic.description || '',
-        subtopics: topic.subtopics || subtopics,
-        materials,
-        subtopicQuestions
+        subtopics: subtopics,  // Now from subtopics table
+        materials: (topic.materials || []).map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          type: m.type,
+          content: m.content || m.storage_path || ''
+        })),
+        subtopicQuestions,
+        checkpoints_required: topic.checkpoints_required || 3,
+        checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
+        final_assessment_required: topic.final_assessment_required !== false
       };
     });
 
@@ -340,6 +344,7 @@ export const getCourses = async (): Promise<CourseStructure> => {
   }
 };
 
+// In storageService.ts, update the saveTopic function:
 export const saveTopic = async (subject: string, topic: Topic): Promise<void> => {
   console.log(`💾 Saving topic: ${subject} - ${topic.title}`);
   
@@ -364,20 +369,45 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
       subjectId = subjectData.id;
     }
 
-    // Upsert topic
-    const { error: topicError } = await supabase
-      .from('topics')
-      .upsert({
-        id: topic.id,
-        subject_id: subjectId,
-        title: topic.title,
-        description: topic.description,
-        grade_level: topic.gradeLevel,
-        subtopics: topic.subtopics,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
+    // Prepare topic data
+    const topicData: any = {
+      subject_id: subjectId,
+      title: topic.title,
+      description: topic.description,
+      grade_level: topic.gradeLevel,
+      checkpoints_required: topic.checkpoints_required || 3,
+      checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
+      final_assessment_required: topic.final_assessment_required !== false,
+      updated_at: new Date().toISOString()
+    };
+
+    // Only include id if it's provided (for updates)
+    // For new topics, don't send id - let DB generate it
+    if (topic.id) {
+      topicData.id = topic.id;
+    }
+
+    // Use insert() for new topics, update() for existing
+    let error;
+    if (topic.id) {
+      // Update existing topic
+      const { error: updateError } = await supabase
+        .from('topics')
+        .update(topicData)
+        .eq('id', topic.id);
+      error = updateError;
+    } else {
+      // Insert new topic (database will generate id)
+      const { error: insertError } = await supabase
+        .from('topics')
+        .insert([topicData]);
+      error = insertError;
+    }
     
-    if (topicError) throw topicError;
+    if (error) {
+      console.error('❌ Save topic error:', error);
+      throw error;
+    }
 
     console.log(`✅ Topic saved: ${topic.title}`);
   } catch (error) {
@@ -1244,3 +1274,250 @@ export const refreshAllLeaderboards = async (): Promise<void> => {
   }
 };
 
+// =====================================================
+// CHECKPOINT SYSTEM FUNCTIONS (NEW)
+// =====================================================
+
+// Get checkpoints for a topic
+export const getTopicCheckpoints = async (topicId: string): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('checkpoints')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('checkpoint_number', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('❌ Get checkpoints error:', error);
+    return [];
+  }
+};
+
+// Get student's checkpoint progress
+export const getStudentCheckpointProgress = async (username: string, topicId: string): Promise<Record<string, any>> => {
+  try {
+    // First get user ID from username
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return {};
+
+    // Get all checkpoints for this topic
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('id')
+      .eq('topic_id', topicId);
+
+    if (!checkpoints || checkpoints.length === 0) return {};
+
+    const checkpointIds = checkpoints.map(cp => cp.id);
+
+    // Get progress for these checkpoints
+    const { data: progressData, error } = await supabase
+      .from('student_checkpoint_progress')
+      .select('*')
+      .eq('user_id', userData.id)
+      .in('checkpoint_id', checkpointIds);
+
+    if (error) throw error;
+
+    // Convert to dictionary for easy lookup
+    const progressDict: Record<string, any> = {};
+    progressData?.forEach(item => {
+      progressDict[item.checkpoint_id] = {
+        score: item.score,
+        passed: item.passed,
+        completedAt: item.completed_at
+      };
+    });
+
+    return progressDict;
+  } catch (error) {
+    console.error('❌ Get checkpoint progress error:', error);
+    return {};
+  }
+};
+
+// Save checkpoint progress
+export const saveCheckpointProgress = async (
+  username: string, 
+  checkpointId: string, 
+  score: number, 
+  passed: boolean
+): Promise<void> => {
+  try {
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) throw new Error('User not found');
+
+    const { error } = await supabase
+      .from('student_checkpoint_progress')
+      .upsert({
+        user_id: userData.id,
+        checkpoint_id: checkpointId,
+        score: Math.round(score),
+        passed: passed,
+        completed_at: new Date().toISOString()
+      }, { onConflict: 'user_id,checkpoint_id' });
+
+    if (error) throw error;
+    console.log(`✅ Checkpoint progress saved for ${username}: ${score}%`);
+  } catch (error) {
+    console.error('❌ Save checkpoint progress error:', error);
+    throw error;
+  }
+};
+
+// Get final assessment for a topic (single)
+export const getTopicFinalAssessment = async (topicId: string): Promise<any> => {
+  try {
+    const { data, error } = await supabase
+      .from('final_assessments')
+      .select('*')
+      .eq('topic_id', topicId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No rows
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    console.error('❌ Get final assessment error:', error);
+    return null;
+  }
+};
+
+// Check if student has unlocked final assessment (passed all checkpoints)
+export const hasUnlockedFinalAssessment = async (username: string, topicId: string): Promise<boolean> => {
+  try {
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return false;
+
+    // SPECIFICALLY check if Checkpoint 4 is passed
+    const checkpoint4Id = '6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e';
+    
+    const { data: progress } = await supabase
+      .from('student_checkpoint_progress')
+      .select('passed')
+      .eq('user_id', userData.id)
+      .eq('checkpoint_id', checkpoint4Id)
+      .single();
+
+    // Only return true if Checkpoint 4 is passed
+    return progress?.passed || false;
+  } catch (error) {
+    console.error('Error checking final assessment unlock:', error);
+    return false;
+  }
+};
+
+// Get topics filtered by student grade level
+export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStructure> => {
+  console.log(`📚 DEBUG: Getting topics for grade level: "${gradeLevel}"`);
+  
+  try {
+    const { data: topicsData, error } = await supabase
+      .from('topics')
+      .select(`
+        id,
+        title,
+        description,
+        grade_level,
+        sort_order,
+        subject:subject_id (name),
+        materials (*),
+        checkpoints (*)
+      `)
+      .eq('grade_level', gradeLevel)
+      .order('sort_order', { ascending: true })  // Add this line
+      .order('title');  // Keep as secondary sort
+
+    if (error) {
+      console.error('❌ Supabase error in getTopicsForStudent:', error);
+      return {};
+    }
+
+    console.log(`📚 DEBUG: Found ${topicsData?.length || 0} topics for grade ${gradeLevel}`);
+    
+    if (!topicsData || topicsData.length === 0) {
+      console.log(`📚 DEBUG: No topics found for grade ${gradeLevel}. Checking all topics...`);
+      // Fallback: Get all topics to debug
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('*, subject:subject_id (name)')
+        .order('title');
+      
+      console.log('📚 DEBUG: All topics in database:', allTopics?.map(t => ({
+        id: t.id,
+        title: t.title,
+        grade: t.grade_level,
+        subject: t.subject?.name
+      })));
+      
+      return {};
+    }
+    
+    const courses: CourseStructure = {};
+    
+    topicsData.forEach(topic => {
+      const subjectName = topic.subject?.name || 'General';
+      
+      if (!courses[subjectName]) {
+        courses[subjectName] = {};
+      }
+
+      console.log(`📚 DEBUG: Adding topic - Subject: ${subjectName}, Title: ${topic.title}`);
+      
+      courses[subjectName][topic.id] = {
+        id: topic.id,
+        title: topic.title,
+        gradeLevel: topic.grade_level,
+        description: topic.description || '',
+        subtopics: [],
+        materials: (topic.materials || []).map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          type: m.type,
+          content: m.content || m.storage_path || ''
+        })),
+        checkpoints: (topic.checkpoints || []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          checkpointNumber: c.checkpoint_number,
+          requiredScore: c.required_score,
+          questionCount: c.question_count
+        }))
+      };
+    });
+
+    console.log(`📚 DEBUG: Final courses structure for grade ${gradeLevel}:`, {
+      subjects: Object.keys(courses),
+      topicCounts: Object.keys(courses).map(subject => ({
+        subject,
+        count: Object.keys(courses[subject]).length
+      }))
+    });
+    
+    return courses;
+  } catch (error) {
+    console.error('❌ Get topics for student error:', error);
+    return {};
+  }
+};

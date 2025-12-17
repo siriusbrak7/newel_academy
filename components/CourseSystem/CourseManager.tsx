@@ -6,7 +6,8 @@ import { getAITutorResponse } from "../../services/geminiService";
 import { getCourses, saveTopic, uploadFileToSupabase } from '../../services/storageService';
 import { 
   Plus, Save, Upload, File, Link as LinkIcon, FileText, 
-  Trash2, Edit, ArrowLeft, Wand2, HelpCircle, CheckCircle, X 
+  Trash2, Edit, ArrowLeft, Wand2, HelpCircle, CheckCircle, 
+  Search
 } from 'lucide-react';
 
 export const CourseManager: React.FC = () => {
@@ -16,8 +17,16 @@ export const CourseManager: React.FC = () => {
   const [viewMode, setViewMode] = useState<'create' | 'edit'>('create');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({
-    id: '', title: '', gradeLevel: 'all', description: '', subtopics: '', 
-    materialTitle: '', materialType: 'text', materialContent: ''
+    title: '', 
+    gradeLevel: 'all', 
+    description: '', 
+    subtopics: '', 
+    materialTitle: '', 
+    materialType: 'text', 
+    materialContent: '',
+    checkpointsRequired: 3,
+    checkpointPassPercentage: 85,
+    finalAssessmentRequired: true
   });
   const [createFile, setCreateFile] = useState<File | null>(null);
   const [questionsMap, setQuestionsMap] = useState<Record<string, Question[]>>({});
@@ -28,6 +37,7 @@ export const CourseManager: React.FC = () => {
   const [addMatFile, setAddMatFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -55,6 +65,19 @@ export const CourseManager: React.FC = () => {
     setViewMode('create');
     setQuestionsMap({});
     setQEntry(null);
+    setSearchTerm('');
+    setCreateForm({
+      title: '', 
+      gradeLevel: 'all', 
+      description: '', 
+      subtopics: '', 
+      materialTitle: '', 
+      materialType: 'text', 
+      materialContent: '',
+      checkpointsRequired: 3,
+      checkpointPassPercentage: 85,
+      finalAssessmentRequired: true
+    });
   };
 
   const summarizeContent = async () => {
@@ -78,7 +101,7 @@ export const CourseManager: React.FC = () => {
       text: qEntry.text,
       type: 'MCQ',
       difficulty: 'IGCSE',
-      topic: createForm.id || 'custom',
+      topic: createForm.title || 'custom',
       options: [qEntry.a, qEntry.b, qEntry.c, qEntry.d],
       correctAnswer: qEntry.correct === 'A' ? qEntry.a : 
                     qEntry.correct === 'B' ? qEntry.b : 
@@ -100,8 +123,8 @@ export const CourseManager: React.FC = () => {
   };
 
   const handleCreateTopic = async () => {
-    if (!createForm.id || !createForm.title) {
-      alert('Topic ID and Title required');
+    if (!createForm.title) {
+      alert('Topic Title required');
       return;
     }
     
@@ -126,33 +149,47 @@ export const CourseManager: React.FC = () => {
       setIsUploading(false);
     }
     
-    const newTopic: Topic = {
-      id: createForm.id.toLowerCase().replace(/\s+/g, '_'),
-      title: createForm.title,
-      gradeLevel: createForm.gradeLevel,
-      description: createForm.description,
-      subtopics: parsedSubtopics,
-      materials: createForm.materialTitle ? [{
-        id: Date.now().toString(),
-        title: createForm.materialTitle,
-        type: createForm.materialType as 'text'|'link'|'file',
-        content: materialContent
-      }] : [],
-      subtopicQuestions: questionsMap
-    };
+    // In your handleCreateTopic function:
+const newTopic: any = {  // Use 'any' to bypass TypeScript checking
+  title: createForm.title,
+  gradeLevel: createForm.gradeLevel,
+  description: createForm.description,
+  subtopics: parsedSubtopics,
+  materials: createForm.materialTitle ? [{
+    title: createForm.materialTitle,
+    type: createForm.materialType as 'text'|'link'|'file',
+    content: materialContent
+  }] : [],
+  subtopicQuestions: questionsMap,
+  checkpoints_required: createForm.checkpointsRequired,
+  checkpoint_pass_percentage: createForm.checkpointPassPercentage,
+  final_assessment_required: createForm.finalAssessmentRequired
+};
 
-    await saveTopic(activeSubject, newTopic);
+// Remove id property completely
+delete newTopic.id;
+
+await saveTopic(activeSubject, newTopic);
     
     const updatedCourses = await getCourses();
     setCourses(updatedCourses);
     
     alert('Topic saved!');
     setCreateForm({ 
-      id: '', title: '', gradeLevel: 'all', description: '', subtopics: '', 
-      materialTitle: '', materialType: 'text', materialContent: '' 
+      title: '', 
+      gradeLevel: 'all', 
+      description: '', 
+      subtopics: '', 
+      materialTitle: '', 
+      materialType: 'text', 
+      materialContent: '',
+      checkpointsRequired: 3,
+      checkpointPassPercentage: 85,
+      finalAssessmentRequired: true
     });
     setCreateFile(null);
     setQuestionsMap({});
+    setAiSummary('');
   };
 
   const handleAddMaterialToTopic = async () => {
@@ -226,6 +263,13 @@ export const CourseManager: React.FC = () => {
     setCourses(updatedCourses);
   };
 
+  // Get filtered topics for dropdown/search
+  const allTopics = Object.values(courses[activeSubject] || {}) as Topic[];
+  const filteredTopics = allTopics.filter(topic => 
+    topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    topic.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="max-w-6xl mx-auto pb-20">
       <div className="flex justify-between items-center mb-8">
@@ -246,6 +290,7 @@ export const CourseManager: React.FC = () => {
               setActiveSubject(sub); 
               setSelectedTopicId(null); 
               setViewMode('create'); 
+              setSearchTerm('');
             }}
             className={`px-4 py-2 text-sm font-bold uppercase tracking-wider transition-colors ${
               activeSubject === sub 
@@ -259,6 +304,7 @@ export const CourseManager: React.FC = () => {
       </div>
 
       <div className="grid md:grid-cols-12 gap-6 h-[600px]">
+        {/* LEFT SIDE: Topic Selection (Now with dropdown/search) */}
         <div className="md:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col">
           <button 
             onClick={handleSwitchToCreate}
@@ -271,32 +317,56 @@ export const CourseManager: React.FC = () => {
             <Plus size={18}/> Create New Topic
           </button>
           
-          <div className="flex-grow overflow-y-auto space-y-2 pr-2">
-            {(Object.values(courses[activeSubject] || {}) as Topic[]).map(topic => (
-              <button
-                key={topic.id}
-                onClick={() => handleSelectTopic(topic.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
-                  selectedTopicId === topic.id 
-                    ? 'bg-purple-600 text-white border-purple-400' 
-                    : 'bg-black/20 text-white/70 border-white/5 hover:bg-white/10'
-                }`}
-              >
-                <div className="font-bold text-sm truncate">{topic.title}</div>
-                <div className="text-xs opacity-50 flex justify-between mt-1">
-                  <span>Grade {topic.gradeLevel}</span>
-                  <span>{topic.materials?.length || 0} Materials</span>
-                </div>
-              </button>
-            ))}
-            {Object.keys(courses[activeSubject] || {}).length === 0 && (
+          {/* Search Box */}
+          <div className="relative mb-4">
+            <input
+              type="text"
+              placeholder="Search topics..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-black/30 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white text-sm placeholder-white/40"
+            />
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <Search size={16} className="text-white/40" />
+            </div>
+          </div>
+          
+          {/* Topic Dropdown/List */}
+          <div className="flex-grow overflow-y-auto">
+            {filteredTopics.length === 0 ? (
               <div className="text-center text-white/30 italic text-sm py-4">
-                No topics found.
+                {searchTerm ? 'No topics match your search' : 'No topics found.'}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredTopics.slice(0, 20).map(topic => ( // Limit to 20 for performance
+                  <button
+                    key={topic.id}
+                    onClick={() => handleSelectTopic(topic.id)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      selectedTopicId === topic.id 
+                        ? 'bg-purple-600 text-white border-purple-400' 
+                        : 'bg-black/20 text-white/70 border-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="font-bold text-sm truncate">{topic.title}</div>
+                    <div className="text-xs opacity-50 flex justify-between mt-1">
+                      <span>Grade {topic.gradeLevel}</span>
+                      <span>{topic.materials?.length || 0} Materials</span>
+                    </div>
+                  </button>
+                ))}
+                {filteredTopics.length > 20 && (
+                  <div className="text-center text-white/40 text-xs py-2">
+                    Showing 20 of {filteredTopics.length} topics
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
 
+        {/* RIGHT SIDE: Content Area */}
         <div className="md:col-span-8 bg-white/5 border border-white/10 rounded-2xl p-6 overflow-y-auto">
           {viewMode === 'create' ? (
             <div className="animate-fade-in">
@@ -305,35 +375,84 @@ export const CourseManager: React.FC = () => {
               </h3>
               
               <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <input 
-                  className="bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
-                  placeholder="Topic ID (e.g. cell_bio)" 
-                  value={createForm.id} 
-                  onChange={e => setCreateForm({...createForm, id: e.target.value})} 
-                />
-                <input 
-                  className="bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
-                  placeholder="Topic Title (e.g. Cell Biology)" 
-                  value={createForm.title} 
-                  onChange={e => setCreateForm({...createForm, title: e.target.value})} 
-                />
-                <select 
-                  className="bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
-                  value={createForm.gradeLevel} 
-                  onChange={e => setCreateForm({...createForm, gradeLevel: e.target.value})}
-                >
-                  <option value="all">All Grades</option>
-                  <option value="9">Grade 9</option>
-                  <option value="10">Grade 10</option>
-                  <option value="11">Grade 11</option>
-                  <option value="12">Grade 12</option>
-                </select>
-                <input 
-                  className="bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
-                  placeholder="Subtopics (comma separated)" 
-                  value={createForm.subtopics} 
-                  onChange={e => setCreateForm({...createForm, subtopics: e.target.value})} 
-                />
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Topic Title</label>
+                  <input 
+                    className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
+                    placeholder="e.g. Cell Biology" 
+                    value={createForm.title} 
+                    onChange={e => setCreateForm({...createForm, title: e.target.value})} 
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Grade Level</label>
+                  <select 
+                    className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
+                    value={createForm.gradeLevel} 
+                    onChange={e => setCreateForm({...createForm, gradeLevel: e.target.value})}
+                  >
+                    <option value="all">All Grades</option>
+                    <option value="9">Grade 9</option>
+                    <option value="10">Grade 10</option>
+                    <option value="11">Grade 11</option>
+                    <option value="12">Grade 12</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Subtopics (comma separated)</label>
+                  <input 
+                    className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
+                    placeholder="e.g. Cell Structure, Cell Function, Cell Division" 
+                    value={createForm.subtopics} 
+                    onChange={e => setCreateForm({...createForm, subtopics: e.target.value})} 
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Checkpoints Required</label>
+                  <input 
+                    type="number"
+                    min="1"
+                    max="10"
+                    className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
+                    placeholder="3" 
+                    value={createForm.checkpointsRequired} 
+                    onChange={e => setCreateForm({...createForm, checkpointsRequired: parseInt(e.target.value) || 3})} 
+                  />
+                </div>
+              </div>
+
+              {/* Add these two fields below the grid */}
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="text-white/60 text-sm mb-1 block">Checkpoint Pass Percentage</label>
+                  <input 
+                    type="number"
+                    min="50"
+                    max="100"
+                    className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white" 
+                    placeholder="85" 
+                    value={createForm.checkpointPassPercentage} 
+                    onChange={e => setCreateForm({...createForm, checkpointPassPercentage: parseInt(e.target.value) || 85})} 
+                  />
+                </div>
+                
+                <div className="flex items-end">
+                  <div className="flex items-center gap-2 p-3">
+                    <input 
+                      type="checkbox"
+                      id="finalAssessment"
+                      checked={createForm.finalAssessmentRequired}
+                      onChange={e => setCreateForm({...createForm, finalAssessmentRequired: e.target.checked})}
+                      className="w-5 h-5 accent-cyan-500"
+                    />
+                    <label htmlFor="finalAssessment" className="text-white text-sm">
+                      Final Assessment Required
+                    </label>
+                  </div>
+                </div>
               </div>
               
               <textarea 
@@ -341,6 +460,7 @@ export const CourseManager: React.FC = () => {
                 placeholder="Description / Instructions" 
                 value={createForm.description} 
                 onChange={e => setCreateForm({...createForm, description: e.target.value})} 
+                rows={3}
               />
               
               {/* Material Upload */}
@@ -396,6 +516,7 @@ export const CourseManager: React.FC = () => {
                       placeholder="Content text" 
                       value={createForm.materialContent} 
                       onChange={e => setCreateForm({...createForm, materialContent: e.target.value})} 
+                      rows={4}
                     />
                   )}
                   
@@ -403,6 +524,7 @@ export const CourseManager: React.FC = () => {
                     <button 
                       onClick={summarizeContent}
                       className="bg-purple-600/50 hover:bg-purple-600 text-white p-3 rounded-lg h-full"
+                      type="button"
                     >
                       <Wand2 size={20}/>
                     </button>
@@ -443,6 +565,7 @@ export const CourseManager: React.FC = () => {
                                 <button 
                                   onClick={() => handleRemoveQuestion(st, q.id)}
                                   className="text-red-400 hover:text-red-300"
+                                  type="button"
                                 >
                                   <Trash2 size={12}/>
                                 </button>
@@ -485,12 +608,14 @@ export const CourseManager: React.FC = () => {
                                 <button 
                                   onClick={() => setQEntry(null)}
                                   className="text-xs text-white/50 hover:text-white"
+                                  type="button"
                                 >
                                   Cancel
                                 </button>
                                 <button 
                                   onClick={handleAddQuestion}
                                   className="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-xs"
+                                  type="button"
                                 >
                                   Add
                                 </button>
@@ -504,6 +629,7 @@ export const CourseManager: React.FC = () => {
                             })}
                             className="w-full border border-dashed border-white/20 text-white/40 hover:text-white hover:border-white/40 rounded py-1 text-xs transition-colors"
                             disabled={questionsMap[st]?.length >= 5}
+                            type="button"
                           >
                             {questionsMap[st]?.length >= 5 ? 'Maximum 5 questions reached' : '+ Add Custom Question'}
                           </button>
@@ -518,6 +644,7 @@ export const CourseManager: React.FC = () => {
                 onClick={handleCreateTopic} 
                 disabled={isUploading}
                 className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-bold flex justify-center items-center gap-2"
+                type="button"
               >
                 {isUploading ? 'Uploading...' : <Save size={18}/>}
                 {isUploading ? 'Uploading...' : 'Save New Topic'}
@@ -531,6 +658,11 @@ export const CourseManager: React.FC = () => {
                     <Edit size={20} className="text-purple-400"/> Edit Topic
                   </h3>
                   <p className="text-white/50">{editingTopic.title} (Grade {editingTopic.gradeLevel})</p>
+                  <div className="flex gap-4 mt-2 text-sm text-white/60">
+                    <span>Checkpoints Required: {editingTopic.checkpoints_required || 3}</span>
+                    <span>Pass Percentage: {editingTopic.checkpoint_pass_percentage || 85}%</span>
+                    <span>Final Assessment: {editingTopic.final_assessment_required ? 'Yes' : 'No'}</span>
+                  </div>
                 </div>
               </div>
 
@@ -574,6 +706,7 @@ export const CourseManager: React.FC = () => {
                           <button 
                             onClick={() => alert(m.content)}
                             className="text-xs bg-white/5 hover:bg-white/20 text-white px-2 py-1 rounded"
+                            type="button"
                           >
                             View
                           </button>
@@ -581,6 +714,7 @@ export const CourseManager: React.FC = () => {
                         <button 
                           onClick={() => handleDeleteMaterial(m.id)}
                           className="text-white/20 hover:text-red-400 p-2"
+                          type="button"
                         >
                           <Trash2 size={16}/>
                         </button>
@@ -653,6 +787,7 @@ export const CourseManager: React.FC = () => {
                   onClick={handleAddMaterialToTopic} 
                   disabled={isUploading}
                   className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white py-2 rounded-lg font-bold text-sm flex justify-center items-center gap-2"
+                  type="button"
                 >
                   {isUploading ? 'Uploading...' : <Plus size={16}/>}
                   {isUploading ? 'Uploading...' : 'Add Material'}

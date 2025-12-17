@@ -17,6 +17,7 @@ import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
+import { TopicDetailCheckpoints } from './components/CourseSystem/TopicDetailCheckPoints';
 
 /* ------------------------------------
    Route Guard
@@ -393,7 +394,7 @@ const App: React.FC = () => {
             path="/topic/:subject/:topicId"
             element={
               <RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}>
-                <TopicDetail />
+                <TopicDetailCheckpoints />
               </RequireAuth>
             }
           />

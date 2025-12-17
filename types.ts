@@ -44,13 +44,16 @@ export interface Material {
 }
 
 export interface Topic {
-  id: string; // e.g., 'cell_biology'
+   id?: string; // optional for new topics
   title: string; // e.g., 'Cell Biology'
   gradeLevel: string;
   description: string;
   subtopics: string[]; // List of subtopic names
   materials: Material[];
-  subtopicQuestions?: Record<string, Question[]>; // Map subtopic name to list of questions
+  subtopicQuestions?: Record<string, Question[]>;
+  checkpoints_required?: number;
+  checkpoint_pass_percentage?: number;
+  final_assessment_required?: boolean; // Map subtopic name to list of questions
 }
 
 export interface CourseStructure {
