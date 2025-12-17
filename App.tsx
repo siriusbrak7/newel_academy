@@ -168,8 +168,8 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <p className={`text-xl md:text-2xl mb-8 max-w-3xl mx-auto font-['Inter'] font-light leading-relaxed ${
             theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white/90'
           }`}>
-            Comprehensive science tutoring combining smart learning technology 
-            with direct access to certified science tutor.
+            Science made easy.... and tailored just for you.
+            
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
@@ -199,7 +199,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             { 
               icon: '🎯', 
               title: 'Course Mastery', 
-              description: 'Complete coverage of IGCSE & A-Level Biology, Chemistry, and Physics syllabi' 
+              description: 'Complete coverage of Biology, Chemistry, and Physics syllabi' 
             },
             { 
               icon: '🤖', 
@@ -209,7 +209,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             { 
               icon: '👨‍🏫', 
               title: 'Expert Tutor Access', 
-              description: 'Schedule sessions with certified science educators for personalized guidance' 
+              description: 'Schedule sessions with certified science tutor for personalized guidance' 
             }
           ].map((feature, index) => (
             <div key={index} className="text-center p-6">
@@ -245,7 +245,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               {
                 icon: '🎯',
                 title: 'Guided Course Mastery',
-                description: 'Step-by-step progress through IGCSE & A-Level science curriculum',
+                description: 'Standard Science Curriculum',
                 color: 'from-cyan-500 to-blue-500'
               },
               {
@@ -256,8 +256,8 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               },
               {
                 icon: '👨‍🏫',
-                title: 'Expert Human Tutors',
-                description: 'Direct access to certified science educators for personalized sessions',
+                title: 'Expert Tutor Available',
+                description: 'Direct access to certified science tutor for personalized sessions',
                 color: 'from-green-500 to-emerald-500'
               },
               {
@@ -275,7 +275,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               {
                 icon: '📚',
                 title: 'Comprehensive Resources',
-                description: 'Access to study materials, past papers, and revision guides',
+                description: 'Access to study materials and revision guides',
                 color: 'from-blue-500 to-indigo-500'
               }
             ].map((feature, index) => (
@@ -363,7 +363,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                Complete course access for one subject
+                Complete course access
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -379,7 +379,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                4 expert tutor sessions per month
+                expert tutor sessions
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -460,7 +460,7 @@ const App: React.FC = () => {
     };
 
     init();
-    document.title = 'Newel Academy • Ace Scientific Concepts with Your Science Wingman'; 
+    document.title = 'Newel Academy • Ace Scientific Concepts....'; 
   }, []);
 
   /* Theme handling with proper background effects */
