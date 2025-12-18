@@ -212,6 +212,23 @@ export interface StudentStats {
   activeDays: number;
 }
 
+// Add to your existing interfaces in types.ts
+export interface TheorySubmission {
+  id: string;
+  user_id: string;
+  checkpoint_id: string;
+  topic_id: string;
+  question_text: string;
+  student_answer: string;
+  ai_suggested_score?: number;
+  teacher_score?: number;
+  teacher_feedback?: string;
+  graded_by?: string;
+  submitted_at: string;
+  graded_at?: string;
+  status: 'pending' | 'ai_graded' | 'teacher_graded' | 'approved';
+}
+
 // =======================
 // ANNOUNCEMENTS & NOTIFICATIONS
 // =======================

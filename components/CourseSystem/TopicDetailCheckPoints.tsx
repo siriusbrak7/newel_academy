@@ -315,6 +315,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
           }
           onClose={() => setActiveCheckpoint(null)}
           username={user.username}
+          checkpoint={activeCheckpoint}
+          topicId={topicId}
         />
       )}
 

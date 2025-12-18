@@ -1521,3 +1521,12 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
     return {};
   }
 };
+
+// Re-export theory grading functions
+export { 
+  getPendingTheorySubmissions,
+  aiGradeTheoryAnswer,
+  teacherGradeTheoryAnswer,
+  approveTheoryGrade,
+  saveTheorySubmission
+} from './theoryGradingService';

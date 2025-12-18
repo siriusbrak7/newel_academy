@@ -1,4 +1,4 @@
-// Dashboards.tsx - COMPLETE FIXED VERSION FOR DEPLOYMENT
+﻿// Dashboards.tsx - COMPLETE FIXED VERSION FOR DEPLOYMENT
 // Dashboards.tsx - Updated Chart.js imports
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -18,7 +18,8 @@ import {
   saveTopic,
   saveAnnouncement,
   getSubmissions,
-  refreshAllLeaderboards
+  refreshAllLeaderboards,
+  getPendingTheorySubmissions
 } from '../services/storageService';
 import { 
   Check, 
@@ -41,7 +42,8 @@ import {
   BookOpen as BookOpenIcon,
   Users,
   BarChart3,
-  Target
+  Target,
+  MessageSquare
 } from 'lucide-react';
 
 // Fixed Chart.js imports
@@ -114,9 +116,9 @@ export const AdminDashboard: React.FC = () => {
       const leaderboards = await getLeaderboards();
       setLeaderboardData(leaderboards);
       
-      console.log('✅ Admin data refresh complete');
+      console.log('âœ… Admin data refresh complete');
     } catch (error) {
-      console.error('❌ Error refreshing admin data:', error);
+      console.error('âŒ Error refreshing admin data:', error);
       setStats([]);
     } finally {
       setLoading(false);
@@ -341,7 +343,7 @@ export const AdminDashboard: React.FC = () => {
                     <div>
                       <p className="text-white font-semibold">{u.username}</p>
                       <p className="text-white/60 text-sm">
-                        {u.role} • Grade {u.gradeLevel || 'N/A'}
+                        {u.role} â€¢ Grade {u.gradeLevel || 'N/A'}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -374,7 +376,7 @@ export const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-white font-semibold">{u.username}</p>
                     <p className="text-white/60 text-sm">
-                      {u.role} • Grade {u.gradeLevel || 'N/A'}
+                      {u.role} â€¢ Grade {u.gradeLevel || 'N/A'}
                     </p>
                   </div>
                   <button
@@ -463,6 +465,8 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     challenge: [], 
     assessments: [] 
   });
+  const [theorySubmissions, setTheorySubmissions] = useState<any[]>([]);
+
   const [activeLeaderboard, setActiveLeaderboard] = useState<'academic' | 'challenge' | 'assessments'>('assessments');
 
   // Instruction Editor State
@@ -471,6 +475,15 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [selTopic, setSelTopic] = useState('');
   const [instructionText, setInstructionText] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const loadTheorySubmissions = async () => {
+    try {
+      const submissions = await getPendingTheorySubmissions();
+      setTheorySubmissions(submissions || []);
+    } catch (error) {
+      console.error('Error loading theory submissions:', error);
+    }
+  };
 
   const loadData = async () => {
     console.log("Refreshing Teacher Dashboard Data...");
@@ -495,6 +508,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         setSelSubject(Object.keys(courseData)[0]);
       }
     } catch (error) {
+      
       console.error('Error loading teacher dashboard:', error);
     } finally {
       setLoading(false);
@@ -528,6 +542,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       alert("Announcement Posted!");
       forceRefresh();
     } catch (error) {
+      
       console.error('Error posting announcement:', error);
       alert("Failed to post announcement");
     }
@@ -544,6 +559,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       alert("Instructions Saved!");
       forceRefresh(); 
     } catch (error) {
+      
       console.error('Error saving instructions:', error);
       alert("Failed to save instructions");
     }
@@ -573,6 +589,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       doc.save(`${user.username}_class_report.pdf`);
     } catch (error) {
+      
       console.error('Error exporting report:', error);
       alert("Failed to export report");
     }
@@ -604,7 +621,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white">Teacher Dashboard</h2>
-          <div className="text-sm text-white/50">Real Student Data Only • Ready for Deployment</div>
+          <div className="text-sm text-white/50">Real Student Data Only â€¢ Ready for Deployment</div>
         </div>
         <div className="flex gap-2">
           <button 
@@ -672,7 +689,28 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </Link>
       </div>
-
+        
+        <Link 
+          to="/courses" 
+          className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-md rounded-2xl border border-purple-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
+        >
+          <div className="bg-purple-900/50 p-4 rounded-xl shadow-purple-500/20 shadow-lg">
+            <MessageSquare size={32} className="text-purple-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              Grade Theory Submissions 
+              {theorySubmissions.length > 0 && (
+                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                  {theorySubmissions.length} new
+                </span>
+              )}
+            </h3>
+            <p className="text-white/60 text-sm">
+              Review and grade student theory answers from checkpoint assessments.
+            </p>
+          </div>
+        </Link>
       <div className="grid md:grid-cols-3 gap-6">
         {/* Left Column: Analytics & Instructions */}
         <div className="md:col-span-2 space-y-6">
@@ -960,7 +998,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const refreshData = async () => {
     setLoading(true);
     try {
-      console.log(`📊 Loading data for student: ${user.username}`);
+      console.log(`ðŸ“Š Loading data for student: ${user.username}`);
       
       // Refresh pending assessments
       const allAssessments = await getAssessments();
@@ -1003,7 +1041,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         s => s.username === user.username && s.graded && s.score !== undefined && s.score > 0
       );
       
-      console.log(`📄 Found ${studentSubmissions.length} graded submissions for ${user.username}`);
+      console.log(`ðŸ“„ Found ${studentSubmissions.length} graded submissions for ${user.username}`);
       studentSubmissions.forEach(sub => {
         console.log(`   Submission: ${sub.assessmentId}, Score: ${sub.score}`);
       });
@@ -1029,7 +1067,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         const data = assessmentSubjectScores[subject];
         if (data.count > 0) {
           combinedScores[subject] = data.total / data.count;
-          console.log(`📈 Assessment average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
+          console.log(`ðŸ“ˆ Assessment average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
         }
       });
       
@@ -1038,7 +1076,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         if (!combinedScores[subject] && courseSubjectScores[subject].count > 0) {
           const data = courseSubjectScores[subject];
           combinedScores[subject] = data.total / data.count;
-          console.log(`📘 Course average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
+          console.log(`ðŸ“˜ Course average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
         }
       });
       
@@ -1054,7 +1092,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       setSubjectLabels(newLabels);
       setSubjectScores(newScores);
       
-      console.log('🎯 Final chart data:', { labels: newLabels, scores: newScores });
+      console.log('ðŸŽ¯ Final chart data:', { labels: newLabels, scores: newScores });
       // ========== END FIX ==========
       
       // Generate advice based on combined scores
@@ -1080,6 +1118,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       }
       
     } catch (error) {
+      
       console.error('Error refreshing student dashboard:', error);
     } finally {
       setLoading(false);
@@ -1109,7 +1148,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }]
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     try {
       const doc = new jsPDF();
       doc.setFontSize(20);
@@ -1156,6 +1195,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       doc.save(`${user.username}_progress_report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
+      
       console.error('Error exporting PDF:', error);
       alert("Failed to export report");
     }
@@ -1203,7 +1243,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <h2 className="text-4xl font-bold text-white mb-2">Hello, {user.username}</h2>
               <p className="text-white/60">
                 {user.gradeLevel ? `Grade ${user.gradeLevel} Science Student` : 'Science Student'}
-                {subjectScores.length > 0 && ` • ${subjectScores.length} Subjects Tracked`}
+                {subjectScores.length > 0 && ` â€¢ ${subjectScores.length} Subjects Tracked`}
               </p>
             </div>
             <div className="flex gap-2">
@@ -1271,7 +1311,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <div key={a.id} className="bg-white/5 p-3 rounded-lg flex justify-between items-center">
                   <div>
                     <p className="text-white font-bold text-sm">{a.title}</p>
-                    <p className="text-white/40 text-xs">{a.subject} • {a.questions?.length || 0} Questions</p>
+                    <p className="text-white/40 text-xs">{a.subject} â€¢ {a.questions?.length || 0} Questions</p>
                   </div>
                   <Link 
                     to="/assessments" 
@@ -1333,7 +1373,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-2 text-white/20">📊</div>
+                  <div className="text-4xl mb-2 text-white/20">ðŸ“Š</div>
                   <p className="text-white/40 mb-2">No scores yet</p>
                   <p className="text-white/50 text-xs">
                     Complete assessments<br/>to see your performance
@@ -1390,3 +1430,4 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     </div>
   );
 };
+

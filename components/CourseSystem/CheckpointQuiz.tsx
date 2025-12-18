@@ -3,9 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { Question } from '../../types';
 import { Timer, Loader2 } from 'lucide-react';
 import Confetti from '../Confetti';
+import { supabase } from '../../services/supabaseClient';
+import { saveTheorySubmission } from '../../services/theoryGradingService';
 
 interface Checkpoint {
   checkpoint_number: number;
+  id: string;
 }
 
 interface CheckpointQuizProps {
@@ -17,6 +20,7 @@ interface CheckpointQuizProps {
   onClose: () => void;
   username: string;
   checkpoint: Checkpoint;
+  topicId?: string; // Add this prop
 }
 
 // ✅ TIMER CALCULATION (FINAL VERSION)
@@ -49,7 +53,8 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
   onComplete,
   onClose,
   username,
-  checkpoint
+  checkpoint,
+  topicId
 }) => {
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -98,6 +103,45 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
   const handleSubmit = async (forced = false) => {
     setGrading(true);
 
+    // Check if this is a theory question (Checkpoint 5)
+    const isTheoryCheckpoint = checkpoint?.checkpoint_number === 5;
+    
+    if (isTheoryCheckpoint) {
+      // For theory questions, save submission for teacher grading
+      try {
+        // Get user ID first
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', username)
+          .single();
+
+        if (userData && topicId) {
+          // Save theory submission
+          await saveTheorySubmission(
+            userData.id,
+            checkpointId,
+            topicId,
+            questions[0]?.text || '',
+            answers[0] || '' // Use first answer for theory questions
+          );
+
+          alert('Theory answer submitted! Teacher will grade it soon.');
+          setSubmitted(true);
+          onComplete(0, false); // Temporary score until graded
+        } else {
+          throw new Error('User or topic not found');
+        }
+      } catch (error) {
+        console.error('Error saving theory submission:', error);
+        alert('Failed to submit answer. Please try again.');
+      } finally {
+        setGrading(false);
+      }
+      return;
+    }
+
+    // Original MCQ grading logic for checkpoints 1-4
     let correctCount = 0;
     questions.forEach((q, idx) => {
       if (q.type === 'MCQ' && answers[idx] === q.correctAnswer) {
@@ -105,9 +149,7 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
       }
     });
 
-    const finalScore =
-      questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
-
+    const finalScore = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
     setScore(finalScore);
     setSubmitted(true);
     setGrading(false);
@@ -136,33 +178,51 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
 
   // ===== RESULT SCREEN =====
   if (submitted) {
+    const isTheory = checkpoint?.checkpoint_number === 5;
+    
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        {showConfetti && <Confetti />}
+        {!isTheory && showConfetti && <Confetti />}
         <div className="bg-slate-900 border border-white/20 p-8 rounded-2xl max-w-md w-full text-center relative z-10">
           <h2 className="text-2xl font-bold text-white mb-4">
-            {score >= passThreshold ? 'Checkpoint Passed! 🎉' : 'Keep Practicing'}
+            {isTheory ? 'Theory Submitted! 📝' : 
+             score >= passThreshold ? 'Checkpoint Passed! 🎉' : 'Keep Practicing'}
           </h2>
 
-          <div className="space-y-4 mb-6">
-            <div className="text-5xl font-bold text-cyan-400">
-              {Math.round(score)}%
+          {!isTheory ? (
+            <div className="space-y-4 mb-6">
+              <div className="text-5xl font-bold text-cyan-400">
+                {Math.round(score)}%
+              </div>
+              <div
+                className={`text-lg font-bold ${
+                  score >= passThreshold ? 'text-green-400' : 'text-red-400'
+                }`}
+              >
+                {score >= passThreshold
+                  ? `✓ Passed (Required: ${passThreshold}%)`
+                  : `✗ Need ${passThreshold}% to pass`}
+              </div>
             </div>
-            <div
-              className={`text-lg font-bold ${
-                score >= passThreshold ? 'text-green-400' : 'text-red-400'
-              }`}
-            >
-              {score >= passThreshold
-                ? `✓ Passed (Required: ${passThreshold}%)`
-                : `✗ Need ${passThreshold}% to pass`}
+          ) : (
+            <div className="space-y-4 mb-6">
+              <div className="text-4xl mb-2">📤</div>
+              <div className="text-lg font-bold text-purple-400">
+                Your theory answer has been submitted
+              </div>
+              <p className="text-white/60 text-sm">
+                Your teacher will review and grade it soon. 
+                You'll receive your score and feedback when it's graded.
+              </p>
             </div>
-          </div>
+          )}
 
           <p className="text-white/60 mb-6">
-            {score >= passThreshold
-              ? 'Great job! You can now continue.'
-              : 'Review the material and try again.'}
+            {isTheory 
+              ? 'Check back later for your grade and feedback.'
+              : score >= passThreshold
+                ? 'Great job! You can now continue.'
+                : 'Review the material and try again.'}
           </p>
 
           <button
@@ -177,6 +237,7 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
   }
 
   const q = questions[currentQ];
+  const isTheory = q.type === 'THEORY';
 
   // ===== QUIZ UI =====
   return (
@@ -188,13 +249,20 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
             <span className="text-sm opacity-50">
               ({currentQ + 1}/{questions.length})
             </span>
+            {isTheory && (
+              <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded">
+                THEORY
+              </span>
+            )}
           </h3>
 
           <div
             className={`flex items-center gap-2 px-3 py-1 rounded-full font-mono font-bold border ${
               timeLeft < 60
                 ? 'bg-red-500/20 text-red-400 border-red-500/50 animate-pulse'
-                : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                : isTheory
+                  ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                  : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
             }`}
           >
             <Timer size={16} />
@@ -209,19 +277,27 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
         <div className="flex-grow overflow-y-auto mb-6">
           <span
             className={`text-xs px-2 py-1 rounded ${
-              q.type === 'MCQ'
-                ? 'bg-cyan-900 text-cyan-200'
-                : 'bg-purple-900 text-purple-200'
+              isTheory
+                ? 'bg-purple-900 text-purple-200'
+                : 'bg-cyan-900 text-cyan-200'
             }`}
           >
-            {q.type}
+            {isTheory ? 'THEORY (Teacher Graded)' : 'MCQ (Auto-graded)'}
           </span>
+
+          {isTheory && (
+            <div className="mt-2 mb-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+              <p className="text-sm text-purple-300">
+                📝 <strong>Note:</strong> This is a theory question. Your answer will be reviewed and graded by your teacher.
+              </p>
+            </div>
+          )}
 
           <p className="text-lg text-white my-6 whitespace-pre-wrap">
             {q.text}
           </p>
 
-          {q.type === 'MCQ' ? (
+          {!isTheory ? (
             <div className="space-y-3">
               {q.options.map((opt, i) => (
                 <button
@@ -242,8 +318,8 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
             </div>
           ) : (
             <textarea
-              className="w-full h-48 bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-cyan-400 outline-none resize-none"
-              placeholder="Type your answer here..."
+              className="w-full h-48 bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-purple-400 outline-none resize-none"
+              placeholder="Type your detailed answer here... (Will be graded by teacher)"
               value={answers[currentQ] || ''}
               onChange={(e) => handleAnswerChange(e.target.value)}
             />
@@ -262,16 +338,24 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
           {currentQ < questions.length - 1 ? (
             <button
               onClick={() => setCurrentQ(prev => prev + 1)}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-lg font-bold"
+              className={`px-6 py-2 rounded-lg font-bold ${
+                isTheory
+                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                  : 'bg-cyan-600 hover:bg-cyan-500 text-white'
+              }`}
             >
               Next
             </button>
           ) : (
             <button
               onClick={() => handleSubmit(false)}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg"
+              className={`px-6 py-2 rounded-lg font-bold shadow-lg ${
+                isTheory
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white'
+              }`}
             >
-              Submit Quiz
+              {isTheory ? 'Submit for Teacher Grading' : 'Submit Quiz'}
             </button>
           )}
         </div>
