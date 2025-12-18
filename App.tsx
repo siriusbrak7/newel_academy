@@ -216,7 +216,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Start Learning Now
+                Start Learning.....
               </span>
             </button>
           </div>
@@ -365,13 +365,13 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <h2 className={`text-4xl font-bold mb-6 font-['Poppins'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-white'
           }`}>
-            Start Your Science Journey Today
+            Start Exploring Science.....
           </h2>
           
           <p className={`text-xl mb-8 max-w-2xl mx-auto font-['Inter'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'
           }`}>
-            Join students who are mastering scientific concepts with our comprehensive learning platform
+            Join students who are mastering scientific concepts with a comprehensive learning platform
           </p>
           
           <div className={`mb-8 text-left max-w-md mx-auto p-6 rounded-xl ${
@@ -440,7 +440,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <p className={`mt-6 text-sm font-['Inter'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300/40' : 'text-white/40'
           }`}>
-            Start learning in 30 seconds • No credit card required to explore
+            Start learning in 30 seconds • No credit card required
           </p>
         </div>
       </div>
