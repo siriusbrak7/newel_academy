@@ -165,7 +165,7 @@ export interface Submission {
   graded: boolean;
   score?: number;
   feedback?: string;
-  aiGraded?: boolean;
+  newelGraded?: boolean;
 }
 
 // =======================

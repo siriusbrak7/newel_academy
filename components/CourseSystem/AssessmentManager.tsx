@@ -193,7 +193,7 @@ export const AssessmentManager: React.FC = () => {
         graded: true,
         score: Math.round(totalScore),
         feedback: feedbackBuffer || "Auto-graded successfully.",
-        aiGraded: true
+        newelGraded: true
       };
       await saveSubmission(gradedSub);
       count++;
@@ -455,7 +455,7 @@ export const AssessmentManager: React.FC = () => {
             ) : (
               <div className="animate-fade-in">
                 <label className="text-xs text-orange-300 mb-1 block">
-                  Model Answer / Rubric (for AI Grading)
+                  Model Answer / Rubric (for Newel Grading)
                 </label>
                 <textarea 
                   className="w-full bg-orange-900/10 border border-orange-500/30 rounded-lg p-3 text-orange-100 text-sm mb-2 h-32 placeholder-orange-100/30 focus:border-orange-500 outline-none" 
@@ -591,7 +591,7 @@ export const AssessmentManager: React.FC = () => {
                       </span>
                       {sub.aiGraded && (
                         <p className="text-[10px] text-purple-400 flex items-center gap-1 justify-end uppercase tracking-widest">
-                          <Brain size={10}/> AI Graded
+                          <Brain size={10}/> Newel Graded
                         </p>
                       )}
                     </div>

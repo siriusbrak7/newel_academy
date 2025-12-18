@@ -258,7 +258,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
       );
       setAiAnswer(resp);
     } catch (error) {
-      console.error('AI Error:', error);
+      console.error('Error:', error);
       setAiAnswer("Sorry, I couldn't process your question. Please try again.");
     } finally {
       setAiLoading(false);
@@ -339,7 +339,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         <div className="fixed inset-y-0 right-0 w-80 bg-slate-900 border-l border-white/10 p-6 z-40 shadow-2xl flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Wand2 size={18} className="text-cyan-400"/> Ask AI
+              <Wand2 size={18} className="text-cyan-400"/> Ask Newel
             </h3>
             <button onClick={() => setShowAiAsk(false)} className="text-white/50 hover:text-white">
               <ChevronRight />
@@ -382,7 +382,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           onClick={() => setShowAiAsk(!showAiAsk)}
           className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
         >
-          <Wand2 size={16} className="text-purple-400"/> Ask AI about this Topic
+          <Wand2 size={16} className="text-purple-400"/> Ask Newel about this Topic
         </button>
       </div>
 
@@ -462,7 +462,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                     <LinkIcon className="text-green-400"/> Biolens Interactive Learning
                   </h4>
                   <p className="text-white/70 text-sm mb-3">
-                    Explore interactive 3D models and visualizations for this topic.
+                    Brief Notes, Interactive Checkpoint, Virtual Lab....
                   </p>
                   <a 
                     href="https://biolens-zhgf.onrender.com/" 

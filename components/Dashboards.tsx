@@ -227,7 +227,7 @@ export const AdminDashboard: React.FC = () => {
       <div className="grid md:grid-cols-4 gap-4">
         <div className="bg-white/5 p-6 rounded-2xl">
           <p className="text-white/60 text-sm flex items-center gap-2">
-            <Users size={16} /> Total Real Users
+            <Users size={16} /> Total Users
           </p>
           <p className="text-3xl font-bold text-white">{users.length}</p>
         </div>
@@ -254,7 +254,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-6">
         <div className="bg-white/5 p-6 rounded-2xl">
-          <h3 className="text-xl font-bold text-white mb-4">Real Students by Grade</h3>
+          <h3 className="text-xl font-bold text-white mb-4">Students by Grade</h3>
           <Bar 
             data={gradeDistributionData} 
             options={{ 
@@ -343,7 +343,7 @@ export const AdminDashboard: React.FC = () => {
                     <div>
                       <p className="text-white font-semibold">{u.username}</p>
                       <p className="text-white/60 text-sm">
-                        {u.role} â€¢ Grade {u.gradeLevel || 'N/A'}
+                        {u.role} Grade {u.gradeLevel || 'N/A'}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -376,7 +376,7 @@ export const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-white font-semibold">{u.username}</p>
                     <p className="text-white/60 text-sm">
-                      {u.role} â€¢ Grade {u.gradeLevel || 'N/A'}
+                      {u.role} Grade {u.gradeLevel || 'N/A'}
                     </p>
                   </div>
                   <button
@@ -685,7 +685,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             <h3 className="text-xl font-bold text-white flex items-center gap-2">
               Create & Grade Assessments <Zap size={16} className="text-yellow-400"/>
             </h3>
-            <p className="text-white/60 text-sm">Create MCQ/Written quizzes, use AI Auto-Grading, and review student submissions.</p>
+            <p className="text-white/60 text-sm">Create MCQ/Written quizzes, use Newel Auto-Grading, and review student submissions.</p>
           </div>
         </Link>
       </div>
@@ -717,7 +717,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
           {/* Analytics Chart */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <TrendingUp size={20} className="text-green-400"/> Real Student Performance
+              <TrendingUp size={20} className="text-green-400"/>Student Performance
             </h3>
             <div className="h-64">
               {stats.length > 0 ? (
@@ -856,7 +856,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden p-6">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <Trophy className="text-yellow-400"/> Assessment Leaderboard (Real Students Only)
+            <Trophy className="text-yellow-400"/> Assessment Leaderboard
           </h3>
           <div className="flex gap-2">
             {['assessments', 'academic', 'challenge'].map(t => (
@@ -998,7 +998,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const refreshData = async () => {
     setLoading(true);
     try {
-      console.log(`ðŸ“Š Loading data for student: ${user.username}`);
+      console.log(` Loading data for student: ${user.username}`);
       
       // Refresh pending assessments
       const allAssessments = await getAssessments();
@@ -1041,7 +1041,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         s => s.username === user.username && s.graded && s.score !== undefined && s.score > 0
       );
       
-      console.log(`ðŸ“„ Found ${studentSubmissions.length} graded submissions for ${user.username}`);
+      console.log(`Found ${studentSubmissions.length} graded submissions for ${user.username}`);
       studentSubmissions.forEach(sub => {
         console.log(`   Submission: ${sub.assessmentId}, Score: ${sub.score}`);
       });
@@ -1067,7 +1067,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         const data = assessmentSubjectScores[subject];
         if (data.count > 0) {
           combinedScores[subject] = data.total / data.count;
-          console.log(`ðŸ“ˆ Assessment average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
+          console.log(`Assessment average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
         }
       });
       
@@ -1076,7 +1076,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         if (!combinedScores[subject] && courseSubjectScores[subject].count > 0) {
           const data = courseSubjectScores[subject];
           combinedScores[subject] = data.total / data.count;
-          console.log(`ðŸ“˜ Course average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
+          console.log(`Course average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
         }
       });
       
@@ -1243,7 +1243,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <h2 className="text-4xl font-bold text-white mb-2">Hello, {user.username}</h2>
               <p className="text-white/60">
                 {user.gradeLevel ? `Grade ${user.gradeLevel} Science Student` : 'Science Student'}
-                {subjectScores.length > 0 && ` â€¢ ${subjectScores.length} Subjects Tracked`}
+                {subjectScores.length > 0 && ` ${subjectScores.length} Subjects Tracked`}
               </p>
             </div>
             <div className="flex gap-2">
@@ -1311,7 +1311,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <div key={a.id} className="bg-white/5 p-3 rounded-lg flex justify-between items-center">
                   <div>
                     <p className="text-white font-bold text-sm">{a.title}</p>
-                    <p className="text-white/40 text-xs">{a.subject} â€¢ {a.questions?.length || 0} Questions</p>
+                    <p className="text-white/40 text-xs">{a.subject}  {a.questions?.length || 0} Questions</p>
                   </div>
                   <Link 
                     to="/assessments" 
@@ -1373,7 +1373,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-2 text-white/20">ðŸ“Š</div>
+                  <div className="text-4xl mb-2 text-white/20"></div>
                   <p className="text-white/40 mb-2">No scores yet</p>
                   <p className="text-white/50 text-xs">
                     Complete assessments<br/>to see your performance

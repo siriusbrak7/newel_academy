@@ -109,10 +109,10 @@ export const QuizInterface: React.FC<QuizProps> = ({
         const cleanJson = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         const result = JSON.parse(cleanJson);
         theoryScore = result.score || 0;
-        theoryFeedback = result.feedback || "AI Graded.";
+        theoryFeedback = result.feedback || "Newel Graded.";
       } catch (e) {
         theoryScore = studentAns.length > 50 ? 70 : 40;
-        theoryFeedback = "AI grading unavailable.";
+        theoryFeedback = "Newel grading unavailable.";
       }
     }
 
@@ -144,8 +144,8 @@ export const QuizInterface: React.FC<QuizProps> = ({
         submittedAt: Date.now(),
         graded: true,
         score: Math.round(finalPercent),
-        feedback: `[AI AUTO-GRADE]\nTheory Feedback: ${theoryFeedback}`,
-        aiGraded: true
+        feedback: `[NEWEL AUTO-GRADE]\nTheory Feedback: ${theoryFeedback}`,
+        newelGraded: true
       };
       saveSubmission(submission);
     }
@@ -176,7 +176,7 @@ export const QuizInterface: React.FC<QuizProps> = ({
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
         <div className="text-center text-white">
           <Loader2 size={48} className="animate-spin mx-auto mb-4 text-cyan-400"/>
-          <h2 className="text-2xl font-bold">AI is Grading your Essay...</h2>
+          <h2 className="text-2xl font-bold">Newel is Grading your Essay...</h2>
           <p className="text-white/50">Analyzing your reflection.</p>
         </div>
       </div>
@@ -196,7 +196,7 @@ export const QuizInterface: React.FC<QuizProps> = ({
               <div className="text-5xl font-bold text-cyan-400">{Math.round(score)}%</div>
               {feedback && (
                 <div className="bg-white/10 p-3 rounded text-sm text-left text-white/80 max-h-32 overflow-y-auto">
-                  <strong>AI Feedback:</strong><br/>{feedback}
+                  <strong>Newel Feedback:</strong><br/>{feedback}
                 </div>
               )}
             </div>

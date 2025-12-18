@@ -684,7 +684,7 @@ export const saveSubmission = async (submission: Submission): Promise<void> => {
         score: submission.score,
         graded: submission.graded,
         feedback: submission.feedback,
-        ai_graded: submission.aiGraded || false,
+        ai_graded: submission.newelGraded || false,
         submitted_at: new Date().toISOString()
       }, { onConflict: 'assessment_id,user_id' });
     
