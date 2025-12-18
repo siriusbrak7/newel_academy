@@ -30,20 +30,34 @@ export const saveTheorySubmission = async (
 };
 
 // Get theory submissions that need grading
+// services/theoryGradingService.ts - FIXED VERSION
+// Get theory submissions that need grading
 export const getPendingTheorySubmissions = async (): Promise<TheorySubmission[]> => {
   const { data, error } = await supabase
     .from('theory_submissions')
     .select(`
       *,
-      user:users(username),
+      student:users!theory_submissions_user_id_fkey(username),
+      grader:users!theory_submissions_graded_by_fkey(username),
       topic:topics(title),
       checkpoint:checkpoints(title, checkpoint_number)
     `)
     .in('status', ['pending', 'ai_graded'])
     .order('submitted_at', { ascending: false });
 
-  if (error) throw error;
-  return data || [];
+  if (error) {
+    console.error('Error fetching theory submissions:', error);
+    throw error;
+  }
+  
+  // Transform the data to match the expected structure
+  const transformedData = (data || []).map(item => ({
+    ...item,
+    user: item.student, // Map student to user for backward compatibility
+    graded_by_user: item.grader // Keep grader separate
+  }));
+  
+  return transformedData;
 };
 
 // Get submissions for a specific student

@@ -213,6 +213,7 @@ export interface StudentStats {
 }
 
 // Add to your existing interfaces in types.ts
+// Add to your TheorySubmission interface in types.ts:
 export interface TheorySubmission {
   id: string;
   user_id: string;
@@ -227,6 +228,11 @@ export interface TheorySubmission {
   submitted_at: string;
   graded_at?: string;
   status: 'pending' | 'ai_graded' | 'teacher_graded' | 'approved';
+  // Add these for the joined data
+  user?: { username: string };
+  graded_by_user?: { username: string };
+  topic?: { title: string };
+  checkpoint?: { title: string; checkpoint_number: number };
 }
 
 // =======================
