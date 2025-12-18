@@ -17,6 +17,17 @@ import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
+// Add this import
+import { ImageOptimizer } from './components/ImageOptimizer';
+
+// Add TypeScript declaration for ThemeManager
+declare global {
+  interface Window {
+    ThemeManager?: {
+      setTheme: (theme: string) => void;
+    };
+  }
+}
 
 /* ------------------------------------
    Route Guard
@@ -94,13 +105,34 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             ))}
           </div>
           
-          {/* Orbiting planets */}
-          <div className="absolute top-1/4 left-1/4 w-32 h-32">
-            <div className="absolute w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 animate-float"></div>
+          {/* Jupiter - Large planet with rings */}
+          <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" style={{ animationDuration: '15s' }}>
+            <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse" style={{ animationDuration: '8s' }}>
+              {/* Jupiter's stripes */}
+              <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
+              <div className="absolute top-1/2 w-full h-2 bg-orange-700/50"></div>
+              <div className="absolute bottom-1/4 w-full h-1 bg-orange-600/50"></div>
+            </div>
+            {/* Jupiter's ring */}
+            <div className="absolute -top-2 -left-2 w-16 h-16 border-2 border-orange-400/30 rounded-full"></div>
           </div>
-          <div className="absolute bottom-1/4 right-1/4 w-24 h-24">
+          
+          {/* Mercury - Small fast planet */}
+          <div className="absolute bottom-1/3 right-1/4 w-16 h-16 animate-float" style={{ animationDuration: '8s', animationDelay: '2s' }}>
+            <div className="absolute w-4 h-4 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 animate-pulse" style={{ animationDuration: '3s' }}>
+              {/* Mercury's craters */}
+              <div className="absolute top-1 w-1 h-1 bg-gray-700 rounded-full"></div>
+              <div className="absolute bottom-2 right-2 w-0.5 h-0.5 bg-gray-800 rounded-full"></div>
+            </div>
+          </div>
+          
+          {/* Orbiting planets */}
+          <div className="absolute top-1/2 left-1/3 w-32 h-32">
+            <div className="absolute w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 animate-float" style={{ animationDuration: '12s' }}></div>
+          </div>
+          <div className="absolute bottom-1/4 left-2/3 w-24 h-24">
             <div className="absolute w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 animate-float" 
-                 style={{ animationDelay: '1s' }}></div>
+                 style={{ animationDuration: '10s', animationDelay: '1s' }}></div>
           </div>
         </>
       )}
@@ -149,7 +181,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                 ? 'cyber-box-glow bg-black text-green-400'
                 : 'bg-gradient-to-r from-cyan-900/30 to-purple-900/30 text-cyan-300 border border-cyan-500/30'
             }`}>
-              <span className="text-sm font-bold uppercase tracking-widest">Premium Science Education Platform</span>
+              <span className="text-sm font-bold uppercase tracking-widest">Science Learning Platform</span>
             </div>
           </div>
           
@@ -158,18 +190,17 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               ? 'cyber-text-glow text-green-400'
               : 'bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'
           }`}>
-            Master Science
+            Scientific Thinking....
             <br />
             <span className="text-4xl md:text-5xl lg:text-6xl block mt-2 font-['Poppins'] font-normal">
-              with Expert Guidance
+            Learn to think like a Scientist 
             </span>
           </h1>
           
           <p className={`text-xl md:text-2xl mb-8 max-w-3xl mx-auto font-['Inter'] font-light leading-relaxed ${
             theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white/90'
           }`}>
-            Science made easy.... and tailored just for you.
-            
+            Learn Science at Warp Speed....
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
@@ -191,33 +222,34 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </div>
         </div>
 
-                {/* Value Proposition */}
+        {/* Value Proposition - Updated with real images */}
         <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 ${
           theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : ''
         } p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm`}>
           {[
             { 
-              icon: 'https://img.icons8.com/color/96/000000/book-stack.png',
+              image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=300&fit=crop&auto=format',
               title: 'Course Mastery', 
               description: 'Complete coverage of Biology, Chemistry, and Physics syllabi' 
             },
             { 
-              icon: 'https://img.icons8.com/color/96/000000/artificial-intelligence.png',
+              image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop&auto=format',
               title: '24/7 Learning Assistant', 
               description: 'Instant help with homework and concept clarification anytime' 
             },
             { 
-              icon: 'https://img.icons8.com/color/96/000000/teacher.png',
-              title: 'Expert Tutor Access', 
+              image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=400&h=300&fit=crop&auto=format',
+              title: 'Expert Tutor Available', 
               description: 'Schedule sessions with certified science tutor for personalized guidance' 
             }
           ].map((feature, index) => (
-            <div key={index} className="text-center p-6">
-              <div className="mb-4 flex justify-center">
-                <img 
-                  src={feature.icon} 
+            <div key={index} className="text-center">
+              <div className="h-48 mb-4 overflow-hidden rounded-lg">
+                <ImageOptimizer 
+                  src={feature.image} 
                   alt={feature.title}
-                  className="w-16 h-16 object-contain filter drop-shadow-lg"
+                  className="w-full h-full"
+                  scienceThemed={true}
                 />
               </div>
               <h3 className={`text-xl font-bold mb-3 font-['Poppins'] ${
@@ -234,50 +266,50 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ))}
         </div>
 
-        {/* Features Grid */}
+        {/* Features Grid - Updated with real images */}
         <div className="mb-16">
           <h2 className={`text-4xl font-bold mb-12 text-center font-['Poppins'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
           }`}>
-            Why Students Excel with Newel Academy
+            Why Students Excel with The Newel 
           </h2>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               {
-                icon: 'https://img.icons8.com/color/96/000000/curriculum.png',
+                image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&h=400&fit=crop&auto=format',
                 title: 'Guided Course Mastery',
                 description: 'Standard Science Curriculum with structured learning paths',
                 color: 'from-cyan-500 to-blue-500'
               },
               {
-                icon: 'https://img.icons8.com/color/96/000000/ai-assistant.png',
+                image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=600&h=400&fit=crop&auto=format',
                 title: '24/7 Learning Assistant',
                 description: 'Get instant help with homework, assignments, and concept questions',
                 color: 'from-purple-500 to-pink-500'
               },
               {
-                icon: 'https://img.icons8.com/color/96/000000/online-class.png',
+                image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600&h=400&fit=crop&auto=format',
                 title: 'Expert Tutor Available',
                 description: 'Direct access to certified science tutor for personalized sessions',
                 color: 'from-green-500 to-emerald-500'
               },
               {
-                icon: 'https://img.icons8.com/color/96/000000/analytics.png',
+                image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=400&fit=crop&auto=format',
                 title: 'Progress Analytics',
                 description: 'Track improvement with detailed performance reports and insights',
                 color: 'from-yellow-500 to-orange-500'
               },
               {
-                icon: 'https://img.icons8.com/color/96/000000/quiz.png',
+                image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600&h=400&fit=crop&auto=format',
                 title: 'Interactive Challenges',
                 description: 'Engaging quizzes and games to reinforce learning',
                 color: 'from-pink-500 to-rose-500'
               },
               {
-                icon: 'https://img.icons8.com/color/96/000000/book-shelf.png',
+                image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop&auto=format',
                 title: 'Comprehensive Resources',
-                description: 'Access to study materials, past papers, and revision guides',
+                description: 'Access to study materials and revision guides',
                 color: 'from-blue-500 to-indigo-500'
               }
             ].map((feature, index) => (
@@ -289,13 +321,16 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     : 'bg-white/5 border border-white/10 hover:border-white/30 backdrop-blur-sm'
                 }`}
               >
-                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-white/10 to-transparent flex items-center justify-center mb-6 mx-auto">
-                  <img 
-                    src={feature.icon} 
+                {/* Image instead of emoji */}
+                <div className="w-full h-48 mb-6 overflow-hidden rounded-xl">
+                  <ImageOptimizer 
+                    src={feature.image} 
                     alt={feature.title}
-                    className="w-10 h-10 object-contain filter drop-shadow-lg"
+                    className="w-full h-full"
+                    scienceThemed={true}
                   />
                 </div>
+                
                 <h3 className={`text-xl font-bold mb-3 text-center font-['Poppins'] ${
                   theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
                 }`}>
@@ -311,7 +346,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </div>
         </div>
 
-        {/* Pricing CTA Section */}
+        {/* Final CTA Section */}
         <div className={`rounded-3xl p-10 md:p-16 text-center ${
           theme === 'Cyber-Dystopian'
             ? 'cyber-box-glow bg-black border-2 border-green-500/30'
@@ -323,7 +358,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                 ? 'cyber-box-glow bg-green-900/50 text-green-400'
                 : 'bg-gradient-to-r from-cyan-900/30 to-purple-900/30 text-cyan-300 border border-cyan-500/30'
             }`}>
-              <span className="text-sm font-bold uppercase tracking-widest">Premium Access</span>
+              <span className="text-sm font-bold uppercase tracking-widest">Ready to Excel?</span>
             </div>
           </div>
           
@@ -333,21 +368,10 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             Start Your Science Journey Today
           </h2>
           
-          <div className={`text-5xl font-bold mb-2 font-['Poppins'] ${
-            theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-white'
-          }`}>
-            $120
-            <span className={`text-2xl ${
-              theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'
-            }`}>
-              /term
-            </span>
-          </div>
-          
-          <p className={`text-lg mb-6 font-['Inter'] ${
+          <p className={`text-xl mb-8 max-w-2xl mx-auto font-['Inter'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'
           }`}>
-            3 months of full platform access
+            Join students who are mastering scientific concepts with our comprehensive learning platform
           </p>
           
           <div className={`mb-8 text-left max-w-md mx-auto p-6 rounded-xl ${
@@ -358,7 +382,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             <h3 className={`text-xl font-bold mb-4 font-['Poppins'] ${
               theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
             }`}>
-              Includes:
+              What You'll Get:
             </h3>
             <ul className={`space-y-3 font-['Inter'] ${
               theme === 'Cyber-Dystopian' ? 'text-green-300/80' : 'text-white/80'
@@ -369,7 +393,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                Complete course access
+                Complete science course access
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -377,7 +401,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                24/7 learning assistant access
+                24/7 Learning assistant
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -385,7 +409,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                expert tutor sessions
+                Expert tutor support
               </li>
               <li className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
@@ -410,13 +434,13 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
-              Register Now
+              Get Started Now
             </span>
           </button>
           <p className={`mt-6 text-sm font-['Inter'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300/40' : 'text-white/40'
           }`}>
-            Launch fee: $120 per term (3 months) • Start learning in 30 seconds
+            Start learning in 30 seconds • No credit card required to explore
           </p>
         </div>
       </div>
@@ -466,103 +490,118 @@ const App: React.FC = () => {
     };
 
     init();
-    document.title = 'Newel Academy • Ace Scientific Concepts....'; 
+    document.title = 'The Newel • Ace Scientific Concepts....'; 
   }, []);
 
   /* Theme handling with proper background effects */
   useEffect(() => {
     if (initializing) return;
 
-    const body = document.body;
-    body.className = '';
-    body.style.backgroundImage = '';
-    body.style.backgroundSize = '';
-    
-    // Add font imports for better typography
-    const style = document.createElement('style');
-    style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
-      
-      @keyframes digitalFloat {
-        0% { transform: translateY(-100px); opacity: 0; }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { transform: translateY(100vh); opacity: 0; }
-      }
-      
-      @keyframes scan {
-        0% { transform: translateY(-100%); }
-        100% { transform: translateY(100vh); }
-      }
-    `;
-    document.head.appendChild(style);
-
-    // Remove all theme elements first
-    document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid').forEach(el => {
-      (el as HTMLElement).style.display = 'none';
-    });
-    document.querySelectorAll('.matrix-column').forEach(el => el.remove());
-    document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
-      (el as HTMLElement).style.display = 'none';
-    });
-
-    if (theme === 'Cosmic') {
-      body.classList.add('cosmic-bg', 'text-white');
-      body.style.fontFamily = "'Inter', sans-serif";
-      
-      // Show cosmic elements
-      document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid').forEach(el => {
-        (el as HTMLElement).style.display = 'block';
-      });
-      
-      // Initialize star field if not already done
-      const starField = document.querySelector('.star-field');
-      if (starField && starField.children.length === 0) {
-        for (let i = 0; i < 200; i++) {
-          const star = document.createElement('div');
-          star.className = 'star';
-          star.style.left = `${Math.random() * 100}%`;
-          star.style.top = `${Math.random() * 100}%`;
-          star.style.animationDelay = `${Math.random() * 3}s`;
-          star.style.animationDuration = `${2 + Math.random() * 2}s`;
-          starField.appendChild(star);
-        }
-      }
-    } else if (theme === 'Cyber-Dystopian') {
-      body.classList.add('cyber-bg', 'text-green-500');
-      body.style.fontFamily = "'Share Tech Mono', 'Inter', monospace";
-      
-      // Show cyber elements
-      document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
-        (el as HTMLElement).style.display = 'block';
-      });
-      
-      // Initialize matrix rain
-      const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
-      const columns = Math.floor(window.innerWidth / 20);
-      
-      for (let i = 0; i < columns; i++) {
-        const column = document.createElement('div');
-        column.className = 'matrix-column';
-        column.style.left = `${i * 20}px`;
-        column.style.animationDelay = `${Math.random() * 20}s`;
-        column.style.animationDuration = `${15 + Math.random() * 10}s`;
-        
-        let text = '';
-        const length = Math.floor(10 + Math.random() * 20);
-        for (let j = 0; j < length; j++) {
-          text += chars[Math.floor(Math.random() * chars.length)] + '\n';
-        }
-        column.textContent = text;
-        body.appendChild(column);
-      }
+    // Call the ThemeManager from index.html
+    if (window.ThemeManager) {
+      window.ThemeManager.setTheme(theme);
     } else {
-      body.style.fontFamily = "'Inter', sans-serif";
+      // Fallback to existing logic
+      const body = document.body;
+      body.className = '';
+      body.style.backgroundImage = '';
+      body.style.backgroundSize = '';
+      
+      // Add font imports for better typography
+      const style = document.createElement('style');
+      style.textContent = `
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+        
+        @keyframes digitalFloat {
+          0% { transform: translateY(-100px); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
+        }
+        
+        @keyframes scan {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(100vh); }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+      `;
+      document.head.appendChild(style);
+
+      // Remove all theme elements first
+      document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
+        (el as HTMLElement).style.display = 'none';
+      });
+      document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+      document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+        (el as HTMLElement).style.display = 'none';
+      });
+
+      if (theme === 'Cosmic') {
+        body.classList.add('cosmic-bg', 'text-white');
+        body.style.fontFamily = "'Inter', sans-serif";
+        
+        // Show cosmic elements
+        document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
+          (el as HTMLElement).style.display = 'block';
+        });
+        
+        // Initialize star field if not already done
+        const starField = document.querySelector('.star-field');
+        if (starField && starField.children.length === 0) {
+          for (let i = 0; i < 200; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.animationDelay = `${Math.random() * 3}s`;
+            star.style.animationDuration = `${2 + Math.random() * 2}s`;
+            starField.appendChild(star);
+          }
+        }
+      } else if (theme === 'Cyber-Dystopian') {
+        body.classList.add('cyber-bg', 'text-green-500');
+        body.style.fontFamily = "'Share Tech Mono', 'Inter', monospace";
+        
+        // Show cyber elements
+        document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+          (el as HTMLElement).style.display = 'block';
+        });
+        
+        // Initialize matrix rain
+        const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
+        const columns = Math.floor(window.innerWidth / 20);
+        
+        for (let i = 0; i < columns; i++) {
+          const column = document.createElement('div');
+          column.className = 'matrix-column';
+          column.style.left = `${i * 20}px`;
+          column.style.animationDelay = `${Math.random() * 20}s`;
+          column.style.animationDuration = `${15 + Math.random() * 10}s`;
+          
+          let text = '';
+          const length = Math.floor(10 + Math.random() * 20);
+          for (let j = 0; j < length; j++) {
+            text += chars[Math.floor(Math.random() * chars.length)] + '\n';
+          }
+          column.textContent = text;
+          body.appendChild(column);
+        }
+      } else {
+        body.style.fontFamily = "'Inter', sans-serif";
+      }
+      
+      return () => {
+        document.head.removeChild(style);
+      };
     }
-    
-    return () => {
-      document.head.removeChild(style);
-    };
   }, [theme, initializing]);
 
   /* Auth handlers */
@@ -591,7 +630,7 @@ const App: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white" style={{ fontFamily: "'Inter', sans-serif" }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-cyan-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold">Initializing Newel Academy</h2>
+          <h2 className="text-xl font-bold">Initializing The Newel....</h2>
           <p className="text-white/60 mt-2">Loading your premium science learning platform...</p>
         </div>
       </div>
@@ -775,7 +814,7 @@ const App: React.FC = () => {
               <div className={`text-2xl font-bold mb-2 font-['Poppins'] ${
                 theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'
               }`}>
-                Newel Academy
+                The Newel
               </div>
               <p className="text-sm">Expert Science Tutoring</p>
             </div>
@@ -790,7 +829,7 @@ const App: React.FC = () => {
               </button>
             </div>
           </div>
-          <p className="text-sm">© 2025 Newel Academy • Premium Science Education Platform</p>
+          <p className="text-sm">© 2025 Newel Academy • Science Learning Platform</p>
         </div>
       </footer>
 

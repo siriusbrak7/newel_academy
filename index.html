@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Newel Academy • Ace Scientific Concepts with Your Science Wingman</title>
+    <title>The Newel • Ace Scientific Concepts....</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,6 +26,8 @@
               'matrix-fall': 'matrixFall 20s linear infinite',
               'theme-pulse': 'themePulse 2s ease-in-out infinite',
               'theme-switch': 'themeSwitch 0.5s ease-out',
+              'scan': 'scan 3s linear infinite',
+              'digitalFloat': 'digitalFloat 3s linear infinite',
             },
             keyframes: {
               fadeIn: {
@@ -68,6 +70,16 @@
               themeSwitch: {
                 '0%': { opacity: '0', transform: 'translateY(-10px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              scan: {
+                '0%': { transform: 'translateY(-100%)' },
+                '100%': { transform: 'translateY(100vh)' },
+              },
+              digitalFloat: {
+                '0%': { transform: 'translateY(-100px); opacity: 0;' },
+                '10%': { opacity: 1; },
+                '90%': { opacity: 1; },
+                '100%': { transform: 'translateY(100vh); opacity: 0;' },
               }
             }
           }
@@ -76,15 +88,30 @@
     </script>
     
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Share+Tech+Mono&family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     
     <style>
+      /* ===== BASE STYLES ===== */
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        font-family: 'Inter', sans-serif;
+        transition: background 0.5s ease;
+      }
+      
+      #root {
+        position: relative;
+        z-index: 10;
+      }
+      
       /* ===== COSMIC THEME ===== */
       .cosmic-bg {
-        background: #000000;
+        background: #000000 !important;
         position: relative;
         overflow-x: hidden;
         min-height: 100vh;
+        color: white !important;
       }
       
       .cosmic-bg::before {
@@ -102,9 +129,31 @@
         pointer-events: none;
       }
       
-      /* Sagittarius Constellation - Fixed to viewport */
+      /* Star Field - Fixed position */
+      .star-field {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
+      }
+      
+      .star {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+        animation: twinkle 3s ease-in-out infinite;
+      }
+      
+      /* Constellation - Fixed position */
       .constellation {
-        position: fixed;
+        position: fixed !important;
         top: 10%;
         right: 15%;
         width: 300px;
@@ -112,6 +161,7 @@
         z-index: 1;
         opacity: 0.3;
         pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
       }
       
       .constellation-line {
@@ -125,30 +175,9 @@
         filter: drop-shadow(0 0 4px rgba(147, 197, 253, 0.6));
       }
       
-      /* Animated Stars Background - Fixed position */
-      .star-field {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 1;
-        pointer-events: none;
-      }
-      
-      .star {
-        position: absolute;
-        width: 2px;
-        height: 2px;
-        background: white;
-        border-radius: 50%;
-        box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
-        animation: twinkle 3s ease-in-out infinite;
-      }
-      
-      /* SVG Rocket - Fixed position */
+      /* Rocket - Fixed position */
       .rocket {
-        position: fixed;
+        position: fixed !important;
         top: 15%;
         right: 10%;
         width: 80px;
@@ -157,11 +186,12 @@
         filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
         animation: rocketFly 8s ease-in-out infinite;
         pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
       }
       
       /* Rocket Exhaust - Fixed position */
       .rocket-exhaust {
-        position: fixed;
+        position: fixed !important;
         top: calc(15% + 60px);
         right: calc(10% + 20px);
         width: 30px;
@@ -169,16 +199,18 @@
         z-index: 1;
         animation: rocketFly 8s ease-in-out infinite;
         pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
       }
       
-      /* Floating Asteroids - Fixed position */
+      /* Asteroids - Fixed position */
       .asteroid {
-        position: fixed;
+        position: fixed !important;
         border-radius: 50%;
         background: linear-gradient(135deg, #4a5568, #2d3748);
         box-shadow: inset -5px -5px 10px rgba(0, 0, 0, 0.5);
         animation: asteroidDrift 15s linear infinite;
         pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
       }
       
       .asteroid-1 {
@@ -205,62 +237,82 @@
         animation-delay: 10s;
       }
       
-      /* Enhanced Cosmic Planet */
-      .cosmic-planet {
-        background: radial-gradient(circle at 35% 35%, #6366f1, #4338ca, #312e81);
-        box-shadow: 
-          0 0 60px rgba(99, 102, 241, 0.4) inset,
-          0 0 40px rgba(99, 102, 241, 0.3),
-          0 0 100px rgba(99, 102, 241, 0.2);
-        position: relative;
+      /* Saturn - Fixed position */
+      .saturn {
+        position: fixed !important;
+        bottom: 10%;
+        left: 5%;
+        width: 120px;
+        height: 120px;
+        z-index: 1;
+        opacity: 0.6;
+        pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
       }
       
-      .cosmic-planet::before {
-        content: '';
-        position: absolute;
-        top: 10%;
-        left: 10%;
-        width: 30%;
-        height: 30%;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.3), transparent);
-        border-radius: 50%;
+      .saturn-planet {
+        fill: url(#saturnGradient);
       }
       
-      /* Cosmic Moon */
-      .cosmic-moon {
-        background: radial-gradient(circle at 40% 40%, #94a3b8, #64748b, #475569);
-        box-shadow: 
-          0 0 20px rgba(148, 163, 184, 0.3) inset,
-          0 0 15px rgba(148, 163, 184, 0.2);
+      .saturn-rings {
+        fill: none;
+        stroke: url(#ringsGradient);
+        stroke-width: 8;
+        opacity: 0.7;
+        transform-origin: 60px 60px;
       }
       
       /* ===== CYBER-DYSTOPIAN THEME ===== */
       .cyber-bg {
-        background: #000000;
+        background: #000000 !important;
         position: relative;
         overflow-x: hidden;
         min-height: 100vh;
         font-family: 'Share Tech Mono', monospace !important;
+        color: #00ff41 !important;
       }
       
       .cyber-bg * {
         font-family: 'Share Tech Mono', monospace !important;
       }
       
-      /* Matrix Rain Effect - Fixed position */
-      .matrix-canvas {
-        position: fixed;
+      /* Cyber Grid - Fixed position */
+      .cyber-grid {
+        position: fixed !important;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
+        background-image: 
+          linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
         z-index: 0;
-        opacity: 0.15;
         pointer-events: none;
+        display: none; /* Hidden by default, shown via JS */
       }
       
+      /* Cyber Scanline - Fixed position */
+      .cyber-scanline {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          transparent 50%,
+          rgba(0, 255, 65, 0.03) 50%
+        );
+        background-size: 100% 4px;
+        z-index: 1;
+        pointer-events: none;
+        animation: scanline 8s linear infinite;
+        display: none; /* Hidden by default, shown via JS */
+      }
+      
+      /* Matrix Columns - Fixed position */
       .matrix-column {
-        position: fixed;
+        position: fixed !important;
         top: -100%;
         font-family: 'Share Tech Mono', monospace;
         font-size: 14px;
@@ -273,22 +325,24 @@
         pointer-events: none;
       }
       
-      /* Cyber Grid - Fixed position */
-      .cyber-grid {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: 
-          linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
-        background-size: 50px 50px;
-        z-index: 0;
-        pointer-events: none;
+      /* ===== ANIMATIONS ===== */
+      @keyframes scanline {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 100%; }
       }
       
-      /* Cyber Glow Effects */
+      @keyframes glitch {
+        0%, 100% { transform: translate(0); }
+        20% { transform: translate(-2px, 2px); }
+        40% { transform: translate(-2px, -2px); }
+        60% { transform: translate(2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+      }
+      
+      .cyber-glitch:hover {
+        animation: glitch 0.3s infinite;
+      }
+      
       .cyber-text-glow {
         text-shadow: 
           0 0 10px rgba(0, 255, 65, 0.8),
@@ -303,218 +357,285 @@
         border: 1px solid rgba(0, 255, 65, 0.5);
       }
       
-      /* Cyber Scanline Effect - Fixed position */
-      .cyber-scanline {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(
-          transparent 50%,
-          rgba(0, 255, 65, 0.03) 50%
-        );
-        background-size: 100% 4px;
-        z-index: 1;
-        pointer-events: none;
-        animation: scanline 8s linear infinite;
-      }
-      
-      @keyframes scanline {
-        0% { background-position: 0 0; }
-        100% { background-position: 0 100%; }
-      }
-      
-      /* Glitch Effect */
-      @keyframes glitch {
-        0%, 100% { transform: translate(0); }
-        20% { transform: translate(-2px, 2px); }
-        40% { transform: translate(-2px, -2px); }
-        60% { transform: translate(2px, 2px); }
-        80% { transform: translate(2px, -2px); }
-      }
-      
-      .cyber-glitch:hover {
-        animation: glitch 0.3s infinite;
-      }
-      
-      /* Additional Animation Classes */
-      @keyframes float {
-        0%, 100% { transform: translateY(0px) rotate(0deg); }
-        50% { transform: translateY(-20px) rotate(2deg); }
-      }
-      
-      @keyframes orbit {
-        from { transform: rotate(0deg) translateX(100px) rotate(0deg); }
-        to { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
-      }
-      
-      @keyframes twinkle {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.3; transform: scale(0.8); }
-      }
-      
-      .animate-float { 
-        animation: float 6s ease-in-out infinite; 
-      }
-      
-      .animate-orbit { 
-        animation: orbit 20s linear infinite; 
-      }
-      
-      .animate-twinkle { 
-        animation: twinkle 3s ease-in-out infinite; 
-      }
-      
-      /* Main content z-index to be above theme elements */
-      .main-content {
-        position: relative;
-        z-index: 10;
+      /* Smooth transitions */
+      .theme-transition {
+        transition: all 0.5s ease-in-out;
       }
     </style>
     
     <script>
-      // Matrix Rain Generator
-      function initMatrixRain() {
-        const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
-        const container = document.querySelector('.cyber-bg');
-        if (!container) return;
+      // Theme Manager - Aligns with app.tsx logic
+      class ThemeManager {
+        constructor() {
+          this.currentTheme = null;
+          this.initialized = false;
+        }
         
-        // Clear existing columns
-        document.querySelectorAll('.matrix-column').forEach(el => el.remove());
-        
-        const columns = Math.floor(window.innerWidth / 20);
-        
-        for (let i = 0; i < columns; i++) {
-          const column = document.createElement('div');
-          column.className = 'matrix-column';
-          column.style.left = `${i * 20}px`;
-          column.style.animationDelay = `${Math.random() * 20}s`;
-          column.style.animationDuration = `${15 + Math.random() * 10}s`;
+        initialize() {
+          if (this.initialized) return;
           
-          let text = '';
-          const length = Math.floor(10 + Math.random() * 20);
-          for (let j = 0; j < length; j++) {
-            text += chars[Math.floor(Math.random() * chars.length)] + '\n';
+          // Create theme elements if they don't exist
+          this.createThemeElements();
+          this.initialized = true;
+        }
+        
+        createThemeElements() {
+          const body = document.body;
+          
+          // Create Cosmic elements
+          if (!document.querySelector('.star-field')) {
+            const starField = document.createElement('div');
+            starField.className = 'star-field';
+            starField.style.display = 'none';
+            body.appendChild(starField);
+            
+            // Create constellation
+            const constellation = document.createElement('div');
+            constellation.className = 'constellation';
+            constellation.innerHTML = `
+              <svg viewBox="0 0 300 300">
+                <line class="constellation-line" x1="50" y1="50" x2="100" y2="100"/>
+                <line class="constellation-line" x1="100" y1="100" x2="150" y2="80"/>
+                <line class="constellation-line" x1="150" y1="80" x2="200" y2="120"/>
+                <line class="constellation-line" x1="200" y1="120" x2="250" y2="100"/>
+                <line class="constellation-line" x1="100" y1="100" x2="120" y2="150"/>
+                <line class="constellation-line" x1="120" y1="150" x2="180" y2="180"/>
+                <circle class="constellation-star" cx="50" cy="50" r="3"/>
+                <circle class="constellation-star" cx="100" cy="100" r="4"/>
+                <circle class="constellation-star" cx="150" cy="80" r="3"/>
+                <circle class="constellation-star" cx="200" cy="120" r="3"/>
+                <circle class="constellation-star" cx="250" cy="100" r="2"/>
+                <circle class="constellation-star" cx="120" cy="150" r="3"/>
+                <circle class="constellation-star" cx="180" cy="180" r="3"/>
+              </svg>
+            `;
+            constellation.style.display = 'none';
+            body.appendChild(constellation);
+            
+            // Create rocket
+            const rocket = document.createElement('div');
+            rocket.className = 'rocket';
+            rocket.innerHTML = `
+              <svg viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="rocketGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                  </linearGradient>
+                </defs>
+                <ellipse cx="50" cy="50" rx="15" ry="30" fill="url(#rocketGradient)"/>
+                <path d="M 50 20 L 35 35 L 65 35 Z" fill="#93c5fd"/>
+                <path d="M 35 65 L 30 80 L 35 75 Z" fill="#1e40af"/>
+                <path d="M 65 65 L 70 80 L 65 75 Z" fill="#1e40af"/>
+                <circle cx="50" cy="45" r="6" fill="#1e3a8a" opacity="0.7"/>
+                <circle cx="50" cy="45" r="4" fill="#60a5fa" opacity="0.5"/>
+              </svg>
+            `;
+            rocket.style.display = 'none';
+            body.appendChild(rocket);
+            
+            // Create rocket exhaust
+            const exhaust = document.createElement('div');
+            exhaust.className = 'rocket-exhaust';
+            exhaust.innerHTML = `
+              <svg viewBox="0 0 30 50">
+                <defs>
+                  <linearGradient id="exhaustGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#facc15;stop-opacity:0.8" />
+                    <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:0" />
+                  </linearGradient>
+                </defs>
+                <ellipse cx="15" cy="10" rx="12" ry="20" fill="url(#exhaustGradient)">
+                  <animate attributeName="ry" values="20;25;20" dur="0.3s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="1;0.7;1" dur="0.3s" repeatCount="indefinite"/>
+                </ellipse>
+              </svg>
+            `;
+            exhaust.style.display = 'none';
+            body.appendChild(exhaust);
+            
+            // Create asteroids
+            for (let i = 1; i <= 3; i++) {
+              const asteroid = document.createElement('div');
+              asteroid.className = `asteroid asteroid-${i}`;
+              asteroid.style.display = 'none';
+              body.appendChild(asteroid);
+            }
+            
+            // Create Saturn
+            const saturn = document.createElement('div');
+            saturn.className = 'saturn';
+            saturn.innerHTML = `
+              <svg viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="saturnGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+                  </linearGradient>
+                  <linearGradient id="ringsGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:0.8" />
+                    <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:0.6" />
+                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.4" />
+                  </linearGradient>
+                </defs>
+                <circle class="saturn-planet" cx="60" cy="60" r="35"/>
+                <ellipse class="saturn-rings" cx="60" cy="60" rx="55" ry="15" transform="rotate(15, 60, 60)">
+                  <animateTransform attributeName="transform" type="rotate" from="15 60 60" to="375 60 60" dur="40s" repeatCount="indefinite"/>
+                </ellipse>
+              </svg>
+            `;
+            saturn.style.display = 'none';
+            body.appendChild(saturn);
           }
-          column.textContent = text;
           
-          if (container.classList.contains('cyber-bg')) {
-            container.appendChild(column);
+          // Create Cyber elements
+          if (!document.querySelector('.cyber-grid')) {
+            const cyberGrid = document.createElement('div');
+            cyberGrid.className = 'cyber-grid';
+            cyberGrid.style.display = 'none';
+            body.appendChild(cyberGrid);
+            
+            const scanline = document.createElement('div');
+            scanline.className = 'cyber-scanline';
+            scanline.style.display = 'none';
+            body.appendChild(scanline);
+          }
+        }
+        
+        setTheme(theme) {
+          const body = document.body;
+          
+          // Remove all theme classes
+          body.classList.remove('cosmic-bg', 'cyber-bg', 'text-white', 'text-green-500');
+          
+          // Hide all theme elements
+          this.hideAllThemeElements();
+          
+          // Clear existing matrix columns
+          document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+          
+          if (theme === 'Cosmic') {
+            body.classList.add('cosmic-bg', 'text-white');
+            body.style.fontFamily = "'Inter', sans-serif";
+            
+            // Show cosmic elements
+            this.showCosmicElements();
+            
+          } else if (theme === 'Cyber-Dystopian') {
+            body.classList.add('cyber-bg', 'text-green-500');
+            body.style.fontFamily = "'Share Tech Mono', 'Inter', monospace";
+            
+            // Show cyber elements
+            this.showCyberElements();
+            
+            // Initialize matrix rain
+            this.initMatrixRain();
+          }
+          
+          this.currentTheme = theme;
+        }
+        
+        hideAllThemeElements() {
+          // Hide all cosmic elements
+          document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
+            el.style.display = 'none';
+          });
+          
+          // Hide all cyber elements
+          document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+            el.style.display = 'none';
+          });
+        }
+        
+        showCosmicElements() {
+          // Initialize star field
+          const starField = document.querySelector('.star-field');
+          if (starField) {
+            starField.innerHTML = '';
+            for (let i = 0; i < 200; i++) {
+              const star = document.createElement('div');
+              star.className = 'star';
+              star.style.left = `${Math.random() * 100}%`;
+              star.style.top = `${Math.random() * 100}%`;
+              star.style.animationDelay = `${Math.random() * 3}s`;
+              star.style.animationDuration = `${2 + Math.random() * 2}s`;
+              starField.appendChild(star);
+            }
+            starField.style.display = 'block';
+          }
+          
+          // Show other cosmic elements
+          document.querySelectorAll('.constellation, .rocket, .rocket-exhaust, .saturn').forEach(el => {
+            el.style.display = 'block';
+          });
+          
+          // Show asteroids
+          document.querySelectorAll('.asteroid').forEach(el => {
+            el.style.display = 'block';
+          });
+        }
+        
+        showCyberElements() {
+          document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+            el.style.display = 'block';
+          });
+        }
+        
+        initMatrixRain() {
+          const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
+          const columns = Math.floor(window.innerWidth / 20);
+          
+          for (let i = 0; i < columns; i++) {
+            const column = document.createElement('div');
+            column.className = 'matrix-column';
+            column.style.left = `${i * 20}px`;
+            column.style.animationDelay = `${Math.random() * 20}s`;
+            column.style.animationDuration = `${15 + Math.random() * 10}s`;
+            
+            let text = '';
+            const length = Math.floor(10 + Math.random() * 20);
+            for (let j = 0; j < length; j++) {
+              text += chars[Math.floor(Math.random() * chars.length)] + '\n';
+            }
+            column.textContent = text;
+            document.body.appendChild(column);
           }
         }
       }
       
-      // Star Field Generator
-      function initStarField() {
-        const starField = document.querySelector('.star-field');
-        if (!starField) return;
-        
-        // Clear existing stars
-        starField.innerHTML = '';
-        
-        for (let i = 0; i < 200; i++) {
-          const star = document.createElement('div');
-          star.className = 'star';
-          star.style.left = `${Math.random() * 100}%`;
-          star.style.top = `${Math.random() * 100}%`;
-          star.style.animationDelay = `${Math.random() * 3}s`;
-          star.style.animationDuration = `${2 + Math.random() * 2}s`;
-          starField.appendChild(star);
-        }
-      }
+      // Initialize theme manager
+      const themeManager = new ThemeManager();
       
       // Initialize on DOM load
       document.addEventListener('DOMContentLoaded', () => {
-        const body = document.body;
-        
-        if (body.classList.contains('cosmic-bg')) {
-          initStarField();
-        } else if (body.classList.contains('cyber-bg')) {
-          initMatrixRain();
-        }
+        themeManager.initialize();
       });
       
-      // Handle window resize
+      // Handle window resize for matrix rain
+      let resizeTimeout;
       window.addEventListener('resize', () => {
-        const body = document.body;
-        
-        if (body.classList.contains('cosmic-bg')) {
-          initStarField();
-        } else if (body.classList.contains('cyber-bg')) {
-          initMatrixRain();
-        }
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          if (themeManager.currentTheme === 'Cyber-Dystopian') {
+            document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+            themeManager.initMatrixRain();
+          }
+        }, 250);
       });
     </script>
   </head>
   
-  <body class="cosmic-bg text-white font-sans">
-    <!-- Cosmic Theme Elements - All fixed positioned -->
-    <div class="star-field"></div>
-    
-    <!-- Sagittarius Constellation -->
-    <svg class="constellation" viewBox="0 0 300 300">
-      <line class="constellation-line" x1="50" y1="50" x2="100" y2="100"/>
-      <line class="constellation-line" x1="100" y1="100" x2="150" y2="80"/>
-      <line class="constellation-line" x1="150" y1="80" x2="200" y2="120"/>
-      <line class="constellation-line" x1="200" y1="120" x2="250" y2="100"/>
-      <line class="constellation-line" x1="100" y1="100" x2="120" y2="150"/>
-      <line class="constellation-line" x1="120" y1="150" x2="180" y2="180"/>
-      <circle class="constellation-star" cx="50" cy="50" r="3"/>
-      <circle class="constellation-star" cx="100" cy="100" r="4"/>
-      <circle class="constellation-star" cx="150" cy="80" r="3"/>
-      <circle class="constellation-star" cx="200" cy="120" r="3"/>
-      <circle class="constellation-star" cx="250" cy="100" r="2"/>
-      <circle class="constellation-star" cx="120" cy="150" r="3"/>
-      <circle class="constellation-star" cx="180" cy="180" r="3"/>
-    </svg>
-    
-    <!-- SVG Rocket -->
-    <svg class="rocket" viewBox="0 0 100 100">
-      <defs>
-        <linearGradient id="rocketGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      <!-- Rocket Body -->
-      <ellipse cx="50" cy="50" rx="15" ry="30" fill="url(#rocketGradient)"/>
-      <!-- Rocket Nose -->
-      <path d="M 50 20 L 35 35 L 65 35 Z" fill="#93c5fd"/>
-      <!-- Rocket Fins -->
-      <path d="M 35 65 L 30 80 L 35 75 Z" fill="#1e40af"/>
-      <path d="M 65 65 L 70 80 L 65 75 Z" fill="#1e40af"/>
-      <!-- Window -->
-      <circle cx="50" cy="45" r="6" fill="#1e3a8a" opacity="0.7"/>
-      <circle cx="50" cy="45" r="4" fill="#60a5fa" opacity="0.5"/>
-    </svg>
-    
-    <!-- Rocket Exhaust -->
-    <svg class="rocket-exhaust" viewBox="0 0 30 50">
-      <defs>
-        <linearGradient id="exhaustGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
-          <stop offset="50%" style="stop-color:#facc15;stop-opacity:0.8" />
-          <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:0" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="15" cy="10" rx="12" ry="20" fill="url(#exhaustGradient)">
-        <animate attributeName="ry" values="20;25;20" dur="0.3s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="1;0.7;1" dur="0.3s" repeatCount="indefinite"/>
-      </ellipse>
-    </svg>
-    
-    <!-- Floating Asteroids -->
-    <div class="asteroid asteroid-1"></div>
-    <div class="asteroid asteroid-2"></div>
-    <div class="asteroid asteroid-3"></div>
-    
-    <!-- Cyber Theme Elements (hidden by default) -->
-    <div class="cyber-grid" style="display: none;"></div>
-    <div class="cyber-scanline" style="display: none;"></div>
-    
+  <body>
     <!-- Main Content Container -->
     <div id="root" class="main-content"></div>
     <script type="module" src="/index.tsx"></script>
+    
+    <!-- Theme Controller Script - This will be called from app.tsx -->
+    <script>
+      // Expose theme manager to window for React to call
+      window.ThemeManager = themeManager;
+    </script>
   </body>
 </html>
