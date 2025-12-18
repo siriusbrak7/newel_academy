@@ -3,6 +3,18 @@ import { supabase } from './supabaseClient';
 import { TheorySubmission } from '../types';
 import { getAITutorResponse } from './geminiService';
 
+// Helper function to get user ID from username
+const getUserIdFromUsername = async (username: string): Promise<string> => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('username', username)
+    .single();
+  
+  if (error || !data) throw new Error(`User ${username} not found`);
+  return data.id;
+};
+
 // Save a theory question submission
 export const saveTheorySubmission = async (
   userId: string,
@@ -29,8 +41,6 @@ export const saveTheorySubmission = async (
   return data;
 };
 
-// Get theory submissions that need grading
-// services/theoryGradingService.ts - FIXED VERSION
 // Get theory submissions that need grading
 export const getPendingTheorySubmissions = async (): Promise<TheorySubmission[]> => {
   const { data, error } = await supabase
@@ -123,44 +133,58 @@ FEEDBACK: [text]`;
   }
 };
 
-// Teacher manual grading
+// Teacher manual grading - UPDATED to use UUID
 export const teacherGradeTheoryAnswer = async (
   submissionId: string,
   teacherScore: number,
   teacherFeedback: string,
-  gradedBy: string
+  teacherUsername: string
 ): Promise<void> => {
-  const { error } = await supabase
-    .from('theory_submissions')
-    .update({
-      teacher_score: teacherScore,
-      teacher_feedback: teacherFeedback,
-      graded_by: gradedBy,
-      graded_at: new Date().toISOString(),
-      status: 'teacher_graded'
-    })
-    .eq('id', submissionId);
+  try {
+    const teacherId = await getUserIdFromUsername(teacherUsername);
+    
+    const { error } = await supabase
+      .from('theory_submissions')
+      .update({
+        teacher_score: teacherScore,
+        teacher_feedback: teacherFeedback,
+        graded_by: teacherId,
+        graded_at: new Date().toISOString(),
+        status: 'teacher_graded'
+      })
+      .eq('id', submissionId);
 
-  if (error) throw error;
+    if (error) throw error;
+  } catch (error) {
+    console.error('Teacher grading error:', error);
+    throw error;
+  }
 };
 
-// Final approval (teacher confirms AI grade or modifies it)
+// Final approval (teacher confirms AI grade or modifies it) - UPDATED to use UUID
 export const approveTheoryGrade = async (
   submissionId: string,
   finalScore: number,
   feedback: string,
-  approvedBy: string
+  approvedByUsername: string
 ): Promise<void> => {
-  const { error } = await supabase
-    .from('theory_submissions')
-    .update({
-      teacher_score: finalScore,
-      teacher_feedback: feedback,
-      graded_by: approvedBy,
-      graded_at: new Date().toISOString(),
-      status: 'approved'
-    })
-    .eq('id', submissionId);
+  try {
+    const approvedById = await getUserIdFromUsername(approvedByUsername);
+    
+    const { error } = await supabase
+      .from('theory_submissions')
+      .update({
+        teacher_score: finalScore,
+        teacher_feedback: feedback,
+        graded_by: approvedById,
+        graded_at: new Date().toISOString(),
+        status: 'approved'
+      })
+      .eq('id', submissionId);
 
-  if (error) throw error;
+    if (error) throw error;
+  } catch (error) {
+    console.error('Approval error:', error);
+    throw error;
+  }
 };
