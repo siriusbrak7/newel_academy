@@ -913,7 +913,7 @@ export const CourseManager: React.FC = () => {
                             <div className="text-lg font-bold text-purple-400">
                               {sub.ai_suggested_score}%
                             </div>
-                            <div className="text-xs text-white/50">AI Suggested</div>
+                            <div className="text-xs text-white/50">Newel Suggested</div>
                           </div>
                         )}
                       </div>

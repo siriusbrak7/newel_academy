@@ -225,7 +225,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentTheme, setThe
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <span style={{ fontFamily: "'Pacifico', cursive" }} className="text-xl bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                  Newel Academy
+                  The Newel
                 </span>
               </div>
               <p className="text-white/40 text-sm">v1.0 • Learn Effectively</p>

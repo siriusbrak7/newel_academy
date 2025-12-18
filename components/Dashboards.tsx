@@ -621,7 +621,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white">Teacher Dashboard</h2>
-          <div className="text-sm text-white/50">Real Student Data Only â€¢ Ready for Deployment</div>
+          <div className="text-sm text-white/50">Real Student Data Only....</div>
         </div>
         <div className="flex gap-2">
           <button 
@@ -1203,14 +1203,14 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   const features = [
     { 
-      title: "Cambridge Questions", 
-      desc: "Practice IGCSE/A-Level style questions.", 
+      title: "Critical Questions", 
+      desc: "Practice Standard Science questions.", 
       icon: <Brain className="text-purple-400" size={32} />, 
       color: "from-purple-500/20 to-blue-500/20", 
       link: "/courses" 
     },
     { 
-      title: "AI Explainer", 
+      title: "Newel-Explainer", 
       desc: "Get instant simplifications of complex theories.", 
       icon: <Atom className="text-cyan-400" size={32} />, 
       color: "from-cyan-500/20 to-teal-500/20", 
@@ -1268,7 +1268,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <Brain className="text-cyan-300" size={24}/>
             </div>
             <div>
-              <h4 className="font-bold text-cyan-300 mb-1">AI Advisor</h4>
+              <h4 className="font-bold text-cyan-300 mb-1">Personal Advisor</h4>
               <p className="text-white/80 italic">"{advice}"</p>
             </div>
           </div>

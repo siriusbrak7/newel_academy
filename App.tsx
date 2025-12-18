@@ -829,7 +829,7 @@ const App: React.FC = () => {
               </button>
             </div>
           </div>
-          <p className="text-sm">© 2025 Newel Academy • Science Learning Platform</p>
+          <p className="text-sm">© 2025 The Newel • Science Learning Platform</p>
         </div>
       </footer>
 

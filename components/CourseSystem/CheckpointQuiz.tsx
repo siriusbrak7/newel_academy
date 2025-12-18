@@ -126,7 +126,7 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
             answers[0] || '' // Use first answer for theory questions
           );
 
-          alert('Theory answer submitted! Teacher will grade it soon.');
+          alert('Answer submitted! Teacher will grade it soon.');
           setSubmitted(true);
           onComplete(0, false); // Temporary score until graded
         } else {
@@ -185,7 +185,7 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
         {!isTheory && showConfetti && <Confetti />}
         <div className="bg-slate-900 border border-white/20 p-8 rounded-2xl max-w-md w-full text-center relative z-10">
           <h2 className="text-2xl font-bold text-white mb-4">
-            {isTheory ? 'Theory Submitted! 📝' : 
+            {isTheory ? 'Submitted! 📝' : 
              score >= passThreshold ? 'Checkpoint Passed! 🎉' : 'Keep Practicing'}
           </h2>
 

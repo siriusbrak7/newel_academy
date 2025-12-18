@@ -60,7 +60,7 @@ const Navbar: React.FC<NavbarProps> = ({
             ? 'bg-gradient-to-r from-cyan-400 to-purple-400'
             : 'bg-gradient-to-r from-green-400 to-emerald-400 cyber-text-glow'
         }`}>
-          Newel Academy
+          The Newel
         </span>
       </Link>
 
