@@ -1501,7 +1501,7 @@ export const canAccessTopic = async (username: string, topicId: string): Promise
     // Get current topic info
     const { data: currentTopic } = await supabase
       .from('topics')
-      .select('subject_id, sort_order')
+      .select('subject_id, sort_order, title')
       .eq('id', topicId)
       .single();
 
@@ -1510,17 +1510,122 @@ export const canAccessTopic = async (username: string, topicId: string): Promise
       return false;
     }
 
+    // ===== NEW: Check if this is in the last 3 topics of its subject =====
+    // Get total topics count and this topic's position
+    const { data: subjectTopics, error: topicsError } = await supabase
+      .from('topics')
+      .select('id, sort_order')
+      .eq('subject_id', currentTopic.subject_id)
+      .order('sort_order', { ascending: true });
+
+    if (!topicsError && subjectTopics) {
+      const totalTopics = subjectTopics.length;
+      const currentTopicIndex = subjectTopics.findIndex(t => t.id === topicId);
+      const isLastThree = currentTopicIndex >= totalTopics - 3;
+      
+      if (isLastThree) {
+        console.log(`🔒 Topic "${currentTopic.title}" is in the last 3 topics of its subject - checking if unlocked`);
+        
+        // Check if explicitly unlocked in user_topic_access table
+        const { data: existingAccess } = await supabase
+          .from('user_topic_access')
+          .select('unlocked')
+          .eq('user_id', userData.id)
+          .eq('topic_id', topicId)
+          .single();
+
+        if (existingAccess?.unlocked) {
+          console.log(`✅ Last-3 topic ${topicId} explicitly unlocked for ${username}`);
+          return true;
+        } else {
+          // Last 3 topics are locked by default - need to check prerequisites
+          return await checkPrerequisitesForLastThreeTopics(userData.id, topicId, currentTopic, username);
+        }
+      }
+    }
+    // ===== END NEW =====
+
     // First two topics in any subject are always accessible
     if (currentTopic.sort_order === 0 || currentTopic.sort_order === 1) {
-      console.log(`✅ Topic ${topicId} is first or second in subject - always accessible`);
+      console.log(`✅ Topic ${currentTopic.title} is first or second in subject - always accessible`);
       return true;
     }
 
-    // Check if explicitly unlocked in user_topic_access table
+    // For middle topics (not first 2, not last 3), check regular progression
+    return await checkRegularTopicProgression(userData.id, topicId, currentTopic, username);
+  } catch (error) {
+    console.error('Error checking topic access:', error);
+    return false;
+  }
+};
+
+// Helper function for last 3 topics
+const checkPrerequisitesForLastThreeTopics = async (
+  userId: string, 
+  topicId: string, 
+  currentTopic: any,
+  username: string
+): Promise<boolean> => {
+  try {
+    // For last 3 topics, student must have passed ALL previous topics in the subject
+    const { data: allTopics } = await supabase
+      .from('topics')
+      .select('id, sort_order, title')
+      .eq('subject_id', currentTopic.subject_id)
+      .order('sort_order', { ascending: true });
+
+    if (!allTopics) return false;
+
+    const currentIndex = allTopics.findIndex(t => t.id === topicId);
+    
+    // Check all previous topics (excluding current one)
+    for (let i = 0; i < currentIndex; i++) {
+      const previousTopic = allTopics[i];
+      
+      // Check if student passed this previous topic
+      const passed = await hasPassedTopic(username, previousTopic.id);
+      if (!passed) {
+        console.log(`❌ Cannot access ${currentTopic.title} - previous topic "${previousTopic.title}" not passed`);
+        return false;
+      }
+    }
+
+    console.log(`✅ All previous topics passed! Unlocking last-3 topic ${currentTopic.title} for ${username}`);
+    
+    // Auto-unlock for future access
+    const { error } = await supabase
+      .from('user_topic_access')
+      .upsert({
+        user_id: userId,
+        topic_id: topicId,
+        unlocked: true,
+        unlocked_at: new Date().toISOString()
+      }, { onConflict: 'user_id,topic_id' });
+    
+    if (error) {
+      console.error('Error auto-unlocking topic:', error);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error checking prerequisites for last 3 topics:', error);
+    return false;
+  }
+};
+
+// Helper function for regular topics (not last 3)
+const checkRegularTopicProgression = async (
+  userId: string, 
+  topicId: string, 
+  currentTopic: any,
+  username: string
+): Promise<boolean> => {
+  try {
+    // Check if explicitly unlocked
     const { data: existingAccess } = await supabase
       .from('user_topic_access')
       .select('unlocked')
-      .eq('user_id', userData.id)
+      .eq('user_id', userId)
       .eq('topic_id', topicId)
       .single();
 
@@ -1542,60 +1647,23 @@ export const canAccessTopic = async (username: string, topicId: string): Promise
       return false;
     }
 
-    console.log(`🔍 Checking if previous topic ${previousTopic.title} (${previousTopic.id}) was passed...`);
+    console.log(`🔍 Checking if previous topic ${previousTopic.title} was passed...`);
 
-    // Check if student passed the previous topic's final assessment
-    const previousProgress = await getStudentCheckpointProgress(username, previousTopic.id);
+    // Check if student passed the previous topic
+    const passed = await hasPassedTopic(username, previousTopic.id);
     
-    // Check if final MCQ (checkpoint 4) is passed with ≥85%
-    const checkpoint4Id = '6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e';
-    const checkpoint4Progress = previousProgress[checkpoint4Id];
-    
-    if (!checkpoint4Progress) {
-      console.log(`❌ No checkpoint 4 progress found for topic ${previousTopic.id}`);
+    if (!passed) {
+      console.log(`❌ Previous topic "${previousTopic.title}" not passed`);
       return false;
     }
 
-    const isMcqPassed = checkpoint4Progress.passed && checkpoint4Progress.score >= 85;
+    console.log(`✅ Previous topic passed! Unlocking topic ${currentTopic.title} for ${username}`);
     
-    if (!isMcqPassed) {
-      console.log(`❌ Checkpoint 4 not passed: score=${checkpoint4Progress.score}%, required=85%`);
-      return false;
-    }
-
-    console.log(`✅ Checkpoint 4 passed with ${checkpoint4Progress.score}%`);
-
-    // Check if final theory (checkpoint 5) exists and is passed
-    const { data: checkpoint5 } = await supabase
-      .from('checkpoints')
-      .select('id')
-      .eq('topic_id', previousTopic.id)
-      .eq('checkpoint_number', 5)
-      .single();
-
-    if (checkpoint5) {
-      const checkpoint5Progress = previousProgress[checkpoint5.id];
-      if (!checkpoint5Progress) {
-        console.log(`❌ No checkpoint 5 progress found for topic ${previousTopic.id}`);
-        return false;
-      }
-      
-      const isTheoryPassed = checkpoint5Progress.passed && checkpoint5Progress.score >= 85;
-      if (!isTheoryPassed) {
-        console.log(`❌ Checkpoint 5 not passed: score=${checkpoint5Progress.score}%, required=85%`);
-        return false;
-      }
-      
-      console.log(`✅ Checkpoint 5 passed with ${checkpoint5Progress.score}%`);
-    }
-
-    console.log(`✅ All requirements met! Unlocking topic ${topicId} for ${username}`);
-    
-    // Auto-unlock the topic for future access
+    // Auto-unlock for future access
     const { error } = await supabase
       .from('user_topic_access')
       .upsert({
-        user_id: userData.id,
+        user_id: userId,
         topic_id: topicId,
         unlocked: true,
         unlocked_at: new Date().toISOString()
@@ -1607,7 +1675,58 @@ export const canAccessTopic = async (username: string, topicId: string): Promise
     
     return true;
   } catch (error) {
-    console.error('Error checking topic access:', error);
+    console.error('Error checking regular topic progression:', error);
+    return false;
+  }
+};
+
+// Helper function to check if a topic was passed
+const hasPassedTopic = async (username: string, topicId: string): Promise<boolean> => {
+  try {
+    // Get checkpoint progress for this topic
+    const progress = await getStudentCheckpointProgress(username, topicId);
+    
+    // Check if final MCQ (checkpoint 4) is passed with ≥85%
+    const checkpoint4Id = '6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e';
+    const checkpoint4Progress = progress[checkpoint4Id];
+    
+    if (!checkpoint4Progress) {
+      console.log(`❌ No checkpoint 4 progress found for topic ${topicId}`);
+      return false;
+    }
+
+    const isMcqPassed = checkpoint4Progress.passed && checkpoint4Progress.score >= 85;
+    
+    if (!isMcqPassed) {
+      console.log(`❌ Checkpoint 4 not passed: score=${checkpoint4Progress.score}%, required=85%`);
+      return false;
+    }
+
+    // Check if final theory (checkpoint 5) exists and is passed
+    const { data: checkpoint5 } = await supabase
+      .from('checkpoints')
+      .select('id')
+      .eq('topic_id', topicId)
+      .eq('checkpoint_number', 5)
+      .single();
+
+    if (checkpoint5) {
+      const checkpoint5Progress = progress[checkpoint5.id];
+      if (!checkpoint5Progress) {
+        console.log(`❌ No checkpoint 5 progress found for topic ${topicId}`);
+        return false;
+      }
+      
+      const isTheoryPassed = checkpoint5Progress.passed && checkpoint5Progress.score >= 85;
+      if (!isTheoryPassed) {
+        console.log(`❌ Checkpoint 5 not passed: score=${checkpoint5Progress.score}%, required=85%`);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error checking if topic passed:', error);
     return false;
   }
 };
