@@ -13,6 +13,25 @@ export const getTopicCheckpoints = async (topicId: string): Promise<Checkpoint[]
   return data || [];
 };
 
+// Add to services/checkpointService.ts
+export const getCheckpointByTopicAndNumber = async (topicId: string, checkpointNumber: number) => {
+  try {
+    const { data, error } = await supabase
+      .from('checkpoints')
+      .select('*')
+      .eq('topic_id', topicId)
+      .eq('checkpoint_number', checkpointNumber)
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (error) throw error;
+    return data?.[0] || null;
+  } catch (error) {
+    console.error('Error getting checkpoint:', error);
+    return null;
+  }
+};
+
 export const getCheckpointQuestions = async (checkpointId: string): Promise<Question[]> => {
   const { data, error } = await supabase
     .from('checkpoint_questions')

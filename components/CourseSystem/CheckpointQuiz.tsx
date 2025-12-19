@@ -145,12 +145,16 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
     let correctCount = 0;
     questions.forEach((q, idx) => {
       if (q.type === 'MCQ' && q.correctAnswer && q.options) {
-        const selectedAnswer = answers[idx]; // User's selected option text
-        const correctLetter = q.correctAnswer.toUpperCase(); // Ensure uppercase
+        const selectedAnswer = answers[idx]; // User's selected option text (e.g., "Photosynthesis")
+        const correctLetter = q.correctAnswer.toUpperCase(); // Ensure uppercase (e.g., "C")
+        
+        // Convert letter to index: A=0, B=1, C=2, D=3
         const letterIndex = 'ABCD'.indexOf(correctLetter);
         
         if (letterIndex >= 0 && letterIndex < q.options.length) {
-          const correctOptionText = q.options[letterIndex];
+          const correctOptionText = q.options[letterIndex]; // Get the actual text (e.g., "Photosynthesis")
+          
+          // Compare the selected text with the correct text
           if (selectedAnswer === correctOptionText) {
             correctCount++;
           }
@@ -159,17 +163,19 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
     });
 
     const finalScore = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
-    console.log('Grading results:', {
-      correctCount,
+
+    // DEBUG LOG - Remove after confirming it works
+    console.log('DEBUG - Grading Results:', {
       totalQuestions: questions.length,
+      correctCount,
       finalScore,
       answers,
-      questions: questions.map((q, i) => ({
-        question: q.text,
+      questionDetails: questions.map((q, i) => ({
+        question: q.text?.substring(0, 50) + '...',
         selected: answers[i],
-        correct: q.correctAnswer,
-        options: q.options,
-        isCorrect: answers[i] === q.options['ABCD'.indexOf(q.correctAnswer?.toUpperCase() || '')]
+        correctLetter: q.correctAnswer,
+        correctText: q.options?.['ABCD'.indexOf(q.correctAnswer?.toUpperCase() || 'A')],
+        isCorrect: answers[i] === q.options?.['ABCD'.indexOf(q.correctAnswer?.toUpperCase() || 'A')]
       }))
     });
     
