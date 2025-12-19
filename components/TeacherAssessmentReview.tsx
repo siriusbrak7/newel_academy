@@ -1,6 +1,62 @@
-// components/CourseSystem/TeacherAssessmentReview.tsx
-import React, { useState, useEffect } from 'react';
-import { Assessment, Submission, User, TheorySubmission } from '../types';
+﻿import React, { useState, useEffect } from 'react';
+
+// Define types locally to avoid import issues
+interface Assessment {
+  id: string;
+  title: string;
+  subject: string;
+  topic?: string;
+  questions: any[];
+  assignedTo: string[];
+  targetGrade: string;
+  createdBy: string;
+  dueDate?: number;
+}
+
+interface Submission {
+  assessmentId: string;
+  username: string;
+  answers: Record<string, string>;
+  submittedAt: number;
+  graded: boolean;
+  score?: number;
+  feedback?: string;
+  newelGraded?: boolean;
+}
+
+interface User {
+  username: string;
+  role: 'admin' | 'teacher' | 'student';
+  approved: boolean;
+  securityQuestion: string;
+  securityAnswer: string;
+  gradeLevel?: string;
+  assignedStudents?: string[];
+  lastLogin?: number;
+  loginHistory?: number[];
+}
+
+interface TheorySubmission {
+  id: string;
+  user_id: string;
+  checkpoint_id: string;
+  topic_id: string;
+  question_text: string;
+  student_answer: string;
+  ai_suggested_score?: number;
+  teacher_score?: number;
+  teacher_feedback?: string;
+  graded_by?: string;
+  submitted_at: string;
+  graded_at?: string;
+  status: 'pending' | 'ai_graded' | 'teacher_graded' | 'approved';
+  user?: { username: string };
+  graded_by_user?: { username: string };
+  topic?: { title: string };
+  checkpoint?: { title: string; checkpoint_number: number };
+}
+
+import { supabase } from '../services/supabaseClient';
 import { 
   getAssessments, 
   getSubmissions, 
@@ -104,6 +160,80 @@ export const TeacherAssessmentReview: React.FC = () => {
     }
   };
 
+  // Add this function to update student progress after grading
+  const updateStudentProgressAfterGrading = async (
+    submission: TheorySubmission, 
+    score: number
+  ) => {
+    try {
+      // Import the function dynamically to avoid circular dependencies
+      const { saveCheckpointProgress } = await import('../services/checkpointService');
+      
+      // Save checkpoint progress for the student
+      const checkpointId = submission.checkpoint_id;
+      const passed = score >= 85; // Use 85% threshold
+      
+      // Update checkpoint progress
+      await saveCheckpointProgress(
+        submission.user_id,
+        checkpointId,
+        score,
+        passed
+      );
+      
+      console.log(`✅ Updated checkpoint progress: ${submission.user_id}, score: ${score}%, passed: ${passed}`);
+      
+      // If passed, check if we should unlock the next topic
+      if (passed && submission.topic_id) {
+        await checkAndUnlockNextTopic(submission.user_id, submission.topic_id);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error updating student progress:', error);
+    }
+  };
+
+  // Add this function too
+  const checkAndUnlockNextTopic = async (userId: string, currentTopicId: string) => {
+    try {
+      // Get all topics in the same subject
+      const { data: currentTopic } = await supabase
+        .from('topics')
+        .select('subject_id, sort_order')
+        .eq('id', currentTopicId)
+        .single();
+      
+      if (!currentTopic) return;
+      
+      // Get the next topic in sequence
+      const { data: nextTopic } = await supabase
+        .from('topics')
+        .select('id, title')
+        .eq('subject_id', currentTopic.subject_id)
+        .eq('sort_order', (currentTopic.sort_order || 0) + 1)
+        .single();
+      
+      if (nextTopic) {
+        console.log(`✅ Unlocking next topic: ${nextTopic.title} for user ${userId}`);
+        // Store unlock status in user_topic_access table
+        const { error } = await supabase
+          .from('user_topic_access')
+          .upsert({
+            user_id: userId,
+            topic_id: nextTopic.id,
+            unlocked: true,
+            unlocked_at: new Date().toISOString()
+          }, { onConflict: 'user_id,topic_id' });
+        
+        if (error) {
+          console.error('Error saving unlock status:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking next topic:', error);
+    }
+  };
+
   const handleTeacherGrade = async () => {
     if (!selectedTheory || !currentUser) return;
     
@@ -114,6 +244,9 @@ export const TeacherAssessmentReview: React.FC = () => {
         teacherFeedback,
         currentUser.username
       );
+      
+      // ✅ ADD THIS: Update student progress after grading
+      await updateStudentProgressAfterGrading(selectedTheory, gradingScore);
       
       // Update local state
       setTheorySubmissions(prev => prev.map(s => 

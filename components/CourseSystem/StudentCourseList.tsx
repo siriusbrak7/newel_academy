@@ -1,9 +1,9 @@
-// src/components/CourseSystem/StudentCourseList.tsx
+﻿// src/components/CourseSystem/StudentCourseList.tsx
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CourseStructure, User, UserProgress } from '../../types';
-import { getTopicsForStudent, getProgress } from '../../services/storageService'; // ADD getTopicsForStudent import
-import { ChevronRight, FileText, ArrowLeft } from 'lucide-react';
+import { getTopicsForStudent, getProgress, canAccessTopic } from '../../services/storageService';
+import { ChevronRight, FileText, ArrowLeft, Lock } from 'lucide-react';
 
 interface StudentCourseListProps {
   user: User;
@@ -12,6 +12,8 @@ interface StudentCourseListProps {
 export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) => {
   const [courses, setCourses] = useState<CourseStructure>({});
   const [progress, setProgress] = useState<UserProgress>({});
+  const [topicAccess, setTopicAccess] = useState<Record<string, boolean>>({});
+  const [loadingAccess, setLoadingAccess] = useState<boolean>(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,12 +25,36 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         
         const progressData = await getProgress(user.username);
         setProgress(progressData);
+        
+        // Load topic access permissions
+        await loadTopicAccess(coursesData, user.username);
       } catch (error) {
         console.error('Error loading courses:', error);
+      } finally {
+        setLoadingAccess(false);
       }
     };
     loadData();
   }, [user.username, user.gradeLevel]);
+
+  const loadTopicAccess = async (coursesData: CourseStructure, username: string) => {
+    const accessMap: Record<string, boolean> = {};
+    
+    // Check access for each topic
+    for (const subject in coursesData) {
+      for (const topicId in coursesData[subject]) {
+        try {
+          const canAccess = await canAccessTopic(username, topicId);
+          accessMap[`${subject}-${topicId}`] = canAccess;
+        } catch (error) {
+          console.error(`Error checking access for topic ${topicId}:`, error);
+          accessMap[`${subject}-${topicId}`] = false;
+        }
+      }
+    }
+    
+    setTopicAccess(accessMap);
+  };
 
   // Helper function to calculate topic completion percentage
   const getTopicCompletion = (subject: string, topicId: string) => {
@@ -40,6 +66,11 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
     
     const completed = subtopics.filter(key => topicProgress.subtopics[key]).length;
     return Math.round((completed / subtopics.length) * 100);
+  };
+
+  const getTopicAccessStatus = (subject: string, topicId: string) => {
+    const key = `${subject}-${topicId}`;
+    return topicAccess[key] ?? null; // null means still loading
   };
 
   return (
@@ -68,6 +99,58 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
               <div className="space-y-3">
                 {Object.values(courses[subject] || {}).map((topic: any) => {
                   const completion = getTopicCompletion(subject, topic.id);
+                  const isAccessible = getTopicAccessStatus(subject, topic.id);
+                  
+                  if (isAccessible === null) {
+                    // Loading state
+                    return (
+                      <div key={topic.id} className="bg-black/20 p-3 rounded-lg flex justify-between items-center">
+                        <div className="flex-1">
+                          <p className="text-white font-medium text-sm mb-1">{topic.title}</p>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-green-400 to-cyan-400 transition-all duration-500" 
+                                style={{ width: `${completion}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs text-white/60">
+                              {completion}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-cyan-400 rounded-full animate-spin"></div>
+                      </div>
+                    );
+                  }
+                  
+                  if (!isAccessible) {
+                    // Locked state
+                    return (
+                      <div key={topic.id} className="bg-black/20 p-3 rounded-lg flex justify-between items-center opacity-50 cursor-not-allowed">
+                        <div className="flex-1">
+                          <p className="text-white font-medium text-sm mb-1 flex items-center gap-1">
+                            <Lock size={12} /> {topic.title}
+                          </p>
+                          <p className="text-xs text-yellow-400 mb-2">Complete previous topic first</p>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-gray-400 to-gray-600 transition-all duration-500" 
+                                style={{ width: `${completion}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs text-white/60">
+                              {completion}%
+                            </span>
+                          </div>
+                        </div>
+                        <Lock className="text-white/30" size={16} />
+                      </div>
+                    );
+                  }
+                  
+                  // Accessible state
                   return (
                     <Link 
                       to={`/topic/${subject}/${topic.id}`} 
@@ -104,6 +187,14 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
           </div>
         )}
       </div>
+      
+      {/* Loading indicator for topic access */}
+      {loadingAccess && (
+        <div className="text-center py-4">
+          <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-cyan-500 mr-2"></div>
+          <span className="text-white/60 text-sm">Checking topic access permissions...</span>
+        </div>
+      )}
     </div>
   );
 };
