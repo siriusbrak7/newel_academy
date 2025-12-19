@@ -11,13 +11,13 @@ const DEMO_ACCOUNTS = ['admin', 'teacher_demo', 'student_demo'];
 // INITIALIZATION
 // =====================================================
 export const initStorage = async (): Promise<void> => {
-  console.log('ðŸ”„ Initializing Supabase storage...');
+  console.log('Initializing Supabase storage...');
   try {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    console.log('âœ… Supabase Auth initialized');
+    console.log('Supabase Auth initialized');
   } catch (error) {
-    console.error('âŒ Initialization error:', error);
+    console.error('Initialization error:', error);
     throw error;
   }
 };
@@ -42,7 +42,7 @@ export const saveSession = (user: User | null) => {
 // AUTHENTICATION (Supabase Auth)
 // =====================================================
 export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
-  console.log('ðŸ” Authenticating via Supabase Auth:', username);
+  console.log('Authenticating via Supabase Auth:', username);
   
   try {
     // Sign in with password
@@ -75,7 +75,7 @@ export const authenticateUser = async (username: string, password: string): Prom
       return null;
     }
 
-    console.log('âœ… Authentication successful:', username);
+    console.log('Authentication successful:', username);
 
     return {
       username: profile.username,
@@ -89,7 +89,7 @@ export const authenticateUser = async (username: string, password: string): Prom
       loginHistory: profile.login_history ? profile.login_history.map((d: string) => new Date(d).getTime()) : undefined
     };
   } catch (error) {
-    console.error('âŒ Authentication error:', error);
+    console.error('Authentication error:', error);
     return null;
   }
 };
@@ -98,7 +98,7 @@ export const authenticateUser = async (username: string, password: string): Prom
 // USER MANAGEMENT
 // =====================================================
 export const getUsers = async (): Promise<Record<string, User>> => {
-  console.log('ðŸ‘¥ Fetching users...');
+  console.log('Fetching users...');
   
   try {
     const { data, error } = await supabase
@@ -122,10 +122,10 @@ export const getUsers = async (): Promise<Record<string, User>> => {
       };
     });
 
-    console.log(`âœ… Fetched ${Object.keys(users).length} users`);
+    console.log(`Fetched ${Object.keys(users).length} users`);
     return users;
   } catch (error) {
-    console.error('âŒ Get users error:', error);
+    console.error('Get users error:', error);
     return {};
   }
 };
@@ -165,13 +165,13 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
       loginHistory: data.login_history ? data.login_history.map((d: string) => new Date(d).getTime()) : undefined
     };
   } catch (error) {
-    console.error('âŒ Get user error:', error);
+    console.error('Get user error:', error);
     return null;
   }
 };
 
 export const saveUser = async (user: User & { password?: string }): Promise<void> => {
-  console.log('ðŸ’¾ Saving user:', user.username);
+  console.log('Saving user:', user.username);
   
   try {
     let userId: string;
@@ -217,15 +217,15 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
     
     if (error) throw error;
     
-    console.log(`âœ… User saved: ${user.username}`);
+    console.log(`User saved: ${user.username}`);
   } catch (error) {
-    console.error('âŒ Save user error:', error);
+    console.error('Save user error:', error);
     throw error;
   }
 };
 
 export const deleteUser = async (username: string): Promise<void> => {
-  console.log('ðŸ—‘ï¸ Deleting user:', username);
+  console.log('Deleting user:', username);
   
   try {
     // Get user ID
@@ -249,9 +249,9 @@ export const deleteUser = async (username: string): Promise<void> => {
     
     if (error) throw error;
     
-    console.log(`âœ… User deleted: ${username}`);
+    console.log(`User deleted: ${username}`);
   } catch (error) {
-    console.error('âŒ Delete user error:', error);
+    console.error('Delete user error:', error);
     throw error;
   }
 };
@@ -260,7 +260,7 @@ export const deleteUser = async (username: string): Promise<void> => {
 // COURSE MANAGEMENT
 // =====================================================
 export const getCourses = async (): Promise<CourseStructure> => {
-  console.log('ðŸ“š Fetching courses...');
+  console.log('Fetching courses...');
   
   try {
     const { data: topicsData, error: topicsError } = await supabase
@@ -336,17 +336,17 @@ export const getCourses = async (): Promise<CourseStructure> => {
       };
     });
 
-    console.log(`âœ… Courses fetched: ${Object.keys(courses).length} subjects`);
+    console.log(`Courses fetched: ${Object.keys(courses).length} subjects`);
     return courses;
   } catch (error) {
-    console.error('âŒ Get courses error:', error);
+    console.error('Get courses error:', error);
     return {};
   }
 };
 
 // In storageService.ts, update the saveTopic function:
 export const saveTopic = async (subject: string, topic: Topic): Promise<void> => {
-  console.log(`ðŸ’¾ Saving topic: ${subject} - ${topic.title}`);
+  console.log(`Saving topic: ${subject} - ${topic.title}`);
   
   try {
     // Get or create subject
@@ -405,13 +405,13 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
     }
     
     if (error) {
-      console.error('âŒ Save topic error:', error);
+      console.error('Save topic error:', error);
       throw error;
     }
 
-    console.log(`âœ… Topic saved: ${topic.title}`);
+    console.log(`Topic saved: ${topic.title}`);
   } catch (error) {
-    console.error('âŒ Save topic error:', error);
+    console.error('Save topic error:', error);
     throw error;
   }
 };
@@ -420,7 +420,7 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
 // PROGRESS MANAGEMENT
 // =====================================================
 export const getProgress = async (username: string): Promise<UserProgress> => {
-  console.log(`ðŸ“ˆ Fetching progress for: ${username}`);
+  console.log(`Fetching progress for: ${username}`);
   
   try {
     // Get user ID
@@ -458,10 +458,10 @@ export const getProgress = async (username: string): Promise<UserProgress> => {
       };
     });
 
-    console.log(`âœ… Progress fetched for ${username}`);
+    console.log(`Progress fetched for ${username}`);
     return progress;
   } catch (error) {
-    console.error('âŒ Get progress error:', error);
+    console.error('Get progress error:', error);
     return {};
   }
 };
@@ -472,7 +472,7 @@ export const updateTopicProgress = async (
   topicId: string, 
   updates: Partial<TopicProgress>
 ): Promise<void> => {
-  console.log(`ðŸ“ Updating progress: ${username} - ${topicId}`);
+  console.log(`Updating progress: ${username} - ${topicId}`);
   
   try {
     // Get user ID
@@ -520,9 +520,9 @@ export const updateTopicProgress = async (
     
     if (error) throw error;
     
-    console.log(`âœ… Progress updated: ${username} - ${topicId}`);
+    console.log(`Progress updated: ${username} - ${topicId}`);
   } catch (error) {
-    console.error('âŒ Update progress error:', error);
+    console.error('Update progress error:', error);
     throw error;
   }
 };
@@ -531,7 +531,7 @@ export const updateTopicProgress = async (
 // ASSESSMENTS
 // =====================================================
 export const getAssessments = async (): Promise<Assessment[]> => {
-  console.log('ðŸ“ Fetching assessments...');
+  console.log('Fetching assessments...');
   
   try {
     const { data: assessmentsData, error: assessmentsError } = await supabase
@@ -570,16 +570,16 @@ export const getAssessments = async (): Promise<Assessment[]> => {
       });
     }
 
-    console.log(`âœ… Fetched ${assessments.length} assessments`);
+    console.log(`Fetched ${assessments.length} assessments`);
     return assessments;
   } catch (error) {
-    console.error('âŒ Get assessments error:', error);
+    console.error('Get assessments error:', error);
     return [];
   }
 };
 
 export const saveAssessment = async (assessment: Assessment): Promise<void> => {
-  console.log(`ðŸ’¾ Saving assessment: ${assessment.title}`);
+  console.log(`Saving assessment: ${assessment.title}`);
   
   try {
     // Save assessment
@@ -615,9 +615,9 @@ export const saveAssessment = async (assessment: Assessment): Promise<void> => {
       if (questionError) console.error('Question save error:', questionError);
     }
 
-    console.log(`âœ… Assessment saved: ${assessment.title}`);
+    console.log(`Assessment saved: ${assessment.title}`);
   } catch (error) {
-    console.error('âŒ Save assessment error:', error);
+    console.error('Save assessment error:', error);
     throw error;
   }
 };
@@ -630,7 +630,7 @@ export const deleteAssessment = async (id: string): Promise<void> => {
 // SUBMISSIONS
 // =====================================================
 export const getSubmissions = async (assessmentId?: string): Promise<Submission[]> => {
-  console.log('ðŸ“„ Fetching submissions...');
+  console.log('Fetching submissions...');
   
   try {
     let query = supabase
@@ -655,16 +655,16 @@ export const getSubmissions = async (assessmentId?: string): Promise<Submission[
       aiGraded: item.ai_graded || false
     }));
 
-    console.log(`âœ… Fetched ${submissions.length} submissions`);
+    console.log(`Fetched ${submissions.length} submissions`);
     return submissions;
   } catch (error) {
-    console.error('âŒ Get submissions error:', error);
+    console.error('Get submissions error:', error);
     return [];
   }
 };
 
 export const saveSubmission = async (submission: Submission): Promise<void> => {
-  console.log(`ðŸ’¾ DEBUG: Saving submission for: ${submission.username}, graded: ${submission.graded}, score: ${submission.score}`);
+  console.log(`DEBUG: Saving submission for: ${submission.username}, graded: ${submission.graded}, score: ${submission.score}`);
   
   try {
     // Get user ID
@@ -690,17 +690,17 @@ export const saveSubmission = async (submission: Submission): Promise<void> => {
     
     if (error) throw error;
     
-    console.log(`âœ… Submission saved for: ${submission.username}`);
+    console.log(`Submission saved for: ${submission.username}`);
     
     // ALWAYS update leaderboard if graded and has score
     if (submission.graded && submission.score !== undefined) {
-      console.log(`ðŸ”„ Calling updateAssessmentLeaderboard for ${submission.username} with score ${submission.score}`);
+      console.log(`Calling updateAssessmentLeaderboard for ${submission.username} with score ${submission.score}`);
       await updateAssessmentLeaderboard(submission.username, submission.score);
     } else {
-      console.log(`â¸ï¸ Not updating leaderboard - submission not graded or no score`);
+      console.log(`Not updating leaderboard - submission not graded or no score`);
     }
   } catch (error) {
-    console.error('âŒ Save submission error:', error);
+    console.error('Save submission error:', error);
     throw error;
   }
 };
@@ -713,7 +713,7 @@ export const getLeaderboards = async (): Promise<{
   challenge: LeaderboardEntry[];
   assessments: LeaderboardEntry[];
 }> => {
-  console.log('ðŸ† Fetching leaderboards (demo accounts excluded)...');
+  console.log('Fetching leaderboards (demo accounts excluded)...');
   
   try {
     // Get all submissions to calculate assessment scores
@@ -865,21 +865,21 @@ export const getLeaderboards = async (): Promise<{
       assessments: assessmentEntries
     };
 
-    console.log(`âœ… Leaderboards fetched: ${assessmentEntries.length} real assessment entries`);
+    console.log('Leaderboards fetched: ${assessmentEntries.length} real assessment entries');
     return leaderboards;
   } catch (error) {
-    console.error('âŒ Get leaderboards error:', error);
+    console.error('Get leaderboards error:', error);
     return { academic: [], challenge: [], assessments: [] };
   }
 };
 
 
 export const saveSprintScore = async (username: string, score: number): Promise<void> => {
-  console.log(`ðŸ’¾ Saving sprint score: ${username} - ${score}`);
+  console.log(`Saving sprint score: ${username} - ${score}`);
   
   // Don't save demo account scores
   if (DEMO_ACCOUNTS.includes(username)) {
-    console.log('âš ï¸ Skipping demo account score');
+    console.log('Skipping demo account score');
     return;
   }
   
@@ -906,19 +906,19 @@ export const saveSprintScore = async (username: string, score: number): Promise<
     
     if (error) throw error;
     
-    console.log(`âœ… Sprint score saved: ${username} - ${score}`);
+    console.log(`Sprint score saved: ${username} - ${score}`);
   } catch (error) {
-    console.error('âŒ Save sprint score error:', error);
+    console.error('Save sprint score error:', error);
   }
 };
 
 // In storageService.ts, find the updateAssessmentLeaderboard function
 export const updateAssessmentLeaderboard = async (username: string, score: number): Promise<void> => {
-  console.log(`ðŸ“ˆ DEBUG: Updating assessment leaderboard for ${username} with score ${score}`);
+  console.log(`DEBUG: Updating assessment leaderboard for ${username} with score ${score}`);
   
   // Don't update demo accounts
   if (DEMO_ACCOUNTS.includes(username)) {
-    console.log('âš ï¸ Skipping demo account leaderboard update');
+    console.log('Skipping demo account leaderboard update');
     return;
   }
   
@@ -931,7 +931,7 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
       .single();
 
     if (!user) {
-      console.log(`âŒ User ${username} not found in database`);
+      console.log(`User ${username} not found in database`);
       return;
     }
 
@@ -944,7 +944,7 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means "no rows returned"
-      console.error('âŒ Error fetching existing leaderboard:', fetchError);
+      console.error('Error fetching existing leaderboard:', fetchError);
       return;
     }
 
@@ -953,7 +953,7 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
       const submissionCount = 1; // You might want to track this separately
       const newScore = Math.max(existing.score, score); // Keep highest OR calculate average
       
-      console.log(`ðŸ“ˆ Updating existing score from ${existing.score} to ${newScore}`);
+      console.log(`Updating existing score from ${existing.score} to ${newScore}`);
       
       const { error: updateError } = await supabase
         .from('leaderboards')
@@ -964,12 +964,12 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
         .eq('id', existing.id);
       
       if (updateError) {
-        console.error('âŒ Update leaderboard error:', updateError);
+        console.error('Update leaderboard error:', updateError);
         return;
       }
     } else {
       // Create new entry
-      console.log(`ðŸ“ˆ Creating new leaderboard entry for ${username} with score ${score}`);
+      console.log(`Creating new leaderboard entry for ${username} with score ${score}`);
       
       const { error: insertError } = await supabase
         .from('leaderboards')
@@ -983,14 +983,14 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
         });
       
       if (insertError) {
-        console.error('âŒ Insert leaderboard error:', insertError);
+        console.error('Insert leaderboard error:', insertError);
         return;
       }
     }
     
-    console.log(`âœ… Assessment leaderboard updated for ${username}`);
+    console.log(`Assessment leaderboard updated for ${username}`);
   } catch (error) {
-    console.error('âŒ Update assessment leaderboard error:', error);
+    console.error('Update assessment leaderboard error:', error);
   }
 };
 
@@ -1000,7 +1000,7 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
 // ANNOUNCEMENTS
 // =====================================================
 export const getAnnouncements = async (): Promise<Announcement[]> => {
-  console.log('ðŸ“¢ Fetching announcements...');
+  console.log('Fetching announcements...');
   
   try {
     const { data, error } = await supabase
@@ -1018,16 +1018,16 @@ export const getAnnouncements = async (): Promise<Announcement[]> => {
       author: item.author_user?.username || item.author_name || 'System'
     }));
 
-    console.log(`âœ… Fetched ${announcements.length} announcements`);
+    console.log(`Fetched ${announcements.length} announcements`);
     return announcements;
   } catch (error) {
-    console.error('âŒ Get announcements error:', error);
+    console.error('Get announcements error:', error);
     return [];
   }
 };
 
 export const saveAnnouncement = async (announcement: Announcement): Promise<void> => {
-  console.log(`ðŸ’¾ Saving announcement: ${announcement.title}`);
+  console.log(`Saving announcement: ${announcement.title}`);
   
   try {
     const { error } = await supabase
@@ -1041,9 +1041,9 @@ export const saveAnnouncement = async (announcement: Announcement): Promise<void
     
     if (error) throw error;
     
-    console.log(`âœ… Announcement saved: ${announcement.title}`);
+    console.log(`Announcement saved: ${announcement.title}`);
   } catch (error) {
-    console.error('âŒ Save announcement error:', error);
+    console.error('Save announcement error:', error);
     throw error;
   }
 };
@@ -1086,30 +1086,30 @@ export const calculateUserStats = (user: User) => {
 
 export const getAllStudentStats = async (): Promise<StudentStats[]> => {
   try {
-    console.log('ðŸ“Š DEBUG: Calculating student stats...');
+    console.log('DEBUG: Calculating student stats...');
     
     // Get all users (excluding demo accounts)
     const users = await getRealUsers();
-    console.log('ðŸ“Š DEBUG: Real users found:', Object.keys(users).length);
+    console.log('DEBUG: Real users found:', Object.keys(users).length);
     
     const students = Object.values(users).filter(u => u.role === 'student');
-    console.log('ðŸ“Š DEBUG: Students found:', students.length);
-    console.log('ðŸ“Š DEBUG: Student usernames:', students.map(s => s.username));
+    console.log('DEBUG: Students found:', students.length);
+    console.log('DEBUG: Student usernames:', students.map(s => s.username));
     
     // Get all submissions
     const submissions = await getSubmissions();
-    console.log('ðŸ“Š DEBUG: Total submissions:', submissions.length);
-    console.log('ðŸ“Š DEBUG: Graded submissions:', submissions.filter(s => s.graded).length);
+    console.log('DEBUG: Total submissions:', submissions.length);
+    console.log('DEBUG: Graded submissions:', submissions.filter(s => s.graded).length);
     
     const stats: StudentStats[] = [];
     
     for (const user of students) {
-      console.log(`\nðŸ“Š DEBUG: Processing student: ${user.username}`);
+      console.log(`\nDEBUG: Processing student: ${user.username}`);
       const userSubs = submissions.filter(s => 
         s.username === user.username && s.graded
       );
       
-      console.log(`ðŸ“Š DEBUG: Graded submissions for ${user.username}:`, userSubs.length);
+      console.log(`DEBUG: Graded submissions for ${user.username}:`, userSubs.length);
       userSubs.forEach((sub, i) => {
         console.log(`  Submission ${i+1}: Score=${sub.score}, Assessment=${sub.assessmentId}`);
       });
@@ -1129,16 +1129,16 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
         activeDays: activeDays
       };
       
-      console.log(`ðŸ“Š DEBUG: Final stats for ${user.username}:`, studentStat);
+      console.log(`DEBUG: Final stats for ${user.username}:`, studentStat);
       stats.push(studentStat);
     }
     
     const sortedStats = stats.sort((a, b) => b.avgScore - a.avgScore);
-    console.log('ðŸ“Š DEBUG: Final sorted stats:', sortedStats);
+    console.log('DEBUG: Final sorted stats:', sortedStats);
     
     return sortedStats;
   } catch (error) {
-    console.error('âŒ Error calculating stats:', error);
+    console.error('Error calculating stats:', error);
     return [];
   }
 };
@@ -1186,7 +1186,7 @@ export const uploadFileToSupabase = async (file: File): Promise<string | null> =
       });
 
     if (error) {
-      console.error('âŒ Upload failed:', error);
+      console.error('Upload failed:', error);
       // Create bucket if doesn't exist
       if (error.message.includes('bucket')) {
         await supabase.storage.createBucket('materials', {
@@ -1204,7 +1204,7 @@ export const uploadFileToSupabase = async (file: File): Promise<string | null> =
 
     return `https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/${fileName}`;
   } catch (error: any) {
-    console.error('âŒ Upload error:', error);
+    console.error('Upload error:', error);
     return null;
   }
 };
@@ -1213,7 +1213,7 @@ export const uploadFileToSupabase = async (file: File): Promise<string | null> =
 // EXPORT/IMPORT
 // =====================================================
 export const exportAllData = async (): Promise<string> => {
-  console.log('ðŸ“¦ Exporting all data...');
+  console.log('Exporting all data...');
   
   try {
     const [
@@ -1243,16 +1243,16 @@ export const exportAllData = async (): Promise<string> => {
       source: 'supabase'
     };
     
-    console.log('âœ… Data export complete (demo accounts excluded)');
+    console.log('Data export complete (demo accounts excluded)');
     return JSON.stringify(data, null, 2);
   } catch (error) {
-    console.error('âŒ Export failed:', error);
+    console.error('Export failed:', error);
     throw error;
   }
 };
 
 export const importAllData = async (jsonString: string): Promise<boolean> => {
-  console.log('ðŸ“¥ Importing data to Supabase...');
+  console.log('Importing data to Supabase...');
   
   try {
     const data = JSON.parse(jsonString);
@@ -1283,10 +1283,10 @@ export const importAllData = async (jsonString: string): Promise<boolean> => {
       }
     }
     
-    console.log('âœ… Import to Supabase complete');
+    console.log('Import to Supabase complete');
     return true;
   } catch (error) {
-    console.error('âŒ Import failed:', error);
+    console.error('Import failed:', error);
     return false;
   }
 };
@@ -1295,7 +1295,7 @@ export const importAllData = async (jsonString: string): Promise<boolean> => {
 // CLEANUP FUNCTIONS FOR DEPLOYMENT
 // =====================================================
 export const cleanupDemoData = async (): Promise<void> => {
-  console.log('ðŸ§¹ Cleaning up demo data from database...');
+  console.log('Cleaning up demo data from database...');
   
   try {
     // Delete demo accounts from leaderboards
@@ -1314,14 +1314,14 @@ export const cleanupDemoData = async (): Promise<void> => {
     
     if (submissionError) console.error('Submission cleanup error:', submissionError);
     
-    console.log('âœ… Demo data cleanup complete');
+    console.log('Demo data cleanup complete');
   } catch (error) {
-    console.error('âŒ Cleanup error:', error);
+    console.error('Cleanup error:', error);
   }
 };
 
 export const refreshAllLeaderboards = async (): Promise<void> => {
-  console.log('ðŸ”„ Refreshing all leaderboards with current data...');
+  console.log('Refreshing all leaderboards with current data...');
   
   try {
     // Clean existing demo data
@@ -1337,10 +1337,10 @@ export const refreshAllLeaderboards = async (): Promise<void> => {
         await updateAssessmentLeaderboard(sub.username, sub.score);
       }
     }
-    
-    console.log('âœ… All leaderboards refreshed');
+
+    console.log('All leaderboards refreshed');
   } catch (error) {
-    console.error('âŒ Refresh leaderboards error:', error);
+    console.error('Refresh leaderboards error:', error);
   }
 };
 
