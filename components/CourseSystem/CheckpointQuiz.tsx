@@ -141,15 +141,38 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
       return;
     }
 
-    // Original MCQ grading logic for checkpoints 1-4
+    // ===== FIXED MCQ GRADING LOGIC =====
     let correctCount = 0;
     questions.forEach((q, idx) => {
-      if (q.type === 'MCQ' && answers[idx] === q.correctAnswer) {
-        correctCount++;
+      if (q.type === 'MCQ' && q.correctAnswer && q.options) {
+        const selectedAnswer = answers[idx]; // User's selected option text
+        const correctLetter = q.correctAnswer.toUpperCase(); // Ensure uppercase
+        const letterIndex = 'ABCD'.indexOf(correctLetter);
+        
+        if (letterIndex >= 0 && letterIndex < q.options.length) {
+          const correctOptionText = q.options[letterIndex];
+          if (selectedAnswer === correctOptionText) {
+            correctCount++;
+          }
+        }
       }
     });
 
     const finalScore = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
+    console.log('Grading results:', {
+      correctCount,
+      totalQuestions: questions.length,
+      finalScore,
+      answers,
+      questions: questions.map((q, i) => ({
+        question: q.text,
+        selected: answers[i],
+        correct: q.correctAnswer,
+        options: q.options,
+        isCorrect: answers[i] === q.options['ABCD'.indexOf(q.correctAnswer?.toUpperCase() || '')]
+      }))
+    });
+    
     setScore(finalScore);
     setSubmitted(true);
     setGrading(false);
