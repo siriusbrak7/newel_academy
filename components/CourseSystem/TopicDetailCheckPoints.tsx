@@ -75,21 +75,27 @@ export const TopicDetailCheckpoints: React.FC = () => {
         const finalAssess = await getTopicFinalAssessment(topicId!);
         setFinalAssessment(finalAssess);
 
-        // Check specifically if Checkpoint 4 (Final MCQ) is passed
-        const checkpoint4Id = '6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e';
-        const checkpoint4Progress = progressData[checkpoint4Id];
+        // Find Checkpoint 4 (Final MCQ)
+        const checkpoint4 = checkpointsData.find(cp => cp.checkpoint_number === 4);
+        const checkpoint4Id = checkpoint4?.id;
+        const checkpoint4Progress = checkpoint4Id ? progressData[checkpoint4Id] : undefined;
         const isCheckpoint4Passed = checkpoint4Progress?.passed || false;
+        
+        // Find Checkpoint 5 (Final Theory)
+        const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 5);
 
         // Checkpoint 5 should only unlock if Checkpoint 4 is passed
         const checkpoint5Unlocked = isCheckpoint4Passed;
 
         setIsUnlocked(checkpoint5Unlocked);
 
-        // Add this debug log to see what's happening
+        // Debug log
         console.log('Unlock status:', {
+          checkpoint4,
           checkpoint4Id,
           checkpoint4Progress,
           isCheckpoint4Passed,
+          checkpoint5,
           checkpoint5Unlocked,
           allProgress: progressData
         });
@@ -117,8 +123,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
       setCheckpointProgress(progressData);
 
       // Recheck if final assessment is now unlocked
-      const checkpoint4Id = '6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e';
-      const checkpoint4Progress = progressData[checkpoint4Id];
+      const checkpoint4 = checkpoints.find(cp => cp.checkpoint_number === 4);
+      const checkpoint4Id = checkpoint4?.id;
+      const checkpoint4Progress = checkpoint4Id ? progressData[checkpoint4Id] : undefined;
       const isCheckpoint4Passed = checkpoint4Progress?.passed || false;
       const checkpoint5Unlocked = isCheckpoint4Passed;
       
@@ -277,6 +284,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
   };
 
   const progress = calculateProgress();
+
+  // Find Checkpoint 5 (Final Theory) for the UI
+  const checkpoint5 = checkpoints.find(cp => cp.checkpoint_number === 5);
 
   if (loading) {
     return (
@@ -585,7 +595,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                 : `Pass the 20-question MCQ assessment first (85% required).`}
             </p>
             
-            {finalAssessment ? (
+            {checkpoint5 ? (
               <>
                 <div className="text-sm text-white/50 mb-4 space-y-2">
                   <div className="flex justify-between">
