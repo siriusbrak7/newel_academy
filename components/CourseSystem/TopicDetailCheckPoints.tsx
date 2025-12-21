@@ -1,3 +1,4 @@
+
 // components/CourseSystem/TopicDetailCheckpoints.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -42,7 +43,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Calculate progress using useMemo to avoid recalculating on every render
+  // Calculate progress - FIXED: Only count checkpoints 1-4, not including checkpoint 5
   const progress = useMemo(() => {
     if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
     
@@ -64,20 +65,23 @@ export const TopicDetailCheckpoints: React.FC = () => {
       if (validCheckpointNumbers.includes(checkpoint.checkpoint_number)) {
         const progress = checkpointProgress[checkpoint.id];
         const isPassed = progress?.passed || false;
-        console.log(`Checkpoint ${checkpoint.checkpoint_number}: passed=${isPassed}, score=${progress?.score}%`);
         if (isPassed) {
           passedCount++;
         }
       }
     });
     
-    const totalCheckpoints = Math.min(checkpoints.length, 4); // Only count checkpoints 1-4
+    // Total should only count checkpoints 1-4 (not 5)
+    const totalCheckpoints = checkpoints.filter(cp => 
+      validCheckpointNumbers.includes(cp.checkpoint_number)
+    ).length;
+    
     const percentage = totalCheckpoints > 0 ? (passedCount / totalCheckpoints) * 100 : 0;
     
-    console.log('🔍 DEBUG Progress Result:', {
-      passedCount,
-      totalCheckpoints,
-      percentage
+    console.log('✅ Progress calculation result:', { 
+      passedCount, 
+      totalCheckpoints, 
+      percentage: Math.round(percentage) 
     });
     
     return { passed: passedCount, total: totalCheckpoints, percentage };
@@ -113,7 +117,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           setError('No checkpoints found for this topic. Please contact your teacher.');
           setCheckpoints([]);
         } else {
-          // Filter out checkpoint 5 from display
+          // Filter out checkpoint 5 from display (but keep for unlock logic)
           const checkpointsToShow = checkpointsData.filter(cp => cp.checkpoint_number !== 5);
           setCheckpoints(checkpointsToShow);
           
@@ -164,7 +168,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
         const checkpoint4Id = latestCheckpoint4?.[0];
 
         // Checkpoint 4 passed unlocks the final theory assessment
-        // NOTE: Removed checkpoint 5 reference - using only finalAssessment
         setIsUnlocked(isCheckpoint4Passed);
 
         // Debug log
@@ -223,7 +226,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         return {
           id: q.id,
           text: q.text,
-          type: q.type || 'THEORY', // Final assessments are primarily theory questions
+          type: q.type || 'THEORY',
           difficulty: q.difficulty || 'AS',
           topic: topic?.title || '',
           correctAnswer: q.correct_answer || '',
@@ -244,63 +247,63 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
   // Unlock next topic
   const unlockNextTopic = async (userId: string, completedTopicId: string) => {
-  try {
-    console.log(`🔓 Attempting to unlock next topic after completing: ${completedTopicId}`);
-    
-    // 1. Get current topic's subject and title
-    const { data: currentTopic } = await supabase
-      .from('topics')
-      .select('subject_id, title')
-      .eq('id', completedTopicId)
-      .single();
+    try {
+      console.log(`🔓 Attempting to unlock next topic after completing: ${completedTopicId}`);
+      
+      // 1. Get current topic's subject and title
+      const { data: currentTopic } = await supabase
+        .from('topics')
+        .select('subject_id, title')
+        .eq('id', completedTopicId)
+        .single();
 
-    if (!currentTopic) {
-      console.log('❌ Current topic not found');
-      return;
-    }
+      if (!currentTopic) {
+        console.log('❌ Current topic not found');
+        return;
+      }
 
-    // 2. Get ALL topics in this subject sorted by title (since sort_order is broken)
-    const { data: allTopics } = await supabase
-      .from('topics')
-      .select('id, title, sort_order')
-      .eq('subject_id', currentTopic.subject_id)
-      .order('title', { ascending: true });
+      // 2. Get ALL topics in this subject sorted by title
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('id, title, sort_order')
+        .eq('subject_id', currentTopic.subject_id)
+        .order('title', { ascending: true });
 
-    if (!allTopics || allTopics.length <= 1) {
-      console.log('ℹ️ No next topic found');
-      return;
-    }
+      if (!allTopics || allTopics.length <= 1) {
+        console.log('ℹ️ No next topic found');
+        return;
+      }
 
-    // 3. Find current topic index
-    const currentIndex = allTopics.findIndex(t => t.id === completedTopicId);
-    if (currentIndex === -1 || currentIndex >= allTopics.length - 1) {
-      console.log('ℹ️ No next topic found (current is last)');
-      return;
-    }
+      // 3. Find current topic index
+      const currentIndex = allTopics.findIndex(t => t.id === completedTopicId);
+      if (currentIndex === -1 || currentIndex >= allTopics.length - 1) {
+        console.log('ℹ️ No next topic found (current is last)');
+        return;
+      }
 
-    // 4. Get next topic
-    const nextTopic = allTopics[currentIndex + 1];
-    console.log(`✅ Found next topic: ${nextTopic.title}, unlocking...`);
-    
-    // 5. Unlock next topic for user
-    const { error } = await supabase
-      .from('user_topic_access')
-      .upsert({
-        user_id: userId,
-        topic_id: nextTopic.id,
-        unlocked: true,
-        unlocked_at: new Date().toISOString()
-      }, { onConflict: 'user_id, topic_id' });
+      // 4. Get next topic
+      const nextTopic = allTopics[currentIndex + 1];
+      console.log(`✅ Found next topic: ${nextTopic.title}, unlocking...`);
+      
+      // 5. Unlock next topic for user
+      const { error } = await supabase
+        .from('user_topic_access')
+        .upsert({
+          user_id: userId,
+          topic_id: nextTopic.id,
+          unlocked: true,
+          unlocked_at: new Date().toISOString()
+        }, { onConflict: 'user_id, topic_id' });
 
-    if (error) {
+      if (error) {
+        console.error('❌ Failed to unlock next topic:', error);
+      } else {
+        console.log(`✅ Successfully unlocked next topic: ${nextTopic.title}`);
+      }
+    } catch (error) {
       console.error('❌ Failed to unlock next topic:', error);
-    } else {
-      console.log(`✅ Successfully unlocked next topic: ${nextTopic.title}`);
     }
-  } catch (error) {
-    console.error('❌ Failed to unlock next topic:', error);
-  }
-};
+  };
 
   const handleCheckpointComplete = async (checkpointId: string, score: number, passed: boolean) => {
     if (!user) return;
@@ -330,11 +333,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
         alert(`🎉 Checkpoint ${completedCheckpoint?.checkpoint_number} passed with ${Math.round(score)}%!`);
       }
 
-      // If checkpoint 4 is passed, check if topic is complete
+      // If checkpoint 4 is passed, update topic progress
       if (isCheckpoint4 && passed) {
-        console.log(`✅ Checkpoint 4 passed! Checking if topic is complete...`);
+        console.log(`✅ Checkpoint 4 passed! Updating topic progress...`);
         
-        // Get user ID for unlocking next topic
+        // Get user ID
         const { data: userData } = await supabase
           .from('users')
           .select('id')
@@ -614,17 +617,19 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
       {/* Final Assessment Quiz Modal */}
       {activeFinalQuiz && user && finalAssessment && (
-        <QuizInterface
-          title={`${topic.title} - Final Assessment`}
-          questions={finalAssessmentQuestions} // Pass the loaded questions
-          passThreshold={finalAssessment.pass_percentage || 85}
-          onComplete={handleFinalAssessmentComplete}
-          onClose={() => setActiveFinalQuiz(false)}
-          isCourseFinal={true}
-          assessmentId={finalAssessment.id}
-          username={user.username}
-        />
-      )}
+      <QuizInterface
+        title={`${topic.title} - Final Assessment`}
+        questions={finalAssessmentQuestions.length > 0 
+          ? [finalAssessmentQuestions[Math.floor(Math.random() * finalAssessmentQuestions.length)]] 
+          : []}
+        passThreshold={finalAssessment.pass_percentage || 85}
+        onComplete={handleFinalAssessmentComplete}
+        onClose={() => setActiveFinalQuiz(false)}
+        isCourseFinal={true}
+        assessmentId={finalAssessment.id}
+        username={user.username}
+      />
+    )}
 
       {/* Ask AI Sidebar */}
       {showAiAsk && (

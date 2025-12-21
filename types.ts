@@ -166,6 +166,7 @@ export interface Submission {
   score?: number;
   feedback?: string;
   newelGraded?: boolean;
+  ai_graded?: boolean;
 }
 
 // =======================
