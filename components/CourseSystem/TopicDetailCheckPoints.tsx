@@ -31,6 +31,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const [checkpoints, setCheckpoints] = useState<any[]>([]);
   const [checkpointProgress, setCheckpointProgress] = useState<Record<string, any>>({});
   const [finalAssessment, setFinalAssessment] = useState<any>(null);
+  const [finalAssessmentQuestions, setFinalAssessmentQuestions] = useState<Question[]>([]);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [activeCheckpoint, setActiveCheckpoint] = useState<any>(null);
   const [activeFinalQuiz, setActiveFinalQuiz] = useState(false);
@@ -137,6 +138,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
         const finalAssess = await getTopicFinalAssessment(topicId!);
         setFinalAssessment(finalAssess);
 
+        // Load final assessment questions if final assessment exists
+        if (finalAssess) {
+          await loadFinalAssessmentQuestions(finalAssess.id);
+        }
+
         // Find the user's ACTUAL checkpoint 4 attempt for THIS topic
         const userCheckpoint4Attempts = Object.entries(progressData)
           .filter(([checkpointId, progress]) => {
@@ -169,7 +175,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
           checkpoint4Id,
           allProgress: progressData,
           topicId,
-          hasFinalAssessment: !!finalAssess
+          hasFinalAssessment: !!finalAssess,
+          hasFinalQuestions: finalAssessmentQuestions.length
         });
 
       } catch (error) {
@@ -182,6 +189,58 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
     loadData();
   }, [subject, topicId, navigate]);
+
+  // Load final assessment questions
+  const loadFinalAssessmentQuestions = async (finalAssessmentId: string) => {
+    try {
+      console.log('🔍 Loading final assessment questions for:', finalAssessmentId);
+      
+      const { data: questionsData, error } = await supabase
+        .from('final_assessment_questions')
+        .select(`
+          question_id,
+          questions (
+            id, text, type, difficulty, correct_answer, options, model_answer, explanation
+          )
+        `)
+        .eq('final_assessment_id', finalAssessmentId)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error fetching final assessment questions:', error);
+        return;
+      }
+
+      if (!questionsData || questionsData.length === 0) {
+        console.log('⚠️ No questions found for final assessment');
+        setFinalAssessmentQuestions([]);
+        return;
+      }
+
+      // Format questions for the quiz
+      const formattedQuestions: Question[] = questionsData.map(item => {
+        const q = item.questions;
+        return {
+          id: q.id,
+          text: q.text,
+          type: q.type || 'THEORY', // Final assessments are primarily theory questions
+          difficulty: q.difficulty || 'AS',
+          topic: topic?.title || '',
+          correctAnswer: q.correct_answer || '',
+          options: q.options || [],
+          modelAnswer: q.model_answer || '',
+          explanation: q.explanation || ''
+        };
+      });
+
+      console.log(`✅ Loaded ${formattedQuestions.length} final assessment questions`);
+      setFinalAssessmentQuestions(formattedQuestions);
+      
+    } catch (error) {
+      console.error('❌ Error loading final assessment questions:', error);
+      setFinalAssessmentQuestions([]);
+    }
+  };
 
   // Unlock next topic
   const unlockNextTopic = async (userId: string, completedTopicId: string) => {
@@ -419,6 +478,39 @@ export const TopicDetailCheckpoints: React.FC = () => {
       alert('Failed to load checkpoint. Please try again.');
     }
   };
+
+  const startFinalAssessment = async () => {
+    if (!finalAssessment || !topicId || !user) {
+      console.error('Missing data for final assessment:', { finalAssessment, topicId, user });
+      return;
+    }
+    
+    // Check if user has unlocked the final assessment
+    if (!isUnlocked) {
+      alert('You must pass the MCQ assessment (Checkpoint 4) first!');
+      return;
+    }
+    
+    // Check if we have questions loaded
+    if (finalAssessmentQuestions.length === 0) {
+      try {
+        // Try to reload questions
+        await loadFinalAssessmentQuestions(finalAssessment.id);
+        
+        if (finalAssessmentQuestions.length === 0) {
+          alert('No questions available for final assessment yet. Please contact your teacher.');
+          return;
+        }
+      } catch (error) {
+        console.error('Error loading final assessment questions:', error);
+        alert('Failed to load final assessment. Please try again.');
+        return;
+      }
+    }
+    
+    console.log('✅ Starting final assessment with questions:', finalAssessmentQuestions.length);
+    setActiveFinalQuiz(true);
+  };
  
   const handleAskAi = async () => {
     if (!aiQuestion.trim() || !topic) return;
@@ -524,7 +616,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
       {activeFinalQuiz && user && finalAssessment && (
         <QuizInterface
           title={`${topic.title} - Final Assessment`}
-          questions={[]} // Will be loaded dynamically
+          questions={finalAssessmentQuestions} // Pass the loaded questions
           passThreshold={finalAssessment.pass_percentage || 85}
           onComplete={handleFinalAssessmentComplete}
           onClose={() => setActiveFinalQuiz(false)}
@@ -823,11 +915,17 @@ export const TopicDetailCheckpoints: React.FC = () => {
                       {isUnlocked ? "✓ MCQ Passed" : "✗ MCQ Required"}
                     </span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>Questions Available:</span>
+                    <span className={finalAssessmentQuestions.length > 0 ? "text-green-400" : "text-red-400"}>
+                      {finalAssessmentQuestions.length} questions
+                    </span>
+                  </div>
                 </div>
                 
                 {isUnlocked ? (
                   <button 
-                    onClick={() => setActiveFinalQuiz(true)}
+                    onClick={startFinalAssessment}
                     className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                   >
                     <Zap size={18} /> Start Final Theory Assessment
@@ -855,6 +953,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                 <div>Progress entries: {Object.keys(checkpointProgress).length}</div>
                 <div>Final unlocked: {isUnlocked ? 'Yes' : 'No'}</div>
                 <div>Has finalAssessment: {finalAssessment ? 'Yes' : 'No'}</div>
+                <div>Final assessment questions: {finalAssessmentQuestions.length}</div>
               </div>
             </div>
           )}
