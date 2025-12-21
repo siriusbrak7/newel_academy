@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { CheckpointQuiz } from './CheckpointQuiz';
 import { QuizInterface } from './QuizInterface';
-import { QUESTION_BANK } from '../../constants';
 
 export const TopicDetailCheckpoints: React.FC = () => {
   const { subject, topicId } = useParams<{ subject: string; topicId: string }>();
