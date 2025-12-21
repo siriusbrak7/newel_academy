@@ -32,15 +32,41 @@ export const getCheckpointByTopicAndNumber = async (topicId: string, checkpointN
   }
 };
 
+// In checkpointService.ts - Add debugging
 export const getCheckpointQuestions = async (checkpointId: string): Promise<Question[]> => {
+  console.log('getCheckpointQuestions called for:', checkpointId);
+  
   const { data, error } = await supabase
     .from('checkpoint_questions')
     .select('question:questions(*)')
     .eq('checkpoint_id', checkpointId)
     .order('sort_order', { ascending: true });
 
-  if (error) throw error;
-  return (data || []).map(item => item.question);
+  if (error) {
+    console.error('Supabase error:', error);
+    throw error;
+  }
+  
+  console.log('Raw data from Supabase:', {
+    count: data?.length,
+    data: data,
+    firstItem: data?.[0],
+    firstQuestion: data?.[0]?.question
+  });
+  
+  const questions = (data || []).map(item => item.question);
+  
+  console.log('Processed questions:', {
+    count: questions.length,
+    questions: questions.map(q => ({
+      id: q?.id,
+      text: q?.text?.substring(0, 30),
+      hasCorrectAnswer: !!q?.correct_answer,
+      optionsCount: q?.options?.length
+    }))
+  });
+  
+  return questions;
 };
 
 export const saveCheckpointProgress = async (

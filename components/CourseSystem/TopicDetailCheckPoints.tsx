@@ -211,80 +211,87 @@ export const TopicDetailCheckpoints: React.FC = () => {
   };
 
   const startCheckpoint = async (checkpoint: any) => {
-    try {
-      // IMPORTANT: Verify we're using the correct topic's checkpoint
-      console.log('Starting checkpoint:', {
-        checkpointId: checkpoint.id,
-        checkpointNumber: checkpoint.checkpoint_number,
-        topicId: topicId,
-        currentTopic: topic?.title,
-        checkpointTitle: checkpoint.title
-      });
-      
-      // 1. Use the service to fetch questions for THIS SPECIFIC checkpoint
-      const allCheckpointQuestions = await getCheckpointQuestions(checkpoint.id);
-      
-      if (!allCheckpointQuestions || allCheckpointQuestions.length === 0) {
-        console.warn(`No questions found for checkpoint ${checkpoint.id}`);
-        alert('No questions available for this checkpoint. Please contact your teacher.');
-        return;
-      }
-      
-      // Determine how many questions to show based on checkpoint number
-      let questionsToShow = 5; // Default for checkpoints 1-3
-
-      switch (checkpoint.checkpoint_number) {
-        case 4: // Final MCQ
-          questionsToShow = 20;
-          break;
-        case 5: // Final Theory
-          questionsToShow = 1;
-          break;
-        default: // Checkpoints 1-3
-          questionsToShow = 5;
-      }
-      
-      console.log('Checkpoint questions loaded:', {
-        checkpointNumber: checkpoint.checkpoint_number,
-        totalQuestionsInPool: allCheckpointQuestions.length,
-        questionsToShow,
-        isFinalMCQ: checkpoint.checkpoint_number === 4,
-        isFinalTheory: checkpoint.checkpoint_number === 5
-      });
-      
-      // Select random questions
-      let questionsToUse = allCheckpointQuestions;
-
-      if (allCheckpointQuestions.length > questionsToShow) {
-        const shuffled = [...allCheckpointQuestions];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        questionsToUse = shuffled.slice(0, questionsToShow);
-      }
-      
-      // Format questions for the quiz component
-      const formattedQuestions: Question[] = questionsToUse.map(q => ({
-        id: q.id,
-        text: q.text,
-        type: q.type || 'MCQ',
-        difficulty: q.difficulty || 'IGCSE',
-        topic: topic?.title || '',
-        options: q.options || [],
-        correctAnswer: q.correctAnswer || ''
-      }));
-      
-      setActiveCheckpoint({
-        ...checkpoint,
-        questions: formattedQuestions
-      });
-      
-    } catch (error) {
-      console.error('Error loading checkpoint questions:', error);
-      alert('Failed to load checkpoint. Please try again.');
+  try {
+    console.log('=== START CHECKPOINT DEBUG ===');
+    console.log('Checkpoint ID:', checkpoint.id);
+    console.log('Checkpoint object:', checkpoint);
+    
+    // 1. Use the service to fetch ALL questions from the database
+    const allCheckpointQuestions = await getCheckpointQuestions(checkpoint.id);
+    
+    console.log('Questions from getCheckpointQuestions:', {
+      count: allCheckpointQuestions?.length,
+      sample: allCheckpointQuestions?.[0],
+      allQuestions: allCheckpointQuestions
+    });
+    
+    if (!allCheckpointQuestions || allCheckpointQuestions.length === 0) {
+      console.error('NO QUESTIONS FOUND for checkpoint:', checkpoint.id);
+      alert('No questions available for this checkpoint. Please contact your teacher.');
+      return;
     }
-  };
+    
+    // 2. Determine how many to show
+    let questionsToShow = 5; // Default for checkpoints 1-3
+    switch (checkpoint.checkpoint_number) {
+      case 4: questionsToShow = 20; break; // Final MCQ
+      case 5: questionsToShow = 1; break;  // Final Theory
+      default: questionsToShow = 5; break; // Checkpoints 1-3
+    }
+    
+    // 3. Select random questions
+    let questionsToUse = allCheckpointQuestions;
+    
+    if (allCheckpointQuestions.length > questionsToShow) {
+      console.log(`Selecting ${questionsToShow} random questions from pool of ${allCheckpointQuestions.length}`);
+      
+      // Fisher-Yates shuffle
+      const shuffled = [...allCheckpointQuestions];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      questionsToUse = shuffled.slice(0, questionsToShow);
+    }
+    
+    // 4. Log the selected questions
+    console.log('Selected questions:', {
+      count: questionsToUse.length,
+      questions: questionsToUse.map(q => ({
+        id: q.id,
+        text: q.text?.substring(0, 50),
+        correctAnswer: q.correctAnswer,
+        options: q.options,
+        type: q.type
+      }))
+    });
+    
+    // 5. Format questions for the quiz component
+    const formattedQuestions: Question[] = questionsToUse.map(q => ({
+      id: q.id,
+      text: q.text,
+      type: q.type || 'MCQ',
+      difficulty: q.difficulty || 'IGCSE',
+      topic: topic?.title || '',
+      options: q.options || [],
+      correctAnswer: q.correctAnswer || ''
+    }));
+    
+    console.log('Formatted questions:', formattedQuestions);
+    
+    // 6. Set active checkpoint
+    setActiveCheckpoint({
+      ...checkpoint,
+      questions: formattedQuestions
+    });
+    
+    console.log('=== END START CHECKPOINT DEBUG ===');
+    
+  } catch (error) {
+    console.error('Error loading checkpoint questions:', error);
+    alert('Failed to load checkpoint. Please try again.');
+  }
+};
 
   const startFinalAssessment = () => {
     if (!topic || !user || !finalAssessment) return;
