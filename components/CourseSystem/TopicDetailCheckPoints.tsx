@@ -1,5 +1,5 @@
 // components/CourseSystem/TopicDetailCheckpoints.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCheckpointQuestions } from '../../services/checkpointService';
 import { User, Material, Question } from '../../types';
@@ -40,6 +40,47 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Calculate progress using useMemo to avoid recalculating on every render
+  const progress = useMemo(() => {
+    if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
+    
+    console.log('🔍 DEBUG Progress Calculation - Raw Data:', {
+      checkpoints: checkpoints.map(cp => ({
+        id: cp.id,
+        number: cp.checkpoint_number,
+        title: cp.title
+      })),
+      progressData: checkpointProgress,
+      checkpointProgressKeys: Object.keys(checkpointProgress)
+    });
+    
+    // Count passed checkpoints (checkpoints 1-4 only)
+    let passedCount = 0;
+    const validCheckpointNumbers = [1, 2, 3, 4];
+    
+    checkpoints.forEach(checkpoint => {
+      if (validCheckpointNumbers.includes(checkpoint.checkpoint_number)) {
+        const progress = checkpointProgress[checkpoint.id];
+        const isPassed = progress?.passed || false;
+        console.log(`Checkpoint ${checkpoint.checkpoint_number}: passed=${isPassed}, score=${progress?.score}%`);
+        if (isPassed) {
+          passedCount++;
+        }
+      }
+    });
+    
+    const totalCheckpoints = Math.min(checkpoints.length, 4); // Only count checkpoints 1-4
+    const percentage = totalCheckpoints > 0 ? (passedCount / totalCheckpoints) * 100 : 0;
+    
+    console.log('🔍 DEBUG Progress Result:', {
+      passedCount,
+      totalCheckpoints,
+      percentage
+    });
+    
+    return { passed: passedCount, total: totalCheckpoints, percentage };
+  }, [checkpoints, checkpointProgress]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,13 +112,15 @@ export const TopicDetailCheckpoints: React.FC = () => {
           setError('No checkpoints found for this topic. Please contact your teacher.');
           setCheckpoints([]);
         } else {
-          setCheckpoints(checkpointsData);
+          // Filter out checkpoint 5 from display
+          const checkpointsToShow = checkpointsData.filter(cp => cp.checkpoint_number !== 5);
+          setCheckpoints(checkpointsToShow);
           
           // Log checkpoints for debugging
           console.log('Loaded checkpoints:', {
             topicId,
             topicTitle: topicData.title,
-            checkpoints: checkpointsData.map(cp => ({
+            checkpoints: checkpointsToShow.map(cp => ({
               id: cp.id,
               number: cp.checkpoint_number,
               title: cp.title,
@@ -115,6 +158,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         const checkpoint4Id = latestCheckpoint4?.[0];
 
         // Checkpoint 4 passed unlocks the final theory assessment
+        // NOTE: Removed checkpoint 5 reference - using only finalAssessment
         setIsUnlocked(isCheckpoint4Passed);
 
         // Debug log
@@ -124,7 +168,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
           isCheckpoint4Passed,
           checkpoint4Id,
           allProgress: progressData,
-          topicId
+          topicId,
+          hasFinalAssessment: !!finalAssess
         });
 
       } catch (error) {
@@ -140,56 +185,63 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
   // Unlock next topic
   const unlockNextTopic = async (userId: string, completedTopicId: string) => {
-    try {
-      console.log(`🔓 Attempting to unlock next topic after completing: ${completedTopicId}`);
-      
-      // 1. Get current topic's subject and sort_order
-      const { data: currentTopic } = await supabase
-        .from('topics')
-        .select('subject_id, sort_order, title')
-        .eq('id', completedTopicId)
-        .single();
+  try {
+    console.log(`🔓 Attempting to unlock next topic after completing: ${completedTopicId}`);
+    
+    // 1. Get current topic's subject and title
+    const { data: currentTopic } = await supabase
+      .from('topics')
+      .select('subject_id, title')
+      .eq('id', completedTopicId)
+      .single();
 
-      if (!currentTopic) {
-        console.log('❌ Current topic not found');
-        return;
-      }
-
-      console.log(`📍 Current topic: ${currentTopic.title}, sort_order: ${currentTopic.sort_order}`);
-
-      // 2. Find next topic in same subject
-      const { data: nextTopic } = await supabase
-        .from('topics')
-        .select('id, title, sort_order')
-        .eq('subject_id', currentTopic.subject_id)
-        .eq('sort_order', (currentTopic.sort_order || 0) + 1)
-        .single();
-
-      if (nextTopic) {
-        console.log(`✅ Found next topic: ${nextTopic.title}, unlocking...`);
-        
-        // 3. Unlock next topic for user
-        const { error } = await supabase
-          .from('user_topic_access')
-          .upsert({
-            user_id: userId,
-            topic_id: nextTopic.id,
-            unlocked: true,
-            unlocked_at: new Date().toISOString()
-          }, { onConflict: 'user_id, topic_id' });
-
-        if (error) {
-          console.error('❌ Failed to unlock next topic:', error);
-        } else {
-          console.log(`✅ Successfully unlocked next topic: ${nextTopic.title}`);
-        }
-      } else {
-        console.log(`ℹ️ No next topic found - this might be the last topic in subject ${currentTopic.subject_id}`);
-      }
-    } catch (error) {
-      console.error('❌ Failed to unlock next topic:', error);
+    if (!currentTopic) {
+      console.log('❌ Current topic not found');
+      return;
     }
-  };
+
+    // 2. Get ALL topics in this subject sorted by title (since sort_order is broken)
+    const { data: allTopics } = await supabase
+      .from('topics')
+      .select('id, title, sort_order')
+      .eq('subject_id', currentTopic.subject_id)
+      .order('title', { ascending: true });
+
+    if (!allTopics || allTopics.length <= 1) {
+      console.log('ℹ️ No next topic found');
+      return;
+    }
+
+    // 3. Find current topic index
+    const currentIndex = allTopics.findIndex(t => t.id === completedTopicId);
+    if (currentIndex === -1 || currentIndex >= allTopics.length - 1) {
+      console.log('ℹ️ No next topic found (current is last)');
+      return;
+    }
+
+    // 4. Get next topic
+    const nextTopic = allTopics[currentIndex + 1];
+    console.log(`✅ Found next topic: ${nextTopic.title}, unlocking...`);
+    
+    // 5. Unlock next topic for user
+    const { error } = await supabase
+      .from('user_topic_access')
+      .upsert({
+        user_id: userId,
+        topic_id: nextTopic.id,
+        unlocked: true,
+        unlocked_at: new Date().toISOString()
+      }, { onConflict: 'user_id, topic_id' });
+
+    if (error) {
+      console.error('❌ Failed to unlock next topic:', error);
+    } else {
+      console.log(`✅ Successfully unlocked next topic: ${nextTopic.title}`);
+    }
+  } catch (error) {
+    console.error('❌ Failed to unlock next topic:', error);
+  }
+};
 
   const handleCheckpointComplete = async (checkpointId: string, score: number, passed: boolean) => {
     if (!user) return;
@@ -311,7 +363,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
       let questionsToShow = 5; // Default for checkpoints 1-3
       switch (checkpoint.checkpoint_number) {
         case 4: questionsToShow = 20; break; // Final MCQ
-        case 5: questionsToShow = 1; break;  // Final Theory
         default: questionsToShow = 5; break; // Checkpoints 1-3
       }
       
@@ -385,40 +436,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
       setAiLoading(false);
     }
   };
-
-  // Calculate progress properly
-  const calculateProgress = () => {
-    if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
-    
-    // Count passed checkpoints (checkpoints 1-4 only)
-    let passedCount = 0;
-    const validCheckpointNumbers = [1, 2, 3, 4];
-    
-    checkpoints.forEach(checkpoint => {
-      if (validCheckpointNumbers.includes(checkpoint.checkpoint_number)) {
-        const progress = checkpointProgress[checkpoint.id];
-        if (progress?.passed) {
-          passedCount++;
-        }
-      }
-    });
-    
-    const totalCheckpoints = Math.min(checkpoints.filter(cp => 
-      [1, 2, 3, 4].includes(cp.checkpoint_number)
-    ).length, 4); // Only count checkpoints 1-4
-    const percentage = totalCheckpoints > 0 ? (passedCount / totalCheckpoints) * 100 : 0;
-    
-    console.log('Progress calculation:', {
-      passedCount,
-      totalCheckpoints,
-      percentage,
-      checkpointProgress
-    });
-    
-    return { passed: passedCount, total: totalCheckpoints, percentage };
-  };
-
-  const progress = calculateProgress();
 
   // Helper function to check if a checkpoint is the most recent attempt
   const isMostRecentAttempt = (checkpointId: string) => {
@@ -660,7 +677,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             </div>
           </section>
 
-          {/* Checkpoints */}
+          {/* Checkpoints - Note: Checkpoint 5 is now filtered out */}
           <section>
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
               <Target className="text-purple-400"/> Topic Checkpoints
@@ -770,7 +787,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             </div>
           </div>
 
-          {/* Final Assessment - Updated to use finalAssessment instead of checkpoint 5 */}
+          {/* Final Assessment - Updated to use finalAssessment, NOT checkpoint 5 */}
           <div className={`p-6 rounded-2xl border ${
             isUnlocked ? 
             'bg-gradient-to-b from-cyan-900/20 to-purple-900/20 border-cyan-500/30' : 
@@ -837,6 +854,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                 <div>Checkpoints: {checkpoints.length}</div>
                 <div>Progress entries: {Object.keys(checkpointProgress).length}</div>
                 <div>Final unlocked: {isUnlocked ? 'Yes' : 'No'}</div>
+                <div>Has finalAssessment: {finalAssessment ? 'Yes' : 'No'}</div>
               </div>
             </div>
           )}

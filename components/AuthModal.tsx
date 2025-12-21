@@ -44,22 +44,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     setLoading(true);
     setError('');
 
-    // Hardcoded admin fallback (for testing without Supabase)
-    if (formData.username === 'admin' && formData.password === 'Cosmic2025!') {
-      const adminUser: User = {
-        username: 'admin',
-        role: 'admin',
-        approved: true,
-        securityQuestion: 'N/A',
-        securityAnswer: 'n/a',
-        gradeLevel: '12',
-        lastLogin: Date.now()
-      };
-      onLogin(adminUser);
-      setLoading(false);
-      return;
-    }
-
+    
     try {
       const user = await authService.login(formData.username, formData.password);
       
