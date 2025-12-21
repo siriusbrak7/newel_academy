@@ -293,114 +293,74 @@ export const TopicDetailCheckpoints: React.FC = () => {
   }
 };
 
-  const startFinalAssessment = () => {
-    if (!topic || !user || !finalAssessment) return;
-    
-    const allQuestions = QUESTION_BANK[subject!] || [];
-    const gradeMap: Record<string, string> = {
-      '9': 'IGCSE', '10': 'IGCSE', '11': 'AS', '12': 'A_LEVEL'
-    };
-    const targetDiff = gradeMap[user.gradeLevel || '9'] || 'IGCSE';
-    
-    const relevantQuestions = allQuestions.filter(q => 
-      q.difficulty === targetDiff
+ 
+const handleAskAi = async () => {
+  if (!aiQuestion.trim() || !topic) return;
+  setAiLoading(true);
+  try {
+    const resp = await getAITutorResponse(
+      aiQuestion, 
+      `Topic: ${topic.title}, Description: ${topic.description}. Student level: ${user?.gradeLevel}`
     );
-
-    const shuffled = [...relevantQuestions].sort(() => 0.5 - Math.random());
-    const mcqs = shuffled.slice(0, 20); // 20 MCQ questions
-
-    // Add 2 theory questions
-    const theoryQuestions: Question[] = [
-      {
-        id: 'theory_1',
-        text: `Write a reflective essay about what you learned in ${topic.title}. Discuss key concepts and how they connect to real-world applications.`,
-        options: [],
-        correctAnswer: '',
-        type: 'THEORY',
-        difficulty: targetDiff as any,
-        topic: topic.title
-      },
-      {
-        id: 'theory_2',
-        text: `Analyze the importance of ${topic.title} in modern science. Provide examples and explain their significance.`,
-        options: [],
-        correctAnswer: '',
-        type: 'THEORY',
-        difficulty: targetDiff as any,
-        topic: topic.title
-      }
-    ];
-
-    setActiveFinalQuiz(true);
-  };
-
-  const handleAskAi = async () => {
-    if (!aiQuestion.trim() || !topic) return;
-    setAiLoading(true);
-    try {
-      const resp = await getAITutorResponse(
-        aiQuestion, 
-        `Topic: ${topic.title}, Description: ${topic.description}. Student level: ${user?.gradeLevel}`
-      );
-      setAiAnswer(resp);
-    } catch (error) {
-      console.error('Error:', error);
-      setAiAnswer("Sorry, I couldn't process your question. Please try again.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const calculateProgress = () => {
-  if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
-  
-  // Count unique checkpoint numbers passed (not individual checkpoint IDs)
-  const passedCheckpointNumbers = new Set<number>();
-  
-  Object.entries(checkpointProgress).forEach(([checkpointId, progress]) => {
-    const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-    // Type-safe check for progress
-    const progressObj = progress as any;
-    if (checkpoint && progressObj?.passed) {
-      passedCheckpointNumbers.add(checkpoint.checkpoint_number);
-    }
-  });
-  
-  const passedCount = passedCheckpointNumbers.size;
-  const totalCheckpointNumbers = new Set(checkpoints.map(cp => cp.checkpoint_number)).size;
-  
-  return {
-    passed: passedCount,
-    total: totalCheckpointNumbers,
-    percentage: totalCheckpointNumbers > 0 ? (passedCount / totalCheckpointNumbers) * 100 : 0
-  };
+    setAiAnswer(resp);
+  } catch (error) {
+    console.error('Error:', error);
+    setAiAnswer("Sorry, I couldn't process your question. Please try again.");
+  } finally {
+    setAiLoading(false);
+  }
 };
 
-  const progress = calculateProgress();
+const calculateProgress = () => {
+if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
+  
+  // Count unique checkpoint numbers passed (not individual checkpoint IDs)
+const passedCheckpointNumbers = new Set<number>();
+  
+Object.entries(checkpointProgress).forEach(([checkpointId, progress]) => {
+  const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
+    // Type-safe check for progress
+  const progressObj = progress as any;
+  if (checkpoint && progressObj?.passed) {
+    passedCheckpointNumbers.add(checkpoint.checkpoint_number);
+  }
+});
+  
+const passedCount = passedCheckpointNumbers.size;
+const totalCheckpointNumbers = new Set(checkpoints.map(cp => cp.checkpoint_number)).size;
+  
+return {
+  passed: passedCount,
+  total: totalCheckpointNumbers,
+  percentage: totalCheckpointNumbers > 0 ? (passedCount / totalCheckpointNumbers) * 100 : 0
+};
+};
+
+const progress = calculateProgress();
 
   // Helper function to check if a checkpoint is the most recent attempt
-  const isMostRecentAttempt = (checkpointId: string) => {
-    const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-    if (!checkpoint) return false;
+const isMostRecentAttempt = (checkpointId: string) => {
+  const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
+  if (!checkpoint) return false;
     
     // Find all checkpoints with the same number
-    const sameNumberCheckpoints = checkpoints.filter(cp => 
-      cp.checkpoint_number === checkpoint.checkpoint_number
+  const sameNumberCheckpoints = checkpoints.filter(cp => 
+    cp.checkpoint_number === checkpoint.checkpoint_number
     );
     
-    if (sameNumberCheckpoints.length === 1) return true;
+  if (sameNumberCheckpoints.length === 1) return true;
     
     // Find all attempts for this checkpoint number
-    const attempts = sameNumberCheckpoints
-      .map(cp => ({ id: cp.id, progress: checkpointProgress[cp.id] }))
-      .filter(item => item.progress)
-      .sort((a, b) => {
-        const dateA = new Date(a.progress.completed_at || 0);
-        const dateB = new Date(b.progress.completed_at || 0);
-        return dateB.getTime() - dateA.getTime();
-      });
+  const attempts = sameNumberCheckpoints
+    .map(cp => ({ id: cp.id, progress: checkpointProgress[cp.id] }))
+    .filter(item => item.progress)
+    .sort((a, b) => {
+      const dateA = new Date(a.progress.completed_at || 0);
+      const dateB = new Date(b.progress.completed_at || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
     
-    return attempts[0]?.id === checkpointId;
+  return attempts[0]?.id === checkpointId;
   };
 
   if (loading) {
@@ -807,4 +767,4 @@ export const TopicDetailCheckpoints: React.FC = () => {
       </div>
     </div>
   );
-}
+};

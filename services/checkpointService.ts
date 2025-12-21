@@ -34,38 +34,48 @@ export const getCheckpointByTopicAndNumber = async (topicId: string, checkpointN
 
 // In checkpointService.ts - Add debugging
 export const getCheckpointQuestions = async (checkpointId: string): Promise<Question[]> => {
-  console.log('getCheckpointQuestions called for:', checkpointId);
+  console.log('🔍 getCheckpointQuestions for:', checkpointId);
   
+  // TRY BOTH QUERY FORMATS:
+  
+  // Format 1: With join
   const { data, error } = await supabase
     .from('checkpoint_questions')
-    .select('question:questions(*)')
+    .select(`
+      question_id,
+      questions (
+        id, text, type, difficulty, correct_answer, options
+      )
+    `)
     .eq('checkpoint_id', checkpointId)
     .order('sort_order', { ascending: true });
 
   if (error) {
-    console.error('Supabase error:', error);
+    console.error('❌ Supabase error:', error);
     throw error;
   }
   
-  console.log('Raw data from Supabase:', {
-    count: data?.length,
-    data: data,
-    firstItem: data?.[0],
-    firstQuestion: data?.[0]?.question
+  console.log('📊 Raw data:', data);
+  
+  if (!data || data.length === 0) {
+    console.warn('⚠️ No questions found for checkpoint:', checkpointId);
+    return [];
+  }
+  
+  // Map data correctly - adjust based on actual structure
+  const questions = data.map(item => {
+    const q = item.questions;
+    return {
+      id: q.id,
+      text: q.text,
+      type: q.type || 'MCQ',
+      difficulty: q.difficulty || 'IGCSE',
+      correctAnswer: q.correct_answer, // Note: correct_answer vs correctAnswer
+      options: q.options || []
+    } as Question;
   });
   
-  const questions = (data || []).map(item => item.question);
-  
-  console.log('Processed questions:', {
-    count: questions.length,
-    questions: questions.map(q => ({
-      id: q?.id,
-      text: q?.text?.substring(0, 30),
-      hasCorrectAnswer: !!q?.correct_answer,
-      optionsCount: q?.options?.length
-    }))
-  });
-  
+  console.log('✅ Processed questions:', questions);
   return questions;
 };
 
