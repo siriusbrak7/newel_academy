@@ -1,7 +1,7 @@
 // components/CourseSystem/TopicDetailCheckpoints.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCheckpointQuestions, getCheckpointByTopicAndNumber } from '../../services/checkpointService';
+import { getCheckpointQuestions } from '../../services/checkpointService';
 import { User, Material, Question } from '../../types';
 import { 
   getStoredSession, 
@@ -13,6 +13,7 @@ import {
   getCourses
 } from '../../services/storageService';
 import { getAITutorResponse } from '../../services/geminiService';
+import { supabase } from '../../services/supabaseClient';
 import { 
   ArrowLeft, FileText, Play, CheckCircle, Lock, Link as LinkIcon, 
   File, Wand2, MessageCircle, ChevronRight, Brain, Check, Clock,
@@ -93,7 +94,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         const finalAssess = await getTopicFinalAssessment(topicId!);
         setFinalAssessment(finalAssess);
 
-        // FIXED: Find the user's ACTUAL checkpoint 4 attempt for THIS topic
+        // Find the user's ACTUAL checkpoint 4 attempt for THIS topic
         const userCheckpoint4Attempts = Object.entries(progressData)
           .filter(([checkpointId, progress]) => {
             // Find which checkpoint this progress belongs to
@@ -113,15 +114,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
         const isCheckpoint4Passed = latestCheckpoint4?.[1]?.passed || false;
         const checkpoint4Id = latestCheckpoint4?.[0];
 
-        // Find Checkpoint 5 (Final Theory) - make sure it's for THIS topic
-        const checkpoint5 = checkpointsData.find(cp => 
-          cp.checkpoint_number === 5
-        );
-
-        // Checkpoint 5 should only unlock if Checkpoint 4 is passed
-        const checkpoint5Unlocked = isCheckpoint4Passed && checkpoint5;
-
-        setIsUnlocked(checkpoint5Unlocked);
+        // Checkpoint 4 passed unlocks the final theory assessment
+        setIsUnlocked(isCheckpoint4Passed);
 
         // Debug log
         console.log('Unlock status:', {
@@ -129,8 +123,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
           latestCheckpoint4,
           isCheckpoint4Passed,
           checkpoint4Id,
-          checkpoint5,
-          checkpoint5Unlocked,
           allProgress: progressData,
           topicId
         });
@@ -146,6 +138,59 @@ export const TopicDetailCheckpoints: React.FC = () => {
     loadData();
   }, [subject, topicId, navigate]);
 
+  // Unlock next topic
+  const unlockNextTopic = async (userId: string, completedTopicId: string) => {
+    try {
+      console.log(`🔓 Attempting to unlock next topic after completing: ${completedTopicId}`);
+      
+      // 1. Get current topic's subject and sort_order
+      const { data: currentTopic } = await supabase
+        .from('topics')
+        .select('subject_id, sort_order, title')
+        .eq('id', completedTopicId)
+        .single();
+
+      if (!currentTopic) {
+        console.log('❌ Current topic not found');
+        return;
+      }
+
+      console.log(`📍 Current topic: ${currentTopic.title}, sort_order: ${currentTopic.sort_order}`);
+
+      // 2. Find next topic in same subject
+      const { data: nextTopic } = await supabase
+        .from('topics')
+        .select('id, title, sort_order')
+        .eq('subject_id', currentTopic.subject_id)
+        .eq('sort_order', (currentTopic.sort_order || 0) + 1)
+        .single();
+
+      if (nextTopic) {
+        console.log(`✅ Found next topic: ${nextTopic.title}, unlocking...`);
+        
+        // 3. Unlock next topic for user
+        const { error } = await supabase
+          .from('user_topic_access')
+          .upsert({
+            user_id: userId,
+            topic_id: nextTopic.id,
+            unlocked: true,
+            unlocked_at: new Date().toISOString()
+          }, { onConflict: 'user_id, topic_id' });
+
+        if (error) {
+          console.error('❌ Failed to unlock next topic:', error);
+        } else {
+          console.log(`✅ Successfully unlocked next topic: ${nextTopic.title}`);
+        }
+      } else {
+        console.log(`ℹ️ No next topic found - this might be the last topic in subject ${currentTopic.subject_id}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to unlock next topic:', error);
+    }
+  };
+
   const handleCheckpointComplete = async (checkpointId: string, score: number, passed: boolean) => {
     if (!user) return;
 
@@ -157,33 +202,51 @@ export const TopicDetailCheckpoints: React.FC = () => {
       const progressData = await getStudentCheckpointProgress(user.username, topicId!);
       setCheckpointProgress(progressData);
 
-      // Recheck if final assessment is now unlocked
-      const userCheckpoint4Attempts = Object.entries(progressData)
-        .filter(([checkpointId, progress]) => {
-          const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-          return checkpoint?.checkpoint_number === 4;
-        });
+      // Check which checkpoint was completed
+      const completedCheckpoint = checkpoints.find(cp => cp.id === checkpointId);
+      const isCheckpoint4 = completedCheckpoint?.checkpoint_number === 4;
+      const isCheckpoint4Passed = isCheckpoint4 && passed;
 
-      const latestCheckpoint4 = userCheckpoint4Attempts
-        .sort((a, b) => {
-          const dateA = new Date(a[1].completed_at || 0);
-          const dateB = new Date(b[1].completed_at || 0);
-          return dateB.getTime() - dateA.getTime();
-        })
-        [0];
-
-      const isCheckpoint4Passed = latestCheckpoint4?.[1]?.passed || false;
-      const checkpoint5 = checkpoints.find(cp => cp.checkpoint_number === 5);
-      const checkpoint5Unlocked = isCheckpoint4Passed && checkpoint5;
-      
-      setIsUnlocked(checkpoint5Unlocked);
+      // Update unlock status
+      if (isCheckpoint4) {
+        setIsUnlocked(isCheckpoint4Passed);
+      }
 
       setActiveCheckpoint(null);
       
       // Show success message
       if (passed) {
-        const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-        alert(`🎉 Checkpoint ${checkpoint?.checkpoint_number} passed with ${Math.round(score)}%!`);
+        alert(`🎉 Checkpoint ${completedCheckpoint?.checkpoint_number} passed with ${Math.round(score)}%!`);
+      }
+
+      // If checkpoint 4 is passed, check if topic is complete
+      if (isCheckpoint4 && passed) {
+        console.log(`✅ Checkpoint 4 passed! Checking if topic is complete...`);
+        
+        // Get user ID for unlocking next topic
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', user.username)
+          .single();
+
+        if (userData && topicId) {
+          // Update topic progress in user_progress table
+          await supabase
+            .from('user_progress')
+            .upsert({
+              user_id: userData.id,
+              topic_id: topicId,
+              main_assessment_passed: true,
+              main_assessment_score: score,
+              last_accessed: new Date().toISOString()
+            }, { onConflict: 'user_id, topic_id' });
+
+          console.log(`✅ Topic progress updated for ${topicId}`);
+          
+          // Try to unlock next topic
+          await unlockNextTopic(userData.id, topicId);
+        }
       }
     } catch (error) {
       console.error('Error saving checkpoint progress:', error);
@@ -201,6 +264,20 @@ export const TopicDetailCheckpoints: React.FC = () => {
         mainAssessmentPassed: passed
       });
 
+      // If passed, unlock next topic
+      if (passed) {
+        // Get user ID
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', user.username)
+          .single();
+
+        if (userData) {
+          await unlockNextTopic(userData.id, topicId);
+        }
+      }
+
       setActiveFinalQuiz(false);
       alert(passed ? '🎉 Congratulations! You passed the final assessment!' : 'Keep practicing and try again.');
     } catch (error) {
@@ -210,156 +287,162 @@ export const TopicDetailCheckpoints: React.FC = () => {
   };
 
   const startCheckpoint = async (checkpoint: any) => {
-  try {
-    console.log('=== START CHECKPOINT DEBUG ===');
-    console.log('Checkpoint ID:', checkpoint.id);
-    console.log('Checkpoint object:', checkpoint);
-    
-    // 1. Use the service to fetch ALL questions from the database
-    const allCheckpointQuestions = await getCheckpointQuestions(checkpoint.id);
-    
-    console.log('Questions from getCheckpointQuestions:', {
-      count: allCheckpointQuestions?.length,
-      sample: allCheckpointQuestions?.[0],
-      allQuestions: allCheckpointQuestions
-    });
-    
-    if (!allCheckpointQuestions || allCheckpointQuestions.length === 0) {
-      console.error('NO QUESTIONS FOUND for checkpoint:', checkpoint.id);
-      alert('No questions available for this checkpoint. Please contact your teacher.');
-      return;
-    }
-    
-    // 2. Determine how many to show
-    let questionsToShow = 5; // Default for checkpoints 1-3
-    switch (checkpoint.checkpoint_number) {
-      case 4: questionsToShow = 20; break; // Final MCQ
-      case 5: questionsToShow = 1; break;  // Final Theory
-      default: questionsToShow = 5; break; // Checkpoints 1-3
-    }
-    
-    // 3. Select random questions
-    let questionsToUse = allCheckpointQuestions;
-    
-    if (allCheckpointQuestions.length > questionsToShow) {
-      console.log(`Selecting ${questionsToShow} random questions from pool of ${allCheckpointQuestions.length}`);
+    try {
+      console.log('=== START CHECKPOINT DEBUG ===');
+      console.log('Checkpoint ID:', checkpoint.id);
+      console.log('Checkpoint object:', checkpoint);
       
-      // Fisher-Yates shuffle
-      const shuffled = [...allCheckpointQuestions];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      // 1. Use the service to fetch ALL questions from the database
+      const allCheckpointQuestions = await getCheckpointQuestions(checkpoint.id);
+      
+      console.log('Questions from getCheckpointQuestions:', {
+        count: allCheckpointQuestions?.length,
+        sample: allCheckpointQuestions?.[0],
+        allQuestions: allCheckpointQuestions
+      });
+      
+      if (!allCheckpointQuestions || allCheckpointQuestions.length === 0) {
+        console.error('NO QUESTIONS FOUND for checkpoint:', checkpoint.id);
+        alert('No questions available for this checkpoint. Please contact your teacher.');
+        return;
       }
-      questionsToUse = shuffled.slice(0, questionsToShow);
-    }
-    
-    // 4. Log the selected questions
-    console.log('Selected questions:', {
-      count: questionsToUse.length,
-      questions: questionsToUse.map(q => ({
+      
+      // 2. Determine how many to show
+      let questionsToShow = 5; // Default for checkpoints 1-3
+      switch (checkpoint.checkpoint_number) {
+        case 4: questionsToShow = 20; break; // Final MCQ
+        case 5: questionsToShow = 1; break;  // Final Theory
+        default: questionsToShow = 5; break; // Checkpoints 1-3
+      }
+      
+      // 3. Select random questions
+      let questionsToUse = allCheckpointQuestions;
+      
+      if (allCheckpointQuestions.length > questionsToShow) {
+        console.log(`Selecting ${questionsToShow} random questions from pool of ${allCheckpointQuestions.length}`);
+        
+        // Fisher-Yates shuffle
+        const shuffled = [...allCheckpointQuestions];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        questionsToUse = shuffled.slice(0, questionsToShow);
+      }
+      
+      // 4. Log the selected questions
+      console.log('Selected questions:', {
+        count: questionsToUse.length,
+        questions: questionsToUse.map(q => ({
+          id: q.id,
+          text: q.text?.substring(0, 50),
+          correctAnswer: q.correctAnswer,
+          options: q.options,
+          type: q.type
+        }))
+      });
+      
+      // 5. Format questions for the quiz component
+      const formattedQuestions: Question[] = questionsToUse.map(q => ({
         id: q.id,
-        text: q.text?.substring(0, 50),
-        correctAnswer: q.correctAnswer,
-        options: q.options,
-        type: q.type
-      }))
-    });
-    
-    // 5. Format questions for the quiz component
-    const formattedQuestions: Question[] = questionsToUse.map(q => ({
-      id: q.id,
-      text: q.text,
-      type: q.type || 'MCQ',
-      difficulty: q.difficulty || 'IGCSE',
-      topic: topic?.title || '',
-      options: q.options || [],
-      correctAnswer: q.correctAnswer || ''
-    }));
-    
-    console.log('Formatted questions:', formattedQuestions);
-    
-    // 6. Set active checkpoint
-    setActiveCheckpoint({
-      ...checkpoint,
-      questions: formattedQuestions
-    });
-    
-    console.log('=== END START CHECKPOINT DEBUG ===');
-    
-  } catch (error) {
-    console.error('Error loading checkpoint questions:', error);
-    alert('Failed to load checkpoint. Please try again.');
-  }
-};
-
+        text: q.text,
+        type: q.type || 'MCQ',
+        difficulty: q.difficulty || 'IGCSE',
+        topic: topic?.title || '',
+        options: q.options || [],
+        correctAnswer: q.correctAnswer || ''
+      }));
+      
+      console.log('Formatted questions:', formattedQuestions);
+      
+      // 6. Set active checkpoint
+      setActiveCheckpoint({
+        ...checkpoint,
+        questions: formattedQuestions
+      });
+      
+      console.log('=== END START CHECKPOINT DEBUG ===');
+      
+    } catch (error) {
+      console.error('Error loading checkpoint questions:', error);
+      alert('Failed to load checkpoint. Please try again.');
+    }
+  };
  
-const handleAskAi = async () => {
-  if (!aiQuestion.trim() || !topic) return;
-  setAiLoading(true);
-  try {
-    const resp = await getAITutorResponse(
-      aiQuestion, 
-      `Topic: ${topic.title}, Description: ${topic.description}. Student level: ${user?.gradeLevel}`
-    );
-    setAiAnswer(resp);
-  } catch (error) {
-    console.error('Error:', error);
-    setAiAnswer("Sorry, I couldn't process your question. Please try again.");
-  } finally {
-    setAiLoading(false);
-  }
-};
+  const handleAskAi = async () => {
+    if (!aiQuestion.trim() || !topic) return;
+    setAiLoading(true);
+    try {
+      const resp = await getAITutorResponse(
+        aiQuestion, 
+        `Topic: ${topic.title}, Description: ${topic.description}. Student level: ${user?.gradeLevel}`
+      );
+      setAiAnswer(resp);
+    } catch (error) {
+      console.error('Error:', error);
+      setAiAnswer("Sorry, I couldn't process your question. Please try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
-const calculateProgress = () => {
-if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
-  
-  // Count unique checkpoint numbers passed (not individual checkpoint IDs)
-const passedCheckpointNumbers = new Set<number>();
-  
-Object.entries(checkpointProgress).forEach(([checkpointId, progress]) => {
-  const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-    // Type-safe check for progress
-  const progressObj = progress as any;
-  if (checkpoint && progressObj?.passed) {
-    passedCheckpointNumbers.add(checkpoint.checkpoint_number);
-  }
-});
-  
-const passedCount = passedCheckpointNumbers.size;
-const totalCheckpointNumbers = new Set(checkpoints.map(cp => cp.checkpoint_number)).size;
-  
-return {
-  passed: passedCount,
-  total: totalCheckpointNumbers,
-  percentage: totalCheckpointNumbers > 0 ? (passedCount / totalCheckpointNumbers) * 100 : 0
-};
-};
+  // Calculate progress properly
+  const calculateProgress = () => {
+    if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
+    
+    // Count passed checkpoints (checkpoints 1-4 only)
+    let passedCount = 0;
+    const validCheckpointNumbers = [1, 2, 3, 4];
+    
+    checkpoints.forEach(checkpoint => {
+      if (validCheckpointNumbers.includes(checkpoint.checkpoint_number)) {
+        const progress = checkpointProgress[checkpoint.id];
+        if (progress?.passed) {
+          passedCount++;
+        }
+      }
+    });
+    
+    const totalCheckpoints = Math.min(checkpoints.filter(cp => 
+      [1, 2, 3, 4].includes(cp.checkpoint_number)
+    ).length, 4); // Only count checkpoints 1-4
+    const percentage = totalCheckpoints > 0 ? (passedCount / totalCheckpoints) * 100 : 0;
+    
+    console.log('Progress calculation:', {
+      passedCount,
+      totalCheckpoints,
+      percentage,
+      checkpointProgress
+    });
+    
+    return { passed: passedCount, total: totalCheckpoints, percentage };
+  };
 
-const progress = calculateProgress();
+  const progress = calculateProgress();
 
   // Helper function to check if a checkpoint is the most recent attempt
-const isMostRecentAttempt = (checkpointId: string) => {
-  const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-  if (!checkpoint) return false;
-    
+  const isMostRecentAttempt = (checkpointId: string) => {
+    const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
+    if (!checkpoint) return false;
+      
     // Find all checkpoints with the same number
-  const sameNumberCheckpoints = checkpoints.filter(cp => 
-    cp.checkpoint_number === checkpoint.checkpoint_number
+    const sameNumberCheckpoints = checkpoints.filter(cp => 
+      cp.checkpoint_number === checkpoint.checkpoint_number
     );
-    
-  if (sameNumberCheckpoints.length === 1) return true;
-    
+      
+    if (sameNumberCheckpoints.length === 1) return true;
+      
     // Find all attempts for this checkpoint number
-  const attempts = sameNumberCheckpoints
-    .map(cp => ({ id: cp.id, progress: checkpointProgress[cp.id] }))
-    .filter(item => item.progress)
-    .sort((a, b) => {
-      const dateA = new Date(a.progress.completed_at || 0);
-      const dateB = new Date(b.progress.completed_at || 0);
-      return dateB.getTime() - dateA.getTime();
-    });
-    
-  return attempts[0]?.id === checkpointId;
+    const attempts = sameNumberCheckpoints
+      .map(cp => ({ id: cp.id, progress: checkpointProgress[cp.id] }))
+      .filter(item => item.progress)
+      .sort((a, b) => {
+        const dateA = new Date(a.progress.completed_at || 0);
+        const dateB = new Date(b.progress.completed_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+    return attempts[0]?.id === checkpointId;
   };
 
   if (loading) {
@@ -687,7 +770,7 @@ const isMostRecentAttempt = (checkpointId: string) => {
             </div>
           </div>
 
-          {/* Final Assessment - Updated with proper prerequisite check */}
+          {/* Final Assessment - Updated to use finalAssessment instead of checkpoint 5 */}
           <div className={`p-6 rounded-2xl border ${
             isUnlocked ? 
             'bg-gradient-to-b from-cyan-900/20 to-purple-900/20 border-cyan-500/30' : 
@@ -702,7 +785,7 @@ const isMostRecentAttempt = (checkpointId: string) => {
                 : `Pass the 20-question MCQ assessment first (85% required).`}
             </p>
             
-            {checkpoints.find(cp => cp.checkpoint_number === 5) ? (
+            {finalAssessment ? (
               <>
                 <div className="text-sm text-white/50 mb-4 space-y-2">
                   <div className="flex justify-between">
@@ -727,12 +810,7 @@ const isMostRecentAttempt = (checkpointId: string) => {
                 
                 {isUnlocked ? (
                   <button 
-                    onClick={() => {
-                      const theoryCheckpoint = checkpoints.find(cp => cp.checkpoint_number === 5);
-                      if (theoryCheckpoint) {
-                        startCheckpoint(theoryCheckpoint);
-                      }
-                    }}
+                    onClick={() => setActiveFinalQuiz(true)}
                     className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                   >
                     <Zap size={18} /> Start Final Theory Assessment
