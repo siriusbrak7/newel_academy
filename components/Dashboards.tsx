@@ -626,7 +626,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white">Teacher Dashboard</h2>
-          <div className="text-sm text-white/50">Real Student Data Only....</div>
+          <div className="text-sm text-white/50">Student Data Only....</div>
         </div>
         <div className="flex gap-2">
           <button 
@@ -916,7 +916,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       {/* Detailed Student List */}
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
         <div className="p-6 border-b border-white/10 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-white">Real Student Progress Overview</h3>
+          <h3 className="text-xl font-bold text-white">Student Progress Overview</h3>
           <span className="text-white/40 text-sm">
             Showing {stats.length} students
           </span>
@@ -1233,7 +1233,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       link: "/courses" 
     },
     { 
-      title: "Newel-Explainer", 
+      title: "Ask Newel", 
       desc: "Get instant simplifications of complex theories.", 
       icon: <Atom className="text-cyan-400" size={32} />, 
       color: "from-cyan-500/20 to-teal-500/20", 
@@ -1291,7 +1291,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <Brain className="text-cyan-300" size={24}/>
             </div>
             <div>
-              <h4 className="font-bold text-cyan-300 mb-1">Personal Advisor</h4>
+              <h4 className="font-bold text-cyan-300 mb-1">From Newel:</h4>
               <p className="text-white/80 italic">"{advice}"</p>
             </div>
           </div>
