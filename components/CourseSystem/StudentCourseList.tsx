@@ -43,19 +43,27 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
 
   const loadCheckpointProgress = async (coursesData: CourseStructure, username: string) => {
     const progressMap: Record<string, any> = {};
+    console.log('📊 Loading checkpoint progress for all topics...');
     
     for (const subject in coursesData) {
       for (const topicId in coursesData[subject]) {
         try {
+          console.log(`📊 Loading checkpoint progress for topic: ${topicId}`);
           const cpProgress = await getStudentCheckpointProgress(username, topicId);
+          console.log(`✅ Checkpoint progress for ${topicId}:`, cpProgress);
           progressMap[topicId] = cpProgress;
+          
+          // Calculate progress percentage immediately for debugging
+          const passedCount = Object.values(cpProgress).filter((cp: any) => cp.passed).length;
+          console.log(`📈 ${topicId}: ${passedCount}/5 checkpoints passed`);
         } catch (error) {
-          console.error(`Error loading checkpoint progress for ${topicId}:`, error);
+          console.error(`❌ Error loading checkpoint progress for ${topicId}:`, error);
           progressMap[topicId] = {};
         }
       }
     }
     
+    console.log('✅ Final checkpoint progress map:', progressMap);
     setCheckpointProgress(progressMap);
   };
 
@@ -80,26 +88,31 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
 
   // Helper function to calculate topic completion percentage using checkpoints
   const getTopicCompletion = (subject: string, topicId: string) => {
-    // Method 1: Use checkpoint progress
+    console.log(`🔍 getTopicCompletion called for: ${topicId}`);
+    
+    // Check checkpoint progress first
     const cpProgress = checkpointProgress[topicId];
+    console.log(`📊 Checkpoint progress for ${topicId}:`, cpProgress);
+    
     if (cpProgress && Object.keys(cpProgress).length > 0) {
       const passedCheckpoints = Object.values(cpProgress).filter((cp: any) => cp.passed).length;
-      // Each topic has 5 checkpoints total (4 MCQ + 1 Final Theory)
-      const totalCheckpoints = 5;
+      const totalCheckpoints = 5; // 4 MCQ + 1 Final Theory
       const percentage = Math.round((passedCheckpoints / totalCheckpoints) * 100);
-      console.log(`📊 Progress for ${topicId}: ${passedCheckpoints}/${totalCheckpoints} = ${percentage}%`);
+      console.log(`📈 Progress calculation: ${passedCheckpoints}/${totalCheckpoints} = ${percentage}%`);
       return percentage;
     }
     
-    // Method 2: Fallback to subtopic progress
+    console.log(`⚠️ No checkpoint progress found for ${topicId}`);
+    
+    // Fallback: Check if topic is completed in user_progress
     const topicProgress = progress[subject]?.[topicId];
-    if (!topicProgress) return 0;
+    if (topicProgress?.mainAssessmentScore) {
+      console.log(`📊 Using mainAssessmentScore: ${topicProgress.mainAssessmentScore}%`);
+      return topicProgress.mainAssessmentScore;
+    }
     
-    const subtopics = Object.keys(topicProgress.subtopics || {});
-    if (subtopics.length === 0) return 0;
-    
-    const completed = subtopics.filter(key => topicProgress.subtopics[key]).length;
-    return Math.round((completed / subtopics.length) * 100);
+    console.log(`📊 No progress data found, returning 0%`);
+    return 0;
   };
 
   const getTopicAccessStatus = (subject: string, topicId: string) => {
@@ -252,6 +265,18 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         <div className="text-center py-4">
           <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-cyan-500 mr-2"></div>
           <span className="text-white/60 text-sm">Checking topic access permissions...</span>
+        </div>
+      )}
+      
+      {/* Debug Info - Development Only */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-black/20 p-4 rounded-lg border border-white/10 mt-4">
+          <h4 className="text-white/60 text-sm mb-2">Debug Info</h4>
+          <div className="text-xs text-white/40 space-y-1">
+            <div>Checkpoint Progress Keys: {Object.keys(checkpointProgress).length}</div>
+            <div>Topics: {Object.keys(courses).reduce((acc, subj) => acc + Object.keys(courses[subj] || {}).length, 0)}</div>
+            <div>Cell Biology Progress: {JSON.stringify(checkpointProgress['ebf5e931-f0fb-48df-8dfc-9021d96d2bd6'])}</div>
+          </div>
         </div>
       )}
     </div>
