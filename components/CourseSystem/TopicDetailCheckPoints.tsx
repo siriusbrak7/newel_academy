@@ -1,4 +1,3 @@
-
 // components/CourseSystem/TopicDetailCheckpoints.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -18,7 +17,7 @@ import { supabase } from '../../services/supabaseClient';
 import { 
   ArrowLeft, FileText, Play, CheckCircle, Lock, Link as LinkIcon, 
   File, Wand2, MessageCircle, ChevronRight, Brain, Check, Clock,
-  Trophy, BookOpen, Target, BarChart3, Zap, AlertCircle
+  Trophy, BookOpen, Target, BarChart3, Zap, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { CheckpointQuiz } from './CheckpointQuiz';
 import { QuizInterface } from './QuizInterface';
@@ -43,6 +42,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Final assessment completion state
+  const [hasPassedFinalAssessment, setHasPassedFinalAssessment] = useState(false);
+  const [finalAssessmentScore, setFinalAssessmentScore] = useState(0);
+  const [finalAssessmentCompletionDate, setFinalAssessmentCompletionDate] = useState('');
+
   // Calculate progress - FIXED: Only count checkpoints 1-4, not including checkpoint 5
   const progress = useMemo(() => {
     if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
@@ -170,6 +174,21 @@ export const TopicDetailCheckpoints: React.FC = () => {
         // Checkpoint 4 passed unlocks the final theory assessment
         setIsUnlocked(isCheckpoint4Passed);
 
+        // Check if final assessment is already passed
+        const finalCheckpointProgress = Object.entries(progressData).find(([checkpointId, progress]) => {
+          const checkpoint = checkpointsData.find(cp => cp.id === checkpointId);
+          return checkpoint?.checkpoint_number === 5;
+        });
+
+        if (finalCheckpointProgress) {
+          const [, finalProgress] = finalCheckpointProgress;
+          setHasPassedFinalAssessment(finalProgress.passed || false);
+          setFinalAssessmentScore(finalProgress.score || 0);
+          if (finalProgress.completed_at) {
+            setFinalAssessmentCompletionDate(new Date(finalProgress.completed_at).toLocaleDateString());
+          }
+        }
+
         // Debug log
         console.log('Unlock status:', {
           userCheckpoint4Attempts,
@@ -179,7 +198,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
           allProgress: progressData,
           topicId,
           hasFinalAssessment: !!finalAssess,
-          hasFinalQuestions: finalAssessmentQuestions.length
+          hasFinalQuestions: finalAssessmentQuestions.length,
+          hasPassedFinalAssessment,
+          finalAssessmentScore
         });
 
       } catch (error) {
@@ -372,6 +393,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
     if (!user || !subject || !topicId) return;
 
     try {
+      // Update final assessment completion state
+      setHasPassedFinalAssessment(passed);
+      setFinalAssessmentScore(score);
+      setFinalAssessmentCompletionDate(new Date().toLocaleDateString());
+
       // Update topic progress
       await updateTopicProgress(user.username, subject!, topicId!, {
         mainAssessmentScore: score,
@@ -617,19 +643,19 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
       {/* Final Assessment Quiz Modal */}
       {activeFinalQuiz && user && finalAssessment && (
-      <QuizInterface
-        title={`${topic.title} - Final Assessment`}
-        questions={finalAssessmentQuestions.length > 0 
-          ? [finalAssessmentQuestions[Math.floor(Math.random() * finalAssessmentQuestions.length)]] 
-          : []}
-        passThreshold={finalAssessment.pass_percentage || 85}
-        onComplete={handleFinalAssessmentComplete}
-        onClose={() => setActiveFinalQuiz(false)}
-        isCourseFinal={true}
-        assessmentId={finalAssessment.id}
-        username={user.username}
-      />
-    )}
+        <QuizInterface
+          title={`${topic.title} - Final Assessment`}
+          questions={finalAssessmentQuestions.length > 0 
+            ? [finalAssessmentQuestions[Math.floor(Math.random() * finalAssessmentQuestions.length)]] 
+            : []}
+          passThreshold={finalAssessment.pass_percentage || 85}
+          onComplete={handleFinalAssessmentComplete}
+          onClose={() => setActiveFinalQuiz(false)}
+          isCourseFinal={true}
+          assessmentId={finalAssessment.id}
+          username={user.username}
+        />
+      )}
 
       {/* Ask AI Sidebar */}
       {showAiAsk && (
@@ -775,80 +801,120 @@ export const TopicDetailCheckpoints: React.FC = () => {
           </section>
 
           {/* Checkpoints - Note: Checkpoint 5 is now filtered out */}
-          <section>
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Target className="text-purple-400"/> Topic Checkpoints
-            </h2>
-            <div className="space-y-4">
-              {checkpoints.length === 0 ? (
-                <div className="text-center py-8 text-white/30 italic">
-                  No checkpoints defined for this topic yet.
-                </div>
-              ) : (
-                checkpoints.map((cp, index) => {
-                  const progress = checkpointProgress[cp.id];
-                  const isPassed = progress?.passed;
-                  const score = progress?.score;
-                  const isMostRecent = isMostRecentAttempt(cp.id);
+          <section className="mt-12">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-white/10 rounded-3xl p-8">
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <Target className="text-purple-400"/> Topic Checkpoints
+              </h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                {checkpoints.map((checkpoint) => {
+                  const progress = checkpointProgress[checkpoint.id];
+                  const isMostRecent = isMostRecentAttempt(checkpoint.id);
+                  
+                  // Log each checkpoint for debugging
+                  console.log(`Checkpoint ${checkpoint.checkpoint_number}:`, {
+                    id: checkpoint.id,
+                    title: checkpoint.title,
+                    progress: progress,
+                    isMostRecent: isMostRecent
+                  });
                   
                   return (
-                    <div key={cp.id} className={`p-4 rounded-xl border ${
-                      isPassed ? 'bg-green-900/10 border-green-500/30' : 
-                      progress ? 'bg-yellow-900/10 border-yellow-500/30' : 
-                      'bg-white/5 border-white/10'
-                    } flex justify-between items-center`}>
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          isPassed ? 'bg-green-500/20 text-green-400' : 
-                          progress ? 'bg-yellow-500/20 text-yellow-400' :
-                          'bg-white/10 text-white/50'
-                        }`}>
-                          {isPassed ? <CheckCircle size={20} /> : 
-                           progress ? <Clock size={20} /> :
-                           <span className="font-bold">{index + 1}</span>}
-                        </div>
-                        <div>
-                          <h4 className="text-white font-semibold">{cp.title}</h4>
-                          <p className="text-xs text-white/40">
-                            Checkpoint {cp.checkpoint_number} • {cp.question_count} questions
-                            {!isMostRecent && progress && (
-                              <span className="text-yellow-400 ml-2">(Previous Attempt)</span>
-                            )}
-                          </p>
-                          {score !== undefined && (
-                            <p className="text-xs text-white/50 mt-1">
-                              Score: {Math.round(score)}% {score >= 85 ? '✓' : '✗'}
-                            </p>
+                    <div 
+                      key={checkpoint.id} 
+                      className={`p-4 rounded-xl border transition-all ${
+                        progress?.passed 
+                          ? 'bg-green-900/10 border-green-500/30' 
+                          : isMostRecent && progress
+                          ? 'bg-yellow-900/10 border-yellow-500/30' 
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-bold text-white">Checkpoint {checkpoint.checkpoint_number}</h3>
+                        {progress ? (
+                          <div className={`flex items-center gap-1 text-sm ${
+                            progress.passed ? 'text-green-400' : 'text-yellow-400'
+                          }`}>
+                            {progress.passed ? <CheckCircle size={14} /> : <Clock size={14} />}
+                            {progress.passed ? 'Passed' : 'Attempted'}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-white/50">Not started</div>
+                        )}
+                      </div>
+                      <p className="text-sm text-white/60 mb-4">{checkpoint.title}</p>
+                      
+                      {/* Progress details */}
+                      {progress && (
+                        <div className="text-xs text-white/40 mb-3">
+                          <div className="flex justify-between">
+                            <span>Score:</span>
+                            <span>{Math.round(progress.score || 0)}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Date:</span>
+                            <span>
+                              {progress.completed_at 
+                                ? new Date(progress.completed_at).toLocaleDateString() 
+                                : 'Not completed'}
+                            </span>
+                          </div>
+                          {isMostRecent && !progress.passed && (
+                            <div className="text-yellow-400 mt-1">
+                              Most recent attempt
+                            </div>
                           )}
                         </div>
+                      )}
+                      
+                      {/* Checkpoint-specific requirements */}
+                      <div className="mb-4">
+                        {checkpoint.checkpoint_number === 4 ? (
+                          <div className="text-sm bg-cyan-900/20 text-cyan-300 p-2 rounded-lg">
+                            <strong>Final MCQ Assessment:</strong> 20 questions, 85% to pass & unlock theory
+                          </div>
+                        ) : (
+                          <div className="text-sm text-white/50">
+                            {checkpoint.checkpoint_number === 1 && 'Foundation concepts'}
+                            {checkpoint.checkpoint_number === 2 && 'Intermediate understanding'}  
+                            {checkpoint.checkpoint_number === 3 && 'Advanced application'}
+                          </div>
+                        )}
                       </div>
                       
-                      {isPassed ? (
-                        <div className="flex items-center gap-2 text-green-400 font-bold text-sm">
-                          <CheckCircle size={18} /> Passed
-                        </div>
-                      ) : progress ? (
-                        <button 
-                          onClick={() => startCheckpoint(cp)}
-                          className="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-yellow-900/20 flex items-center gap-2"
-                        >
-                          <Play size={14} /> {isMostRecent ? 'Retry' : 'Try Different Version'}
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => startCheckpoint(cp)}
-                          className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-900/20 flex items-center gap-2"
-                        >
-                          <Play size={14} /> Start Quiz
-                        </button>
-                      )}
+                      <button
+                        onClick={() => startCheckpoint(checkpoint)}
+                        className={`w-full py-2 rounded-lg text-center text-sm font-medium transition-all ${
+                          progress?.passed 
+                            ? 'bg-green-600 hover:bg-green-700 text-white' 
+                            : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white'
+                        }`}
+                      >
+                        {progress?.passed ? 'Review Again' : 'Start Checkpoint'}
+                      </button>
                     </div>
                   );
-                })
+                })}
+              </div>
+              
+              {/* Final Assessment Reminder */}
+              {checkpoints.some(cp => cp.checkpoint_number === 4) && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-purple-900/20 to-cyan-900/20 border border-purple-500/30 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Zap className="text-yellow-400" size={20} />
+                    <div>
+                      <h4 className="text-white font-bold">Final Theory Assessment</h4>
+                      <p className="text-sm text-white/60">
+                        Complete Checkpoint 4 (20 MCQ questions with 85% score) to unlock the final theory assessment.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </section>
-        </div>
+        </div> {/* Closing div for md:col-span-2 */}
 
         {/* Right Column - Progress & Final Assessment */}
         <div className="space-y-6">
@@ -884,7 +950,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             </div>
           </div>
 
-          {/* Final Assessment - Updated to use finalAssessment, NOT checkpoint 5 */}
+          {/* Final Assessment - UPDATED: Removed "Questions Available", added completion status */}
           <div className={`p-6 rounded-2xl border ${
             isUnlocked ? 
             'bg-gradient-to-b from-cyan-900/20 to-purple-900/20 border-cyan-500/30' : 
@@ -920,50 +986,59 @@ export const TopicDetailCheckpoints: React.FC = () => {
                       {isUnlocked ? "✓ MCQ Passed" : "✗ MCQ Required"}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Questions Available:</span>
-                    <span className={finalAssessmentQuestions.length > 0 ? "text-green-400" : "text-red-400"}>
-                      {finalAssessmentQuestions.length} questions
-                    </span>
-                  </div>
+                  
+                  {/* Completion Status - ADDED */}
+                  {hasPassedFinalAssessment && (
+                    <div className="flex justify-between">
+                      <span>Your Score:</span>
+                      <span className="text-green-400 font-bold">
+                        {finalAssessmentScore}% ✓ Passed
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
                 {isUnlocked ? (
-                  <button 
-                    onClick={startFinalAssessment}
-                    className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-                  >
-                    <Zap size={18} /> Start Final Theory Assessment
-                  </button>
+                  hasPassedFinalAssessment ? (
+                    <div className="space-y-3">
+                      <div className="bg-green-900/20 border border-green-500/30 p-3 rounded-lg text-center">
+                        <div className="text-green-400 font-bold text-lg mb-1">
+                          ✅ Final Assessment Passed!
+                        </div>
+                        <div className="text-white/70 text-sm">
+                          Score: {finalAssessmentScore}% • Completed on {finalAssessmentCompletionDate}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={startFinalAssessment}
+                        className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                      >
+                        <RefreshCw size={18} /> Retry Final Assessment
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={startFinalAssessment}
+                      className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                    >
+                      <Zap size={18} /> Start Final Theory Assessment
+                    </button>
+                  )
                 ) : (
-                  <div className="flex items-center gap-2 text-white/40 bg-black/20 p-3 rounded-lg justify-center">
-                    <Lock size={18} /> Complete MCQ Assessment First
+                  <div className="flex items-center gap-2 text-white/40 bg-black/20 p-3 rounded-lg">
+                    <Lock size={16} /> Complete MCQ Assessment First
                   </div>
                 )}
               </>
             ) : (
-              <div className="text-white/40 italic text-sm text-center py-4">
-                Final assessment not configured yet.
+              <div className="text-center p-4 text-white/40">
+                <AlertCircle className="mx-auto mb-2" size={24} />
+                Final assessment not available yet.
               </div>
             )}
           </div>
-          
-          {/* Debug Info (visible in development) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="bg-black/20 p-4 rounded-xl border border-white/10 text-xs">
-              <h4 className="text-white/60 mb-2">Debug Info</h4>
-              <div className="text-white/40 space-y-1">
-                <div>Topic ID: {topicId}</div>
-                <div>Checkpoints: {checkpoints.length}</div>
-                <div>Progress entries: {Object.keys(checkpointProgress).length}</div>
-                <div>Final unlocked: {isUnlocked ? 'Yes' : 'No'}</div>
-                <div>Has finalAssessment: {finalAssessment ? 'Yes' : 'No'}</div>
-                <div>Final assessment questions: {finalAssessmentQuestions.length}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        </div> {/* Closing div for right column */}
+      </div> {/* Closing div for grid md:grid-cols-3 */}
+    </div> // Closing div for max-w-6xl
   );
 };
