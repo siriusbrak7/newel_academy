@@ -79,13 +79,14 @@ const Navbar: React.FC<NavbarProps> = ({
 
         {user ? (
           <>
-            <div className="hidden md:flex space-x-6 text-sm font-medium">
+            <div className="flex space-x-4 md:space-x-6 text-sm font-medium">
               <Link to="/" className={`flex items-center gap-2 transition-colors ${
                 currentTheme === 'Cosmic'
                   ? 'text-white/80 hover:text-cyan-400'
                   : 'text-green-300/80 hover:text-green-400 cyber-text-glow'
               }`}>
-                <LayoutDashboard size={16} /> Dashboard
+                <LayoutDashboard size={16} /> 
+                <span className="hidden sm:inline">Dashboard</span>
               </Link>
               {user.role !== 'admin' && (
                 <>
@@ -94,14 +95,16 @@ const Navbar: React.FC<NavbarProps> = ({
                       ? 'text-white/80 hover:text-cyan-400'
                       : 'text-green-300/80 hover:text-green-400 cyber-text-glow'
                   }`}>
-                    <BookOpen size={16} /> Courses
+                    <BookOpen size={16} /> 
+                    <span className="hidden sm:inline">Courses</span>
                   </Link>
                   <Link to="/leaderboard" className={`flex items-center gap-2 transition-colors ${
                     currentTheme === 'Cosmic'
                       ? 'text-white/80 hover:text-cyan-400'
                       : 'text-green-300/80 hover:text-green-400 cyber-text-glow'
                   }`}>
-                    <Trophy size={16} /> Leaderboard
+                    <Trophy size={16} /> 
+                    <span className="hidden sm:inline">Leaderboard</span>
                   </Link>
                 </>
               )}
