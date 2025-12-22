@@ -1,3 +1,4 @@
+import { supabase } from '../../services/supabaseClient';  // Add this line
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CourseStructure, Topic, Question, Material } from '../../types';
@@ -141,142 +142,172 @@ export const CourseManager: React.FC = () => {
     }));
   };
 
-  const handleCreateTopic = async () => {
-    if (!createForm.title) {
-      alert('Topic Title required');
-      return;
-    }
-    
-    let materialContent = createForm.materialContent;
+    const handleCreateTopic = async () => {
+      if (!createForm.title) {
+        alert('Topic Title required');
+        return;
+      }
+      
+      let materialContent = createForm.materialContent;
 
-    if (createForm.materialType === 'file' && createFile) {
-      setIsUploading(true);
-      try {
-        const publicUrl = await uploadFileToSupabase(createFile);
-        if (!publicUrl) {
-          alert("Failed to upload file. Please try again.");
+      if (createForm.materialType === 'file' && createFile) {
+        setIsUploading(true);
+        try {
+          const publicUrl = await uploadFileToSupabase(createFile);
+          if (!publicUrl) {
+            alert("Failed to upload file. Please try again.");
+            setIsUploading(false);
+            return;
+          }
+          materialContent = publicUrl;
+        } catch (error) {
+          console.error('Upload error:', error);
+          alert("Upload failed. Please try again.");
           setIsUploading(false);
           return;
         }
-        materialContent = publicUrl;
-      } catch (error) {
-        console.error('Upload error:', error);
-        alert("Upload failed. Please try again.");
         setIsUploading(false);
-        return;
       }
-      setIsUploading(false);
-    }
-    
-    const newTopic: any = {
-      title: createForm.title,
-      gradeLevel: createForm.gradeLevel,
-      description: createForm.description,
-      subtopics: parsedSubtopics,
-      materials: createForm.materialTitle ? [{
-        title: createForm.materialTitle,
-        type: createForm.materialType as 'text'|'link'|'file',
-        content: materialContent
-      }] : [],
-      subtopicQuestions: questionsMap,
-      checkpoints_required: createForm.checkpointsRequired,
-      checkpoint_pass_percentage: createForm.checkpointPassPercentage,
-      final_assessment_required: createForm.finalAssessmentRequired
+      
+      const newTopic: any = {
+        title: createForm.title,
+        gradeLevel: createForm.gradeLevel,
+        description: createForm.description,
+        subtopics: parsedSubtopics,
+        materials: createForm.materialTitle ? [{
+          title: createForm.materialTitle,
+          type: createForm.materialType as 'text'|'link'|'file',
+          content: materialContent
+        }] : [],
+        subtopicQuestions: questionsMap,
+        checkpoints_required: createForm.checkpointsRequired,
+        checkpoint_pass_percentage: createForm.checkpointPassPercentage,
+        final_assessment_required: createForm.finalAssessmentRequired
+      };
+
+      await saveTopic(activeSubject, newTopic);
+      
+      const updatedCourses = await getCourses();
+      setCourses(updatedCourses);
+      
+      alert('Topic saved!');
+      setCreateForm({ 
+        title: '', 
+        gradeLevel: 'all', 
+        description: '', 
+        subtopics: '', 
+        materialTitle: '', 
+        materialType: 'text', 
+        materialContent: '',
+        checkpointsRequired: 3,
+        checkpointPassPercentage: 85,
+        finalAssessmentRequired: true
+      });
+      setCreateFile(null);
+      setQuestionsMap({});
+      setAiSummary('');
     };
 
-    await saveTopic(activeSubject, newTopic);
-    
-    const updatedCourses = await getCourses();
-    setCourses(updatedCourses);
-    
-    alert('Topic saved!');
-    setCreateForm({ 
-      title: '', 
-      gradeLevel: 'all', 
-      description: '', 
-      subtopics: '', 
-      materialTitle: '', 
-      materialType: 'text', 
-      materialContent: '',
-      checkpointsRequired: 3,
-      checkpointPassPercentage: 85,
-      finalAssessmentRequired: true
-    });
-    setCreateFile(null);
-    setQuestionsMap({});
-    setAiSummary('');
-  };
+// CourseManager.tsx - Updated handleAddMaterialToTopic function
+const handleAddMaterialToTopic = async () => {
+  if (!editingTopic) return;
+  if (!addMatForm.title) {
+    alert("Title required");
+    return;
+  }
 
-  const handleAddMaterialToTopic = async () => {
-    if (!editingTopic) return;
-    if (!addMatForm.title) {
-      alert("Title required");
+  let content = addMatForm.content;
+  if (addMatForm.type === 'file') {
+    if (!addMatFile) {
+      alert("Please select a file");
       return;
     }
-
-    let content = addMatForm.content;
-    if (addMatForm.type === 'file') {
-      if (!addMatFile) {
-        alert("Please select a file");
-        return;
-      }
-      setIsUploading(true);
-      try {
-        const url = await uploadFileToSupabase(addMatFile);
-        if (!url) {
-          alert("Upload failed");
-          setIsUploading(false);
-          return;
-        }
-        content = url;
-      } catch (error) {
-        console.error('Upload error:', error);
+    setIsUploading(true);
+    try {
+      const url = await uploadFileToSupabase(addMatFile);
+      if (!url) {
         alert("Upload failed");
         setIsUploading(false);
         return;
       }
+      content = url;
+      console.log(`✅ Additional file uploaded: ${url}`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert("Upload failed");
       setIsUploading(false);
-    } else if (!content) {
-      alert("Content required");
       return;
     }
+    setIsUploading(false);
+  } else if (!content) {
+    alert("Content required");
+    return;
+  }
 
-    const newMat: Material = {
-      id: Date.now().toString(),
-      title: addMatForm.title,
-      type: addMatForm.type as 'text' | 'link' | 'file',
-      content: content
-    };
-
-    const updatedTopic = { 
-      ...editingTopic, 
-      materials: [...editingTopic.materials, newMat] 
-    };
-    
-    await saveTopic(activeSubject, updatedTopic);
-    
-    const updatedCourses = await getCourses();
-    setCourses(updatedCourses);
-    
-    setAddMatForm({ title: '', type: 'text', content: '' });
-    setAddMatFile(null);
+  // ✅ CRITICAL FIX: Create new material with proper structure
+  const newMat: Material = {
+    id: `temp_${Date.now()}`, // Temporary ID
+    title: addMatForm.title,
+    type: addMatForm.type as 'text' | 'link' | 'file',
+    content: content
   };
 
-  const handleDeleteMaterial = async (materialId: string) => {
-    if (!editingTopic) return;
-    
-    if (!confirm("Are you sure you want to delete this material?")) return;
+  const updatedTopic = { 
+    ...editingTopic, 
+    materials: [...editingTopic.materials, newMat] 
+  };
+  
+  await saveTopic(activeSubject, updatedTopic);
+  
+  const updatedCourses = await getCourses();
+  setCourses(updatedCourses);
+  
+  alert('✅ Material added successfully! Students can now access it.');
+  
+  setAddMatForm({ title: '', type: 'text', content: '' });
+  setAddMatFile(null);
+};
 
+  // CourseManager.tsx - Updated handleDeleteMaterial function
+const handleDeleteMaterial = async (materialId: string) => {
+  if (!editingTopic) return;
+  
+  if (!confirm("Are you sure you want to delete this material?")) return;
+
+  // ✅ CRITICAL: For database materials, we need to delete from materials table
+  const materialToDelete = editingTopic.materials.find(m => m.id === materialId);
+  if (materialToDelete?.id?.startsWith('temp_')) {
+    // Temporary material (not yet in DB or in-memory only)
     const updatedTopic = {
       ...editingTopic,
       materials: editingTopic.materials.filter(m => m.id !== materialId)
     };
     
     await saveTopic(activeSubject, updatedTopic);
-    
-    const updatedCourses = await getCourses();
-    setCourses(updatedCourses);
-  };
+  } else {
+    // Material from database - we should delete from materials table
+    try {
+      const { error } = await supabase
+        .from('materials')
+        .delete()
+        .eq('id', materialId);
+      
+      if (error) {
+        console.error('Error deleting material from database:', error);
+        alert('Failed to delete material from database');
+        return;
+      }
+      
+      // Refresh courses to update UI
+      const updatedCourses = await getCourses();
+      setCourses(updatedCourses);
+      alert('✅ Material deleted from database');
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting material');
+    }
+  }
+};
 
   // Get filtered topics for dropdown/search
   const allTopics = Object.values(courses[activeSubject] || {}) as Topic[];

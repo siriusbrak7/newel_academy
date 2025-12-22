@@ -1,5 +1,5 @@
 ﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
-import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement } from '../types';
+import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material } from '../types';
 import { supabase } from './supabaseClient';
 
 // =====================================================
@@ -259,10 +259,12 @@ export const deleteUser = async (username: string): Promise<void> => {
 // =====================================================
 // COURSE MANAGEMENT
 // =====================================================
+// storageService.ts - Updated getCourses function
 export const getCourses = async (): Promise<CourseStructure> => {
   console.log('Fetching courses...');
   
   try {
+    // Fetch topics with their materials from the database
     const { data: topicsData, error: topicsError } = await supabase
       .from('topics')
       .select(`
@@ -295,6 +297,21 @@ export const getCourses = async (): Promise<CourseStructure> => {
         .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
         .map((s: any) => s.name);
 
+      // ✅ CRITICAL FIX: Get materials from database with proper content
+      const materials: Material[] = (topic.materials || []).map((m: any) => {
+        // For files, use storage_path if available, otherwise content
+        const content = m.type === 'file' 
+          ? (m.storage_path || m.content || '')
+          : (m.content || '');
+        
+        return {
+          id: m.id,
+          title: m.title,
+          type: m.type as 'text' | 'link' | 'file',
+          content: content
+        };
+      });
+
       // Organize questions by subtopic
       const topicQuestions = (questionsData || []).filter(q => q.topic_id === topic.id);
       const subtopicQuestions: Record<string, any[]> = {};
@@ -322,13 +339,8 @@ export const getCourses = async (): Promise<CourseStructure> => {
         title: topic.title,
         gradeLevel: topic.grade_level || '9',
         description: topic.description || '',
-        subtopics: subtopics,  // Now from subtopics table
-        materials: (topic.materials || []).map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          type: m.type,
-          content: m.content || m.storage_path || ''
-        })),
+        subtopics: subtopics,
+        materials: materials,  // ✅ Now properly fetched from database
         subtopicQuestions,
         checkpoints_required: topic.checkpoints_required || 3,
         checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
@@ -336,15 +348,16 @@ export const getCourses = async (): Promise<CourseStructure> => {
       };
     });
 
-    console.log(`Courses fetched: ${Object.keys(courses).length} subjects`);
+    console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects`);
     return courses;
   } catch (error) {
-    console.error('Get courses error:', error);
+    console.error('❌ Get courses error:', error);
     return {};
   }
 };
 
 // In storageService.ts, update the saveTopic function:
+// storageService.ts - Updated saveTopic function
 export const saveTopic = async (subject: string, topic: Topic): Promise<void> => {
   console.log(`Saving topic: ${subject} - ${topic.title}`);
   
@@ -381,37 +394,58 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
       updated_at: new Date().toISOString()
     };
 
-    // Only include id if it's provided (for updates)
-    // For new topics, don't send id - let DB generate it
-    if (topic.id) {
-      topicData.id = topic.id;
-    }
-
-    // Use insert() for new topics, update() for existing
-    let error;
+    let topicId: string;
+    
+    // Save topic and get ID
     if (topic.id) {
       // Update existing topic
       const { error: updateError } = await supabase
         .from('topics')
         .update(topicData)
         .eq('id', topic.id);
-      error = updateError;
+      
+      if (updateError) throw updateError;
+      topicId = topic.id;
     } else {
-      // Insert new topic (database will generate id)
-      const { error: insertError } = await supabase
+      // Insert new topic
+      const { data: newTopic, error: insertError } = await supabase
         .from('topics')
-        .insert([topicData]);
-      error = insertError;
-    }
-    
-    if (error) {
-      console.error('Save topic error:', error);
-      throw error;
+        .insert([topicData])
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      if (!newTopic) throw new Error('Failed to create topic');
+      topicId = newTopic.id;
     }
 
-    console.log(`Topic saved: ${topic.title}`);
+    // ✅ CRITICAL FIX: Save materials to materials table
+    if (topic.materials && topic.materials.length > 0) {
+      console.log(`Saving ${topic.materials.length} materials to database`);
+      
+      const materialsToInsert = topic.materials.map((material, index) => ({
+        topic_id: topicId,
+        title: material.title,
+        type: material.type,
+        content: material.content,
+        storage_path: material.type === 'file' ? material.content : null,
+        sort_order: index,
+        created_at: new Date().toISOString()
+      }));
+      
+      const { error: materialsError } = await supabase
+        .from('materials')
+        .insert(materialsToInsert);
+      
+      if (materialsError) {
+        console.error('Error saving materials:', materialsError);
+        // Don't throw - topic is saved, materials might fail but we continue
+      }
+    }
+
+    console.log(`✅ Topic saved: ${topic.title} (ID: ${topicId})`);
   } catch (error) {
-    console.error('Save topic error:', error);
+    console.error('❌ Save topic error:', error);
     throw error;
   }
 };
@@ -1173,11 +1207,12 @@ export const getClassOverview = async () => {
 // =====================================================
 // FILE UPLOAD
 // =====================================================
+// storageService.ts - Ensure file upload returns proper URL
 export const uploadFileToSupabase = async (file: File): Promise<string | null> => {
   try {
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
     
-    // Make sure storage bucket exists and has proper permissions
+    // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from('materials')
       .upload(fileName, file, {
@@ -1186,25 +1221,17 @@ export const uploadFileToSupabase = async (file: File): Promise<string | null> =
       });
 
     if (error) {
-      console.error('Upload failed:', error);
-      // Create bucket if doesn't exist
-      if (error.message.includes('bucket')) {
-        await supabase.storage.createBucket('materials', {
-          public: true,
-          allowedMimeTypes: ['image/*', 'application/pdf', 'application/*']
-        });
-        // Retry upload
-        const { data: retryData } = await supabase.storage
-          .from('materials')
-          .upload(fileName, file);
-        return retryData?.path ? `https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/${fileName}` : null;
-      }
+      console.error('❌ Upload failed:', error);
       return null;
     }
 
-    return `https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/${fileName}`;
+    // ✅ CRITICAL: Return full public URL for file access
+    const publicUrl = `https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/${fileName}`;
+    console.log(`✅ File uploaded: ${publicUrl}`);
+    
+    return publicUrl;
   } catch (error: any) {
-    console.error('Upload error:', error);
+    console.error('❌ Upload error:', error);
     return null;
   }
 };
@@ -1677,6 +1704,179 @@ const checkRegularTopicProgression = async (
   } catch (error) {
     console.error('Error checking regular topic progression:', error);
     return false;
+  }
+};
+
+// Add to storageService.ts
+export const getStudentCourseHistory = async (username: string): Promise<any[]> => {
+  try {
+    console.log(`📊 Getting course history for: ${username}`);
+    
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return [];
+
+    // Get all topics the student has accessed
+    const { data: topicsProgress } = await supabase
+      .from('user_progress')
+      .select(`
+        *,
+        topic:topics (
+          id,
+          title,
+          grade_level,
+          subject:subject_id (name)
+        )
+      `)
+      .eq('user_id', userData.id)
+      .not('main_assessment_score', 'is', null);
+
+    if (!topicsProgress) return [];
+
+    // Get checkpoint progress for each topic
+    const courseHistory = await Promise.all(
+      topicsProgress.map(async (progress) => {
+        // Get checkpoint progress for this topic
+        const { data: checkpoints } = await supabase
+          .from('checkpoints')
+          .select('id, checkpoint_number, title')
+          .eq('topic_id', progress.topic_id);
+
+        const checkpointIds = checkpoints?.map(c => c.id) || [];
+        
+        const { data: checkpointProgress } = await supabase
+          .from('student_checkpoint_progress')
+          .select('checkpoint_id, score, passed, completed_at')
+          .eq('user_id', userData.id)
+          .in('checkpoint_id', checkpointIds);
+
+        return {
+          topicId: progress.topic_id,
+          topicTitle: progress.topic?.title || 'Unknown Topic',
+          subject: progress.topic?.subject?.name || 'General',
+          gradeLevel: progress.topic?.grade_level || 'N/A',
+          finalScore: progress.main_assessment_score,
+          passed: progress.main_assessment_passed,
+          completedDate: progress.last_accessed,
+          checkpoints: checkpoints?.map(checkpoint => {
+            const cpProgress = checkpointProgress?.find(cp => cp.checkpoint_id === checkpoint.id);
+            return {
+              number: checkpoint.checkpoint_number,
+              title: checkpoint.title,
+              score: cpProgress?.score || 0,
+              passed: cpProgress?.passed || false,
+              completedAt: cpProgress?.completed_at
+            };
+          }) || []
+        };
+      })
+    );
+
+    return courseHistory.sort((a, b) => 
+      new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime()
+    );
+  } catch (error) {
+    console.error('❌ Error getting course history:', error);
+    return [];
+  }
+};
+
+// Add to storageService.ts
+export const getStudentAssessmentFeedback = async (username: string): Promise<any[]> => {
+  try {
+    // Get all graded submissions for the student
+    const submissions = await getSubmissions();
+    const studentSubmissions = submissions.filter(
+      s => s.username === username && s.graded && s.feedback
+    );
+
+    // Get assessment details for each submission
+    const assessments = await getAssessments();
+    
+    const feedbackHistory = studentSubmissions.map(sub => {
+      const assessment = assessments.find(a => a.id === sub.assessmentId);
+      return {
+        assessmentId: sub.assessmentId,
+        assessmentTitle: assessment?.title || 'Unknown Assessment',
+        subject: assessment?.subject || 'General',
+        score: sub.score,
+        submittedAt: sub.submittedAt,
+        feedback: sub.feedback,
+        aiGraded: sub.ai_graded || false
+      };
+    });
+
+    return feedbackHistory.sort((a, b) => b.submittedAt - a.submittedAt);
+  } catch (error) {
+    console.error('❌ Error getting assessment feedback:', error);
+    return [];
+  }
+};
+
+// Add to storageService.ts
+export const getStudentTopicPerformance = async (username: string, topicId: string): Promise<any> => {
+  try {
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return null;
+
+    // Get topic progress
+    const { data: topicProgress } = await supabase
+      .from('user_progress')
+      .select('*')
+      .eq('user_id', userData.id)
+      .eq('topic_id', topicId)
+      .single();
+
+    // Get checkpoint progress for this topic
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('id, checkpoint_number, title, required_score')
+      .eq('topic_id', topicId)
+      .order('checkpoint_number', { ascending: true });
+
+    const checkpointIds = checkpoints?.map(c => c.id) || [];
+    
+    const { data: checkpointProgress } = await supabase
+      .from('student_checkpoint_progress')
+      .select('*')
+      .eq('user_id', userData.id)
+      .in('checkpoint_id', checkpointIds);
+
+    // Get theory submissions for this topic
+    const { data: theorySubmissions } = await supabase
+      .from('theory_submissions')
+      .select('*')
+      .eq('user_id', userData.id)
+      .eq('topic_id', topicId);
+
+    return {
+      topicProgress: topicProgress || null,
+      checkpoints: checkpoints?.map(checkpoint => {
+        const progress = checkpointProgress?.find(cp => cp.checkpoint_id === checkpoint.id);
+        return {
+          ...checkpoint,
+          studentScore: progress?.score || 0,
+          passed: progress?.passed || false,
+          completedAt: progress?.completed_at
+        };
+      }) || [],
+      theorySubmissions: theorySubmissions || [],
+      overallCompletion: checkpointProgress?.filter(cp => cp.passed).length || 0
+    };
+  } catch (error) {
+    console.error('❌ Error getting topic performance:', error);
+    return null;
   }
 };
 

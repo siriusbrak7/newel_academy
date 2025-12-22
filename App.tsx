@@ -193,7 +193,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             Scientific Thinking....
             <br />
             <span className="text-4xl md:text-5xl lg:text-6xl block mt-2 font-['Poppins'] font-normal">
-            Learn to think like a Scientist 
+              Reinvented for Students
             </span>
           </h1>
           
@@ -365,7 +365,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <h2 className={`text-4xl font-bold mb-6 font-['Poppins'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-white'
           }`}>
-            Start Exploring Science.....
+            Start Exploring.....
           </h2>
           
           <p className={`text-xl mb-8 max-w-2xl mx-auto font-['Inter'] ${

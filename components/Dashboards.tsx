@@ -16,6 +16,9 @@ import {
   getProgress,
   calculateUserStats,
   saveTopic,
+  getStudentCourseHistory,  // ADD THIS
+  getStudentAssessmentFeedback,  // ADD THIS
+  getStudentTopicPerformance,
   saveAnnouncement,
   getSubmissions,
   refreshAllLeaderboards,
@@ -42,8 +45,10 @@ import {
   BookOpen as BookOpenIcon,
   Users,
   BarChart3,
-  Target,
-  MessageSquare
+  Target,  // ADD THIS
+  MessageSquare,
+  CheckCircle,  // ADD THIS
+  ChevronDown  // ADD THIS
 } from 'lucide-react';
 
 // Fixed Chart.js imports
@@ -981,7 +986,8 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   );
 };
 
-// --- STUDENT DASHBOARD ---
+// StudentDashboard component - FIXED VERSION
+// COMPLETE StudentDashboard component - UPDATED WITH GRADE HISTORY
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
   const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
@@ -991,6 +997,9 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [subjectLabels, setSubjectLabels] = useState<string[]>([]);
   const [subjectScores, setSubjectScores] = useState<number[]>([]);
+  const [courseHistory, setCourseHistory] = useState<any[]>([]);
+  const [assessmentFeedback, setAssessmentFeedback] = useState<any[]>([]);
+  const [showGradeHistory, setShowGradeHistory] = useState(false);
   
   // Stats
   const { activeDays, streak } = calculateUserStats(user);
@@ -1021,7 +1030,6 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       setCourses(coursesData);
       
       // ========== FIXED: Calculate combined subject scores ==========
-      // 1. Get scores from COURSE progress (mainAssessmentScore from topics)
       const courseSubjectScores: Record<string, { total: number, count: number }> = {};
       Object.keys(progressData).forEach(subject => {
         Object.keys(progressData[subject]).forEach(topicId => {
@@ -1036,15 +1044,11 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         });
       });
       
-      // 2. Get scores from ASSESSMENTS (graded submissions)
       const studentSubmissions = allSubmissions.filter(
         s => s.username === user.username && s.graded && s.score !== undefined && s.score > 0
       );
       
       console.log(`Found ${studentSubmissions.length} graded submissions for ${user.username}`);
-      studentSubmissions.forEach(sub => {
-        console.log(`   Submission: ${sub.assessmentId}, Score: ${sub.score}`);
-      });
       
       const assessmentSubjectScores: Record<string, { total: number, count: number }> = {};
       
@@ -1059,28 +1063,22 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
       });
       
-      // 3. COMBINE both sources (prioritize assessments if both exist)
       const combinedScores: Record<string, number> = {};
       
-      // Add assessment scores first (these are teacher-graded assessments)
       Object.keys(assessmentSubjectScores).forEach(subject => {
         const data = assessmentSubjectScores[subject];
         if (data.count > 0) {
           combinedScores[subject] = data.total / data.count;
-          console.log(`Assessment average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
         }
       });
       
-      // Add course scores for subjects not already covered
       Object.keys(courseSubjectScores).forEach(subject => {
         if (!combinedScores[subject] && courseSubjectScores[subject].count > 0) {
           const data = courseSubjectScores[subject];
           combinedScores[subject] = data.total / data.count;
-          console.log(`Course average for ${subject}: ${combinedScores[subject].toFixed(1)}%`);
         }
       });
       
-      // 4. Prepare for chart
       const newLabels: string[] = [];
       const newScores: number[] = [];
       
@@ -1092,13 +1090,11 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       setSubjectLabels(newLabels);
       setSubjectScores(newScores);
       
-      console.log('ðŸŽ¯ Final chart data:', { labels: newLabels, scores: newScores });
-      // ========== END FIX ==========
+      console.log(' Final chart data:', { labels: newLabels, scores: newScores });
       
       // Generate advice based on combined scores
       if (newLabels.length === 0) {
         if (studentSubmissions.length > 0) {
-          // Has assessments but no subject classification
           setAdvice("Great work on your assessments! Complete more to see detailed performance analytics.");
         } else {
           setAdvice("Start your first course or assessment to get personalized AI advice!");
@@ -1117,8 +1113,17 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
       }
       
-    } catch (error) {
+      // NEW: Load grade history
+      const history = await getStudentCourseHistory(user.username);
+      setCourseHistory(history);
       
+      // NEW: Load assessment feedback
+      const feedback = await getStudentAssessmentFeedback(user.username);
+      setAssessmentFeedback(feedback);
+      
+      console.log(`✅ Loaded ${history.length} completed courses, ${feedback.length} assessments with feedback`);
+      
+    } catch (error) {
       console.error('Error refreshing student dashboard:', error);
     } finally {
       setLoading(false);
@@ -1135,12 +1140,12 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       label: 'Average Score (%)',
       data: subjectScores.length > 0 ? subjectScores : [0],
       backgroundColor: [
-        'rgba(6, 182, 212, 0.6)',    // Cyan
-        'rgba(168, 85, 247, 0.6)',   // Purple
-        'rgba(236, 72, 153, 0.6)',   // Pink
-        'rgba(34, 197, 94, 0.6)',    // Green
-        'rgba(245, 158, 11, 0.6)',   // Yellow
-        'rgba(239, 68, 68, 0.6)'     // Red
+        'rgba(6, 182, 212, 0.6)',
+        'rgba(168, 85, 247, 0.6)',
+        'rgba(236, 72, 153, 0.6)',
+        'rgba(34, 197, 94, 0.6)',
+        'rgba(245, 158, 11, 0.6)',
+        'rgba(239, 68, 68, 0.6)'
       ],
       borderColor: 'transparent',
       hoverOffset: 12,
@@ -1178,24 +1183,42 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         doc.text('Complete assessments to see your scores.', 10, y);
       }
       
-      // Add pending assessments
+      // Add course history if available
       y += 10;
-      if (pendingAssessments.length > 0) {
-        doc.text('Pending Assessments:', 10, y);
+      if (courseHistory.length > 0) {
+        doc.text('Completed Courses:', 10, y);
         y += 10;
-        pendingAssessments.forEach(assessment => {
+        courseHistory.forEach(course => {
           if (y > 280) {
             doc.addPage();
             y = 20;
           }
-          doc.text(`- ${assessment.title} (${assessment.subject})`, 10, y);
+          doc.text(`- ${course.topicTitle}: ${Math.round(course.finalScore || 0)}% ${course.passed ? '(Passed)' : '(Not Passed)'}`, 10, y);
           y += 8;
+        });
+      }
+      
+      // Add assessment feedback if available
+      y += 10;
+      if (assessmentFeedback.length > 0) {
+        doc.text('Recent Assessment Feedback:', 10, y);
+        y += 10;
+        assessmentFeedback.slice(0, 3).forEach(feedback => {
+          if (y > 280) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(`- ${feedback.assessmentTitle}: ${feedback.score}%`, 10, y);
+          y += 8;
+          if (feedback.feedback) {
+            doc.text(`  Feedback: ${feedback.feedback.substring(0, 50)}...`, 10, y);
+            y += 8;
+          }
         });
       }
       
       doc.save(`${user.username}_progress_report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
-      
       console.error('Error exporting PDF:', error);
       alert("Failed to export report");
     }
@@ -1383,7 +1406,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
           
-          {/* Quick Stats */}
+          {/* Quick Stats - UPDATED WITH PERFORMANCE METRICS */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-white font-bold mb-4">Quick Stats</h3>
             <div className="space-y-4">
@@ -1423,9 +1446,114 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                   </span>
                 </div>
               )}
+              
+              {/* NEW: Performance Metrics */}
+              {courseHistory.length > 0 && (
+                <>
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/60 flex items-center gap-2">
+                        <CheckCircle size={16}/> Courses Completed
+                      </span>
+                      <span className="text-white font-mono">{courseHistory.length}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 flex items-center gap-2">
+                      <TrendingUp size={16}/> Course Avg Score
+                    </span>
+                    <span className="text-green-400 font-mono font-bold">
+                      {Math.round(courseHistory.reduce((sum, course) => sum + (course.finalScore || 0), 0) / courseHistory.length)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 flex items-center gap-2">
+                      <Target size={16}/> Pass Rate
+                    </span>
+                    <span className="text-cyan-400 font-mono font-bold">
+                      {Math.round((courseHistory.filter(c => c.passed).length / courseHistory.length) * 100)}%
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* Grade History Section - ADDED BELOW MAIN GRID */}
+      <div className="space-y-6">
+        {/* Grade History Toggle */}
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <ClipboardList className="text-green-400"/> Performance History
+          </h3>
+          <button 
+            onClick={() => setShowGradeHistory(!showGradeHistory)}
+            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+          >
+            {showGradeHistory ? 'Hide Details' : 'Show Details'}
+            <ChevronDown className={`transform transition-transform ${showGradeHistory ? 'rotate-180' : ''}`} size={14} />
+          </button>
+        </div>
+        
+        {/* Grade History Cards (Collapsible) */}
+        {showGradeHistory && (
+          <div className="space-y-4">
+            {/* Completed Courses */}
+            {courseHistory.length > 0 ? (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Completed Courses</h4>
+                <div className="space-y-2">
+                  {courseHistory.slice(0, 5).map((course, index) => (
+                    <div key={index} className="bg-black/20 p-3 rounded-lg">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-white font-medium">{course.topicTitle}</span>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          course.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {course.finalScore}% {course.passed ? '✓' : '✗'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs text-white/60">
+                        <span>{course.subject} • Grade {course.gradeLevel}</span>
+                        <span>{course.checkpoints.filter(cp => cp.passed).length}/{course.checkpoints.length} checkpoints</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
+                <BookOpen className="text-white/20 mx-auto mb-2" size={32} />
+                <p className="text-white/40">No completed courses yet</p>
+                <p className="text-white/30 text-sm mt-1">Complete topics to see your history here</p>
+              </div>
+            )}
+            
+            {/* Assessment Feedback */}
+            {assessmentFeedback.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Recent Feedback</h4>
+                <div className="space-y-3">
+                  {assessmentFeedback.slice(0, 3).map((feedback, index) => (
+                    <div key={index} className="bg-black/20 p-3 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-white font-medium text-sm">{feedback.assessmentTitle}</span>
+                        <span className="text-cyan-400 font-bold">{feedback.score}%</span>
+                      </div>
+                      <p className="text-white/70 text-xs mb-1">{feedback.feedback}</p>
+                      <div className="flex justify-between text-xs text-white/40">
+                        <span>{feedback.subject}</span>
+                        <span>{new Date(feedback.submittedAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
