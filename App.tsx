@@ -17,6 +17,8 @@ import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
+// Add this import
+import { ImageOptimizer } from './components/ImageOptimizer';
 
 // Add TypeScript declaration for ThemeManager
 declare global {
@@ -59,7 +61,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
 };
 
 /* ------------------------------------
-   Homepage Component - UPDATED
+   Homepage Component
 ------------------------------------ */
 interface HomepageProps {
   theme: Theme;
@@ -81,7 +83,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
   }, [theme]);
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center text-center px-4 relative overflow-hidden">
+    <div className="min-h-[80vh] flex flex-col justify-center items-center text-center px-4 relative overflow-hidden">
       {/* Background Effects */}
       {theme === 'Cosmic' && (
         <>
@@ -106,16 +108,19 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           {/* Jupiter - Large planet with rings */}
           <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" style={{ animationDuration: '15s' }}>
             <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse" style={{ animationDuration: '8s' }}>
+              {/* Jupiter's stripes */}
               <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
               <div className="absolute top-1/2 w-full h-2 bg-orange-700/50"></div>
               <div className="absolute bottom-1/4 w-full h-1 bg-orange-600/50"></div>
             </div>
+            {/* Jupiter's ring */}
             <div className="absolute -top-2 -left-2 w-16 h-16 border-2 border-orange-400/30 rounded-full"></div>
           </div>
           
           {/* Mercury - Small fast planet */}
           <div className="absolute bottom-1/3 right-1/4 w-16 h-16 animate-float" style={{ animationDuration: '8s', animationDelay: '2s' }}>
             <div className="absolute w-4 h-4 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 animate-pulse" style={{ animationDuration: '3s' }}>
+              {/* Mercury's craters */}
               <div className="absolute top-1 w-1 h-1 bg-gray-700 rounded-full"></div>
               <div className="absolute bottom-2 right-2 w-0.5 h-0.5 bg-gray-800 rounded-full"></div>
             </div>
@@ -134,6 +139,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
 
       {theme === 'Cyber-Dystopian' && (
         <>
+          {/* Grid lines */}
           <div className="absolute inset-0 pointer-events-none opacity-10">
             <div className="absolute inset-0" style={{
               backgroundImage: `linear-gradient(to right, #00ff00 1px, transparent 1px),
@@ -142,8 +148,10 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             }}></div>
           </div>
           
+          {/* Scanning line */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-scan"></div>
           
+          {/* Digital particles */}
           <div className="absolute inset-0 pointer-events-none">
             {particles.map((p, i) => (
               <div
@@ -164,9 +172,9 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
       )}
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-6xl mx-auto w-full">
+      <div className="relative z-10 max-w-6xl mx-auto">
         {/* Hero Section */}
-        <div className="mb-16 pt-12">
+        <div className="mb-16">
           <div className="inline-block mb-6">
             <div className={`px-6 py-2 rounded-full mb-4 ${
               theme === 'Cyber-Dystopian'
@@ -214,19 +222,10 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </div>
         </div>
 
-        {/* === INSERTED SECTION: Neuroscience Fact + AI Ethics Card === */}
-        <div className="my-20 max-w-4xl mx-auto space-y-10">
-          {/* Neuroscience Fact Container (injected from index.html) */}
-          <div id="neuroscience-fact-container" className="neuroscience-fact-container mx-auto"></div>
-
-          {/* AI Ethics Flip Card (injected from index.html) */}
-          <div className="ai-ethics-card mx-auto max-w-lg"></div>
-        </div>
-
-        {/* Value Proposition - Feature Cards */}
-        <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 my-20 p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm ${
+        {/* Value Proposition - Updated with real images */}
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 ${
           theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : ''
-        }`}>
+        } p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm`}>
           {[
             { 
               image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=300&fit=crop&auto=format',
@@ -246,10 +245,11 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ].map((feature, index) => (
             <div key={index} className="text-center">
               <div className="h-48 mb-4 overflow-hidden rounded-lg">
-                <img 
+                <ImageOptimizer 
                   src={feature.image} 
                   alt={feature.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
+                  scienceThemed={true}
                 />
               </div>
               <h3 className={`text-xl font-bold mb-3 font-['Poppins'] ${
@@ -266,13 +266,92 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ))}
         </div>
 
+        {/* Features Grid - Updated with real images */}
+        <div className="mb-16">
+          <h2 className={`text-4xl font-bold mb-12 text-center font-['Poppins'] ${
+            theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
+          }`}>
+            Why Students Excel with The Newel 
+          </h2>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&h=400&fit=crop&auto=format',
+                title: 'Guided Course Mastery',
+                description: 'Standard Science Curriculum with structured learning paths',
+                color: 'from-cyan-500 to-blue-500'
+              },
+              {
+                image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=600&h=400&fit=crop&auto=format',
+                title: '24/7 Learning Assistant',
+                description: 'Get instant help with homework, assignments, and concept questions',
+                color: 'from-purple-500 to-pink-500'
+              },
+              {
+                image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600&h=400&fit=crop&auto=format',
+                title: 'Expert Tutor Available',
+                description: 'Direct access to certified science tutor for personalized sessions',
+                color: 'from-green-500 to-emerald-500'
+              },
+              {
+                image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=400&fit=crop&auto=format',
+                title: 'Progress Analytics',
+                description: 'Track improvement with detailed performance reports and insights',
+                color: 'from-yellow-500 to-orange-500'
+              },
+              {
+                image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600&h=400&fit=crop&auto=format',
+                title: 'Interactive Challenges',
+                description: 'Engaging quizzes and games to reinforce learning',
+                color: 'from-pink-500 to-rose-500'
+              },
+              {
+                image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop&auto=format',
+                title: 'Comprehensive Resources',
+                description: 'Access to study materials and revision guides',
+                color: 'from-blue-500 to-indigo-500'
+              }
+            ].map((feature, index) => (
+              <div
+                key={index}
+                className={`p-8 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl font-['Inter'] ${
+                  theme === 'Cyber-Dystopian'
+                    ? 'cyber-box-glow bg-black border border-green-500/20 hover:border-green-400/50'
+                    : 'bg-white/5 border border-white/10 hover:border-white/30 backdrop-blur-sm'
+                }`}
+              >
+                {/* Image instead of emoji */}
+                <div className="w-full h-48 mb-6 overflow-hidden rounded-xl">
+                  <ImageOptimizer 
+                    src={feature.image} 
+                    alt={feature.title}
+                    className="w-full h-full"
+                    scienceThemed={true}
+                  />
+                </div>
+                
+                <h3 className={`text-xl font-bold mb-3 text-center font-['Poppins'] ${
+                  theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
+                }`}>
+                  {feature.title}
+                </h3>
+                <p className={`text-center ${
+                  theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'
+                }`}>
+                  {feature.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Final CTA Section */}
-        <div className={`rounded-3xl p-10 md:p-16 text-center my-20 ${
+        <div className={`rounded-3xl p-10 md:p-16 text-center ${
           theme === 'Cyber-Dystopian'
             ? 'cyber-box-glow bg-black border-2 border-green-500/30'
             : 'bg-gradient-to-br from-cyan-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
         }`}>
-          {/* ... rest of your CTA section unchanged ... */}
           <div className="inline-block mb-6">
             <div className={`px-6 py-2 rounded-full mb-4 ${
               theme === 'Cyber-Dystopian'
@@ -738,9 +817,6 @@ const App: React.FC = () => {
                 The Newel
               </div>
               <p className="text-sm">Expert Science Tutoring</p>
-              <a href="mailto:bbrak644@gmail.com" className="text-xs text-cyan-300 hover:text-cyan-200 mt-1 inline-block">
-                <i className="fas fa-envelope mr-1"></i> Contact: bbrak644@gmail.com
-              </a>
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/" className="hover:underline">Home</Link>
