@@ -103,7 +103,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             ))}
           </div>
 
-          {/* Planets – unchanged (kept for visual flair) */}
+          {/* Planets */}
           <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" style={{ animationDuration: '15s' }}>
             <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse" style={{ animationDuration: '8s' }}>
               <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
@@ -218,7 +218,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
 
         {/* Value Proposition – 3 columns */}
         <div
-          className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm ${
+          className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-20 p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm ${
             theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : ''
           }`}
         >
@@ -253,75 +253,54 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ))}
         </div>
 
-        {/* Features Grid – 6 cards */}
-        <div className="mb-16">
-          <h2 className={`text-4xl font-bold mb-12 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-            Why Students Excel with The Newel
-          </h2>
+        {/* NEW SECTION: Neuroscience Fact + AI Ethics */}
+        <div className="my-20 max-w-5xl mx-auto space-y-16">
+          {/* Neuroscience Fact Container (injected from index.html) */}
+          <div id="neuroscience-fact-container" className="neuroscience-fact-container mx-auto max-w-3xl" />
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&h=400&fit=crop&auto=format',
-                title: 'Guided Course Mastery',
-                description: 'Standard Science Curriculum with structured learning paths'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=600&h=400&fit=crop&auto=format',
-                title: '24/7 Learning Assistant',
-                description: 'Get instant help with homework, assignments, and concept questions'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600&h=400&fit=crop&auto=format',
-                title: 'Expert Tutor Available',
-                description: 'Direct access to certified science tutor for personalized sessions'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=400&fit=crop&auto=format',
-                title: 'Progress Analytics',
-                description: 'Track improvement with detailed performance reports and insights'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600&h=400&fit=crop&auto=format',
-                title: 'Interactive Challenges',
-                description: 'Engaging quizzes and games to reinforce learning'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop&auto=format',
-                title: 'Comprehensive Resources',
-                description: 'Access to study materials and revision guides'
-              }
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className={`p-8 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
-                  theme === 'Cyber-Dystopian'
-                    ? 'cyber-box-glow bg-black border border-green-500/20 hover:border-green-400/50'
-                    : 'bg-white/5 border border-white/10 hover:border-white/30 backdrop-blur-sm'
-                }`}
-              >
-                <div className="w-full h-48 mb-6 overflow-hidden rounded-xl">
-                  <ImageOptimizer src={feature.image} alt={feature.title} className="w-full h-full object-cover" scienceThemed={true} />
-                </div>
-                <h3 className={`text-xl font-bold mb-3 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-                  {feature.title}
-                </h3>
-                <p className={`text-center ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>
-                  {feature.description}
-                </p>
-              </div>
-            ))}
+          {/* AI Ethical Use in Learning */}
+          <div className={`p-10 rounded-2xl backdrop-blur-md border ${
+            theme === 'Cyber-Dystopian'
+              ? 'cyber-box-glow bg-black/70 border-green-500/30'
+              : 'bg-white/10 border-white/20'
+          }`}>
+            <h2 className={`text-3xl font-bold mb-8 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
+              Ethical Use of AI in Learning
+            </h2>
+            <ul className={`space-y-5 text-lg max-w-3xl mx-auto ${theme === 'Cyber-Dystopian' ? 'text-green-300/90' : 'text-white/90'}`}>
+              <li className="flex items-start gap-4">
+                <span className="text-2xl">🧠</span>
+                <span>Use AI as a study assistant to deepen understanding, not to replace your own thinking.</span>
+              </li>
+              <li className="flex items-start gap-4">
+                <span className="text-2xl">🔍</span>
+                <span>Always verify AI-generated information with credible sources and textbooks.</span>
+              </li>
+              <li className="flex items-start gap-4">
+                <span className="text-2xl">✍️</span>
+                <span>Develop your own answers and explanations — let AI be a guide, not the author.</span>
+              </li>
+              <li className="flex items-start gap-4">
+                <span className="text-2xl">✅</span>
+                <span>Maintain academic integrity: be transparent when AI helped you learn a concept.</span>
+              </li>
+              <li className="flex items-start gap-4">
+                <span className="text-2xl">🌱</span>
+                <span>AI accelerates learning when used ethically — it strengthens, never weakens, your mind.</span>
+              </li>
+            </ul>
           </div>
         </div>
 
         {/* Final CTA */}
         <div
-          className={`rounded-3xl p-10 md:p-16 text-center ${
+          className={`rounded-3xl p-10 md:p-16 text-center my-20 ${
             theme === 'Cyber-Dystopian'
               ? 'cyber-box-glow bg-black border-2 border-green-500/30'
               : 'bg-gradient-to-br from-cyan-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
           }`}
         >
+          {/* ... (your existing CTA code unchanged) ... */}
           <div className="inline-block mb-6">
             <div
               className={`px-6 py-2 rounded-full mb-4 ${
@@ -351,16 +330,38 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               What You'll Get:
             </h3>
             <ul className={`space-y-3 ${theme === 'Cyber-Dystopian' ? 'text-green-300/80' : 'text-white/80'}`}>
-              {['Complete science course access', '24/7 Learning assistant', 'Expert tutor support', 'Progress tracking and analytics'].map((item, i) => (
-                <li key={i} className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  {item}
-                </li>
-              ))}
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                Complete science course access
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                24/7 Learning assistant
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                Expert tutor support
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                Progress tracking and analytics
+              </li>
             </ul>
           </div>
 
@@ -388,7 +389,6 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
     </div>
   );
 };
-
 /* ------------------------------------
    Main App
 ------------------------------------ */
