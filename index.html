@@ -129,7 +129,7 @@
         pointer-events: none;
       }
       
-      /* Star Field - Fixed position */
+      /* Star Field */
       .star-field {
         position: fixed !important;
         top: 0;
@@ -138,7 +138,7 @@
         height: 100%;
         z-index: 1;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
       .star {
@@ -151,7 +151,7 @@
         animation: twinkle 3s ease-in-out infinite;
       }
       
-      /* Constellation - Fixed position */
+      /* Constellation */
       .constellation {
         position: fixed !important;
         top: 10%;
@@ -161,7 +161,7 @@
         z-index: 1;
         opacity: 0.3;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
       .constellation-line {
@@ -175,7 +175,7 @@
         filter: drop-shadow(0 0 4px rgba(147, 197, 253, 0.6));
       }
       
-      /* Rocket - Fixed position */
+      /* Rocket */
       .rocket {
         position: fixed !important;
         top: 15%;
@@ -186,10 +186,10 @@
         filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
         animation: rocketFly 8s ease-in-out infinite;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      /* Rocket Exhaust - Fixed position */
+      /* Rocket Exhaust */
       .rocket-exhaust {
         position: fixed !important;
         top: calc(15% + 60px);
@@ -199,10 +199,10 @@
         z-index: 1;
         animation: rocketFly 8s ease-in-out infinite;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      /* Asteroids - Fixed position */
+      /* Asteroids */
       .asteroid {
         position: fixed !important;
         border-radius: 50%;
@@ -210,34 +210,14 @@
         box-shadow: inset -5px -5px 10px rgba(0, 0, 0, 0.5);
         animation: asteroidDrift 15s linear infinite;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      .asteroid-1 {
-        width: 40px;
-        height: 40px;
-        top: 20%;
-        left: -100px;
-        animation-delay: 0s;
-      }
+      .asteroid-1 { width: 40px; height: 40px; top: 20%; left: -100px; animation-delay: 0s; }
+      .asteroid-2 { width: 25px; height: 25px; top: 60%; left: -100px; animation-delay: 5s; }
+      .asteroid-3 { width: 35px; height: 35px; top: 80%; left: -100px; animation-delay: 10s; }
       
-      .asteroid-2 {
-        width: 25px;
-        height: 25px;
-        top: 60%;
-        left: -100px;
-        animation-delay: 5s;
-      }
-      
-      .asteroid-3 {
-        width: 35px;
-        height: 35px;
-        top: 80%;
-        left: -100px;
-        animation-delay: 10s;
-      }
-      
-      /* Saturn - Fixed position */
+      /* Saturn */
       .saturn {
         position: fixed !important;
         bottom: 10%;
@@ -247,19 +227,7 @@
         z-index: 1;
         opacity: 0.6;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
-      }
-      
-      .saturn-planet {
-        fill: url(#saturnGradient);
-      }
-      
-      .saturn-rings {
-        fill: none;
-        stroke: url(#ringsGradient);
-        stroke-width: 8;
-        opacity: 0.7;
-        transform-origin: 60px 60px;
+        display: none;
       }
       
       /* ===== CYBER-DYSTOPIAN THEME ===== */
@@ -276,7 +244,7 @@
         font-family: 'Share Tech Mono', monospace !important;
       }
       
-      /* Cyber Grid - Fixed position */
+      /* Cyber Grid */
       .cyber-grid {
         position: fixed !important;
         top: 0;
@@ -289,10 +257,10 @@
         background-size: 50px 50px;
         z-index: 0;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      /* Cyber Scanline - Fixed position */
+      /* Cyber Scanline */
       .cyber-scanline {
         position: fixed !important;
         top: 0;
@@ -307,10 +275,10 @@
         z-index: 1;
         pointer-events: none;
         animation: scanline 8s linear infinite;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      /* Matrix Columns - Fixed position */
+      /* Matrix Columns */
       .matrix-column {
         position: fixed !important;
         top: -100%;
@@ -356,15 +324,9 @@
           inset 0 0 20px rgba(0, 255, 65, 0.1);
         border: 1px solid rgba(0, 255, 65, 0.5);
       }
-      
-      /* Smooth transitions */
-      .theme-transition {
-        transition: all 0.5s ease-in-out;
-      }
     </style>
     
     <script>
-      // Theme Manager - Aligns with app.tsx logic
       class ThemeManager {
         constructor() {
           this.currentTheme = null;
@@ -373,8 +335,6 @@
         
         initialize() {
           if (this.initialized) return;
-          
-          // Create theme elements if they don't exist
           this.createThemeElements();
           this.initialized = true;
         }
@@ -382,14 +342,12 @@
         createThemeElements() {
           const body = document.body;
           
-          // Create Cosmic elements
           if (!document.querySelector('.star-field')) {
             const starField = document.createElement('div');
             starField.className = 'star-field';
             starField.style.display = 'none';
             body.appendChild(starField);
             
-            // Create constellation
             const constellation = document.createElement('div');
             constellation.className = 'constellation';
             constellation.innerHTML = `
@@ -412,7 +370,6 @@
             constellation.style.display = 'none';
             body.appendChild(constellation);
             
-            // Create rocket
             const rocket = document.createElement('div');
             rocket.className = 'rocket';
             rocket.innerHTML = `
@@ -434,7 +391,6 @@
             rocket.style.display = 'none';
             body.appendChild(rocket);
             
-            // Create rocket exhaust
             const exhaust = document.createElement('div');
             exhaust.className = 'rocket-exhaust';
             exhaust.innerHTML = `
@@ -455,7 +411,6 @@
             exhaust.style.display = 'none';
             body.appendChild(exhaust);
             
-            // Create asteroids
             for (let i = 1; i <= 3; i++) {
               const asteroid = document.createElement('div');
               asteroid.className = `asteroid asteroid-${i}`;
@@ -463,7 +418,6 @@
               body.appendChild(asteroid);
             }
             
-            // Create Saturn
             const saturn = document.createElement('div');
             saturn.className = 'saturn';
             saturn.innerHTML = `
@@ -480,9 +434,9 @@
                     <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.4" />
                   </linearGradient>
                 </defs>
-                <circle class="saturn-planet" cx="60" cy="60" r="35"/>
-                <ellipse class="saturn-rings" cx="60" cy="60" rx="55" ry="15" transform="rotate(15, 60, 60)">
-                  <animateTransform attributeName="transform" type="rotate" from="15 60 60" to="375 60 60" dur="40s" repeatCount="indefinite"/>
+                <circle cx="60" cy="60" r="35" fill="url(#saturnGradient)"/>
+                <ellipse cx="60" cy="60" rx="55" ry="15" stroke="url(#ringsGradient)" stroke-width="8" fill="none" opacity="0.7">
+                  <animateTransform attributeName="transform" type="rotate" from="0 60 60" to="360 60 60" dur="40s" repeatCount="indefinite"/>
                 </ellipse>
               </svg>
             `;
@@ -490,7 +444,6 @@
             body.appendChild(saturn);
           }
           
-          // Create Cyber elements
           if (!document.querySelector('.cyber-grid')) {
             const cyberGrid = document.createElement('div');
             cyberGrid.className = 'cyber-grid';
@@ -507,30 +460,19 @@
         setTheme(theme) {
           const body = document.body;
           
-          // Remove all theme classes
           body.classList.remove('cosmic-bg', 'cyber-bg', 'text-white', 'text-green-500');
           
-          // Hide all theme elements
           this.hideAllThemeElements();
-          
-          // Clear existing matrix columns
           document.querySelectorAll('.matrix-column').forEach(el => el.remove());
           
           if (theme === 'Cosmic') {
             body.classList.add('cosmic-bg', 'text-white');
             body.style.fontFamily = "'Inter', sans-serif";
-            
-            // Show cosmic elements
             this.showCosmicElements();
-            
           } else if (theme === 'Cyber-Dystopian') {
             body.classList.add('cyber-bg', 'text-green-500');
             body.style.fontFamily = "'Share Tech Mono', 'Inter', monospace";
-            
-            // Show cyber elements
             this.showCyberElements();
-            
-            // Initialize matrix rain
             this.initMatrixRain();
           }
           
@@ -538,19 +480,15 @@
         }
         
         hideAllThemeElements() {
-          // Hide all cosmic elements
           document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
             el.style.display = 'none';
           });
-          
-          // Hide all cyber elements
           document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
             el.style.display = 'none';
           });
         }
         
         showCosmicElements() {
-          // Initialize star field
           const starField = document.querySelector('.star-field');
           if (starField) {
             starField.innerHTML = '';
@@ -566,12 +504,10 @@
             starField.style.display = 'block';
           }
           
-          // Show other cosmic elements
           document.querySelectorAll('.constellation, .rocket, .rocket-exhaust, .saturn').forEach(el => {
             el.style.display = 'block';
           });
           
-          // Show asteroids
           document.querySelectorAll('.asteroid').forEach(el => {
             el.style.display = 'block';
           });
@@ -605,15 +541,12 @@
         }
       }
       
-      // Initialize theme manager
       const themeManager = new ThemeManager();
       
-      // Initialize on DOM load
       document.addEventListener('DOMContentLoaded', () => {
         themeManager.initialize();
       });
       
-      // Handle window resize for matrix rain
       let resizeTimeout;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
@@ -628,13 +561,12 @@
   </head>
   
   <body>
-    <!-- Main Content Container -->
     <div id="root" class="main-content"></div>
+    
     <script type="module" src="/index.tsx"></script>
     
-    <!-- Theme Controller Script - This will be called from app.tsx -->
-    <script>
-      // Expose theme manager to window for React to call
+    <!-- Fixed: Added type="module" to prevent Vite parsing errors -->
+    <script type="module">
       window.ThemeManager = themeManager;
     </script>
   </body>
