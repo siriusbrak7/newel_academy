@@ -55,7 +55,7 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
           
           // Calculate progress percentage immediately for debugging
           const passedCount = Object.values(cpProgress).filter((cp: any) => cp.passed).length;
-          console.log(`📈 ${topicId}: ${passedCount}/5 checkpoints passed`);
+          console.log(`📈 ${topicId}: ${passedCount}/4 checkpoints passed`);
         } catch (error) {
           console.error(`❌ Error loading checkpoint progress for ${topicId}:`, error);
           progressMap[topicId] = {};
@@ -87,38 +87,39 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
   };
 
   // Helper function to calculate topic completion percentage using checkpoints
-  const getTopicCompletion = (subject: string, topicId: string) => {
-    console.log(`🔍 getTopicCompletion called for: ${topicId}`);
-    
-    // Check checkpoint progress first
-    const cpProgress = checkpointProgress[topicId];
-    console.log(`📊 Checkpoint progress for ${topicId}:`, cpProgress);
-    
-    if (cpProgress && Object.keys(cpProgress).length > 0) {
-      const passedCheckpoints = Object.values(cpProgress).filter((cp: any) => cp.passed).length;
-      const totalCheckpoints = 5; // 4 MCQ + 1 Final Theory
-      const percentage = Math.round((passedCheckpoints / totalCheckpoints) * 100);
-      console.log(`📈 Progress calculation: ${passedCheckpoints}/${totalCheckpoints} = ${percentage}%`);
-      return percentage;
-    }
-    
-    console.log(`⚠️ No checkpoint progress found for ${topicId}`);
-    
-    // Fallback: Check if topic is completed in user_progress
-    const topicProgress = progress[subject]?.[topicId];
-    if (topicProgress?.mainAssessmentScore) {
-      console.log(`📊 Using mainAssessmentScore: ${topicProgress.mainAssessmentScore}%`);
-      return topicProgress.mainAssessmentScore;
-    }
-    
-    console.log(`📊 No progress data found, returning 0%`);
-    return 0;
-  };
+  // Helper function to calculate topic completion percentage using checkpoints
+const getTopicCompletion = (subject: string, topicId: string) => {
+  console.log(`🔍 getTopicCompletion called for: ${topicId}`);
+  
+  // Check checkpoint progress first
+  const cpProgress = checkpointProgress[topicId];
+  console.log(`📊 Checkpoint progress for ${topicId}:`, cpProgress);
+  
+  if (cpProgress && Object.keys(cpProgress).length > 0) {
+    const passedCheckpoints = Object.values(cpProgress).filter((cp: any) => cp.passed).length;
+    const totalCheckpoints = 4; // ONLY checkpoints 1-4 count towards progress
+    const percentage = Math.round((passedCheckpoints / totalCheckpoints) * 100);
+    console.log(`📈 Progress calculation: ${passedCheckpoints}/${totalCheckpoints} = ${percentage}%`);
+    return percentage;
+  }
+  
+  console.log(`⚠️ No checkpoint progress found for ${topicId}`);
+  
+  // Fallback: Check if topic is completed in user_progress
+  const topicProgress = progress[subject]?.[topicId];
+  if (topicProgress?.mainAssessmentScore) {
+    console.log(`📊 Using mainAssessmentScore: ${topicProgress.mainAssessmentScore}%`);
+    return topicProgress.mainAssessmentScore;
+  }
+  
+  console.log(`📊 No progress data found, returning 0%`);
+  return 0;
+};
 
-  const getTopicAccessStatus = (subject: string, topicId: string) => {
+  function getTopicAccessStatus(subject: string, topicId: string) {
     const key = `${subject}-${topicId}`;
     return topicAccess[key] ?? null; // null means still loading
-  };
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
