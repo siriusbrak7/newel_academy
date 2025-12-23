@@ -213,7 +213,7 @@ const getTopicCompletion = (subject: string, topicId: string) => {
                           {checkpointProgress[topic.id] && Object.keys(checkpointProgress[topic.id]).length > 0 && (
                             <div className="flex items-center gap-2 mb-1">
                               <div className="flex gap-1">
-                                {[1, 2, 3, 4, 5].map(num => {
+                                {[1, 2, 3, 4].map(num => {
                                   const checkpointKey = Object.keys(checkpointProgress[topic.id] || {}).find(
                                     key => checkpointProgress[topic.id][key].checkpointNumber === num
                                   );
