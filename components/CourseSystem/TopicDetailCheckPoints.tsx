@@ -425,7 +425,7 @@ const progress = useMemo(() => {
 
       // Save checkpoint 5 progress
       const checkpointsData = await getTopicCheckpoints(topicId);
-      const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 5);
+      const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 4);
       
       if (checkpoint5) {
         await saveCheckpointProgress(user.username, checkpoint5.id, score, passed);
