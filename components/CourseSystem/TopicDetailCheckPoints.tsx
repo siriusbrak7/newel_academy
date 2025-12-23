@@ -158,7 +158,7 @@ const progress = useMemo(() => {
               number: cp.checkpoint_number,
               title: cp.title,
               questions: cp.question_count,
-              isFinal: cp.checkpoint_number === 5
+              isFinal: cp.checkpoint_number === 4
             }))
           });
         }
