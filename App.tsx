@@ -82,7 +82,7 @@ const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
           <h3 className={`text-2xl font-bold mb-3 font-['Poppins'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
           }`}>
-            Neuroscience Insight
+            Neuroscience fact of the moment...
           </h3>
           
           <p className={`text-lg leading-relaxed transition-opacity duration-300 ease-in-out ${
@@ -94,7 +94,7 @@ const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
           <div className="mt-4 flex items-center gap-2 text-sm opacity-70">
             <i className="fas fa-clock"></i>
             <span className={theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}>
-              Updates every 11 minutes
+              Updating....
             </span>
           </div>
         </div>
@@ -359,7 +359,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             </li>
             <li className="flex items-start gap-4">
               <span className="text-2xl">🌱</span>
-              <span>AI accelerates learning when used ethically — it strengthens, never weakens, your mind.</span>
+              <span>AI accelerates learning when used ethically as it strengthens your mind.</span>
             </li>
           </ul>
         </div>
