@@ -1,0 +1,176 @@
+/* mobile.css - Mobile-first responsive fixes */
+
+/* Base mobile adjustments */
+@media (max-width: 768px) {
+  /* Font size reductions */
+  html {
+    font-size: 14px;
+  }
+  
+  h1 {
+    font-size: 2rem !important;
+    line-height: 2.5rem !important;
+  }
+  
+  h2 {
+    font-size: 1.5rem !important;
+  }
+  
+  h3 {
+    font-size: 1.25rem !important;
+  }
+  
+  /* Navbar mobile fixes */
+  nav {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    height: 3.5rem !important;
+  }
+  
+  .text-3xl {
+    font-size: 1.75rem !important;
+  }
+  
+  /* Hide text on small icons */
+  .hidden\\/sm\\:inline {
+    display: none !important;
+  }
+  
+  /* Button touch targets */
+  button, a[role="button"] {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  
+  /* Grid adjustments */
+  .grid-cols-1 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .md\\:grid-cols-2, .md\\:grid-cols-3, .md\\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Padding reductions */
+  .p-8 {
+    padding: 1.5rem !important;
+  }
+  
+  .p-6 {
+    padding: 1rem !important;
+  }
+  
+  /* Margin adjustments */
+  .space-y-8 > * + * {
+    margin-top: 1.5rem !important;
+  }
+  
+  /* Modal positioning fix */
+  .fixed.inset-0 {
+    padding: 1rem !important;
+  }
+  
+  /* Sidebar full width on mobile */
+  .fixed.right-0.w-80 {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Table responsive */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  /* Card adjustments */
+  .rounded-2xl {
+    border-radius: 1rem !important;
+  }
+  
+  .rounded-3xl {
+    border-radius: 1.25rem !important;
+  }
+  
+  /* Chart container fixes */
+  .h-64 {
+    height: 200px !important;
+  }
+  
+  /* Input/select touch targets */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents iOS zoom */
+    min-height: 44px !important;
+  }
+  
+  /* Hide non-essential elements on mobile */
+  .mobile\\:hidden {
+    display: none !important;
+  }
+  
+  /* Show mobile-specific elements */
+  .mobile\\:block {
+    display: block !important;
+  }
+  
+  /* Flex column on mobile */
+  .mobile\\:flex-col {
+    flex-direction: column !important;
+  }
+  
+  /* Mobile menu button */
+  .mobile-menu-button {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 375px) {
+  html {
+    font-size: 13px;
+  }
+  
+  .px-6 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  .gap-6 {
+    gap: 1rem !important;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .md\\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  .md\\:grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Landscape orientation fixes */
+@media (max-height: 600px) and (orientation: landscape) {
+  .h-screen {
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+  
+  nav {
+    height: 3rem !important;
+  }
+}

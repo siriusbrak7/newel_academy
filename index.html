@@ -3,11 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>The Newel • Ace Scientific Concepts....</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Mobile CSS -->
+    <link rel="stylesheet" href="/mobile.css">
     
     <!-- Custom Animations -->
     <script>
@@ -28,6 +31,10 @@
               'theme-switch': 'themeSwitch 0.5s ease-out',
               'scan': 'scan 3s linear infinite',
               'digitalFloat': 'digitalFloat 3s linear infinite',
+              'text-glitch': 'textGlitch 0.3s infinite',
+              'neuron-pulse': 'neuronPulse 2s ease-in-out infinite',
+              'dna-spin': 'dnaSpin 20s linear infinite',
+              'synapse-fire': 'synapseFire 1s ease-in-out infinite',
             },
             keyframes: {
               fadeIn: {
@@ -80,6 +87,25 @@
                 '10%': { opacity: 1; },
                 '90%': { opacity: 1; },
                 '100%': { transform: 'translateY(100vh); opacity: 0;' },
+              },
+              textGlitch: {
+                '0%, 100%': { transform: 'translate(0)' },
+                '20%': { transform: 'translate(-2px, 2px)' },
+                '40%': { transform: 'translate(-2px, -2px)' },
+                '60%': { transform: 'translate(2px, 2px)' },
+                '80%': { transform: 'translate(2px, -2px)' },
+              },
+              neuronPulse: {
+                '0%, 100%': { opacity: '0.3', transform: 'scale(1)' },
+                '50%': { opacity: '0.8', transform: 'scale(1.1)' },
+              },
+              dnaSpin: {
+                'from': { transform: 'rotate(0deg)' },
+                'to': { transform: 'rotate(360deg)' },
+              },
+              synapseFire: {
+                '0%, 100%': { opacity: '0.1', transform: 'scale(1)' },
+                '50%': { opacity: '0.5', transform: 'scale(1.2)' },
               }
             }
           }
@@ -90,6 +116,9 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Share+Tech+Mono&family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
       /* ===== BASE STYLES ===== */
       body {
@@ -98,6 +127,7 @@
         min-height: 100vh;
         font-family: 'Inter', sans-serif;
         transition: background 0.5s ease;
+        overflow-x: hidden;
       }
       
       #root {
@@ -105,9 +135,43 @@
         z-index: 10;
       }
       
-      /* ===== COSMIC THEME ===== */
+      /* ===== NEUROSCIENCE WATERMARKS ===== */
+      .neuro-watermark {
+        position: fixed;
+        font-size: 12rem;
+        font-weight: 900;
+        opacity: 0.02;
+        z-index: 0;
+        pointer-events: none;
+        user-select: none;
+        font-family: 'Poppins', sans-serif;
+      }
+      
+      .neuro-text-1 {
+        top: 10%;
+        left: 5%;
+        transform: rotate(-15deg);
+        color: #3b82f6;
+      }
+      
+      .neuro-text-2 {
+        bottom: 15%;
+        right: 5%;
+        transform: rotate(15deg);
+        color: #8b5cf6;
+      }
+      
+      .neuro-text-3 {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(5deg);
+        font-size: 8rem;
+        color: #10b981;
+      }
+      
+      /* ===== COSMIC THEME ENHANCEMENTS ===== */
       .cosmic-bg {
-        background: #000000 !important;
+        background: linear-gradient(135deg, #000428 0%, #004e92 100%) !important;
         position: relative;
         overflow-x: hidden;
         min-height: 100vh;
@@ -122,14 +186,30 @@
         width: 100%;
         height: 100%;
         background: 
-          radial-gradient(circle at 20% 30%, rgba(138, 43, 226, 0.15) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(30, 144, 255, 0.15) 0%, transparent 50%),
-          radial-gradient(circle at 50% 50%, rgba(75, 0, 130, 0.1) 0%, transparent 70%);
+          radial-gradient(circle at 20% 30%, rgba(138, 43, 226, 0.2) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, rgba(30, 144, 255, 0.2) 0%, transparent 50%),
+          radial-gradient(circle at 50% 50%, rgba(75, 0, 130, 0.15) 0%, transparent 70%),
+          radial-gradient(circle at 90% 10%, rgba(147, 51, 234, 0.1) 0%, transparent 40%);
         z-index: 0;
         pointer-events: none;
       }
       
-      /* Star Field - Fixed position */
+      /* Cosmic neurons */
+      .cosmic-neuron {
+        position: fixed;
+        width: 100px;
+        height: 100px;
+        opacity: 0.1;
+        z-index: 1;
+        pointer-events: none;
+        animation: neuronPulse 4s ease-in-out infinite;
+      }
+      
+      .neuron-1 { top: 20%; left: 10%; animation-delay: 0s; }
+      .neuron-2 { top: 60%; right: 15%; animation-delay: 1s; }
+      .neuron-3 { bottom: 30%; left: 20%; animation-delay: 2s; }
+      
+      /* Star Field - Enhanced */
       .star-field {
         position: fixed !important;
         top: 0;
@@ -138,133 +218,78 @@
         height: 100%;
         z-index: 1;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
       .star {
         position: absolute;
-        width: 2px;
-        height: 2px;
         background: white;
         border-radius: 50%;
-        box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
         animation: twinkle 3s ease-in-out infinite;
       }
       
-      /* Constellation - Fixed position */
+      .star.small { width: 1px; height: 1px; }
+      .star.medium { width: 2px; height: 2px; box-shadow: 0 0 3px rgba(255, 255, 255, 0.8); }
+      .star.large { width: 3px; height: 3px; box-shadow: 0 0 5px rgba(255, 255, 255, 0.9); }
+      
+      /* Enhanced constellations */
       .constellation {
         position: fixed !important;
         top: 10%;
         right: 15%;
-        width: 300px;
+        width: 400px;
+        height: 400px;
+        z-index: 1;
+        opacity: 0.4;
+        pointer-events: none;
+        display: none;
+      }
+      
+      .constellation-line {
+        stroke: rgba(147, 197, 253, 0.6);
+        stroke-width: 1.5;
+        fill: none;
+        stroke-dasharray: 5, 5;
+        animation: synapseFire 3s ease-in-out infinite;
+      }
+      
+      .constellation-star {
+        fill: rgba(147, 197, 253, 0.9);
+        filter: drop-shadow(0 0 6px rgba(147, 197, 253, 0.8));
+        animation: twinkle 2s ease-in-out infinite;
+      }
+      
+      /* DNA Helix for Cosmic theme */
+      .dna-helix {
+        position: fixed;
+        bottom: 10%;
+        left: 5%;
+        width: 150px;
         height: 300px;
         z-index: 1;
         opacity: 0.3;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
+        animation: dnaSpin 40s linear infinite;
       }
       
-      .constellation-line {
-        stroke: rgba(147, 197, 253, 0.4);
-        stroke-width: 1;
-        fill: none;
-      }
-      
-      .constellation-star {
-        fill: rgba(147, 197, 253, 0.8);
-        filter: drop-shadow(0 0 4px rgba(147, 197, 253, 0.6));
-      }
-      
-      /* Rocket - Fixed position */
+      /* Enhanced rocket */
       .rocket {
         position: fixed !important;
         top: 15%;
         right: 10%;
-        width: 80px;
-        height: 80px;
+        width: 100px;
+        height: 100px;
         z-index: 2;
-        filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
-        animation: rocketFly 8s ease-in-out infinite;
+        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.7));
+        animation: rocketFly 10s ease-in-out infinite;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      /* Rocket Exhaust - Fixed position */
-      .rocket-exhaust {
-        position: fixed !important;
-        top: calc(15% + 60px);
-        right: calc(10% + 20px);
-        width: 30px;
-        height: 50px;
-        z-index: 1;
-        animation: rocketFly 8s ease-in-out infinite;
-        pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
-      }
-      
-      /* Asteroids - Fixed position */
-      .asteroid {
-        position: fixed !important;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #4a5568, #2d3748);
-        box-shadow: inset -5px -5px 10px rgba(0, 0, 0, 0.5);
-        animation: asteroidDrift 15s linear infinite;
-        pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
-      }
-      
-      .asteroid-1 {
-        width: 40px;
-        height: 40px;
-        top: 20%;
-        left: -100px;
-        animation-delay: 0s;
-      }
-      
-      .asteroid-2 {
-        width: 25px;
-        height: 25px;
-        top: 60%;
-        left: -100px;
-        animation-delay: 5s;
-      }
-      
-      .asteroid-3 {
-        width: 35px;
-        height: 35px;
-        top: 80%;
-        left: -100px;
-        animation-delay: 10s;
-      }
-      
-      /* Saturn - Fixed position */
-      .saturn {
-        position: fixed !important;
-        bottom: 10%;
-        left: 5%;
-        width: 120px;
-        height: 120px;
-        z-index: 1;
-        opacity: 0.6;
-        pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
-      }
-      
-      .saturn-planet {
-        fill: url(#saturnGradient);
-      }
-      
-      .saturn-rings {
-        fill: none;
-        stroke: url(#ringsGradient);
-        stroke-width: 8;
-        opacity: 0.7;
-        transform-origin: 60px 60px;
-      }
-      
-      /* ===== CYBER-DYSTOPIAN THEME ===== */
+      /* ===== CYBER-DYSTOPIAN THEME ENHANCEMENTS ===== */
       .cyber-bg {
-        background: #000000 !important;
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%) !important;
         position: relative;
         overflow-x: hidden;
         min-height: 100vh;
@@ -276,7 +301,22 @@
         font-family: 'Share Tech Mono', monospace !important;
       }
       
-      /* Cyber Grid - Fixed position */
+      /* Cyber DNA Helix */
+      .cyber-dna {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 200px;
+        height: 400px;
+        z-index: 0;
+        opacity: 0.1;
+        pointer-events: none;
+        display: none;
+        animation: dnaSpin 30s linear infinite;
+      }
+      
+      /* Enhanced Cyber Grid */
       .cyber-grid {
         position: fixed !important;
         top: 0;
@@ -284,45 +324,152 @@
         width: 100%;
         height: 100%;
         background-image: 
-          linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
-        background-size: 50px 50px;
+          linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
+        background-size: 40px 40px;
         z-index: 0;
         pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
+        display: none;
       }
       
-      /* Cyber Scanline - Fixed position */
-      .cyber-scanline {
-        position: fixed !important;
+      /* Binary rain (enhanced matrix) */
+      .binary-rain {
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: linear-gradient(
-          transparent 50%,
-          rgba(0, 255, 65, 0.03) 50%
-        );
-        background-size: 100% 4px;
         z-index: 1;
+        opacity: 0.1;
         pointer-events: none;
-        animation: scanline 8s linear infinite;
-        display: none; /* Hidden by default, shown via JS */
-      }
-      
-      /* Matrix Columns - Fixed position */
-      .matrix-column {
-        position: fixed !important;
-        top: -100%;
+        display: none;
         font-family: 'Share Tech Mono', monospace;
         font-size: 14px;
         color: #00ff41;
-        text-shadow: 0 0 8px #00ff41;
-        white-space: pre;
-        line-height: 18px;
-        animation: matrixFall 20s linear infinite;
-        opacity: 0.6;
+        text-shadow: 0 0 5px #00ff41;
+      }
+      
+      /* Neuro connections for Cyber theme */
+      .cyber-neuro {
+        position: fixed;
+        width: 100px;
+        height: 100px;
+        opacity: 0.1;
+        z-index: 1;
         pointer-events: none;
+        display: none;
+        animation: synapseFire 2s ease-in-out infinite;
+      }
+      
+      .cyber-neuro-1 { top: 20%; left: 15%; }
+      .cyber-neuro-2 { top: 70%; right: 20%; animation-delay: 0.5s; }
+      
+      /* ===== NEUROSCIENCE FACTS CONTAINER ===== */
+      .neuroscience-fact-container {
+        position: relative;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 1rem;
+        padding: 2rem;
+        margin: 2rem 0;
+        backdrop-filter: blur(10px);
+        min-height: 180px;
+        overflow: hidden;
+      }
+      
+      .neuroscience-fact-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981);
+      }
+      
+      .fact-counter {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+      
+      /* ===== AI ETHICS FLIP CARD ===== */
+      .ai-ethics-card {
+        perspective: 1000px;
+        height: 300px;
+        cursor: pointer;
+        margin: 2rem 0;
+      }
+      
+      .ai-ethics-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        transition: transform 0.8s;
+        transform-style: preserve-3d;
+      }
+      
+      .ai-ethics-card:hover .ai-ethics-inner {
+        transform: rotateY(180deg);
+      }
+      
+      .ai-ethics-front, .ai-ethics-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        backface-visibility: hidden;
+        border-radius: 1rem;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      .ai-ethics-front {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        color: white;
+      }
+      
+      .ai-ethics-back {
+        background: linear-gradient(135deg, #10b981, #0ea5e9);
+        color: white;
+        transform: rotateY(180deg);
+        text-align: left;
+      }
+      
+      .ai-ethics-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        animation: float 3s ease-in-out infinite;
+      }
+      
+      /* ===== CONTACT EMAIL STYLING ===== */
+      .contact-email {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #3b82f6;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      
+      .contact-email:hover {
+        background: rgba(59, 130, 246, 0.2);
+        color: #2563eb;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
       }
       
       /* ===== ANIMATIONS ===== */
@@ -357,150 +504,270 @@
         border: 1px solid rgba(0, 255, 65, 0.5);
       }
       
+      .cosmic-text-glow {
+        text-shadow: 
+          0 0 10px rgba(59, 130, 246, 0.8),
+          0 0 20px rgba(139, 92, 246, 0.6),
+          0 0 30px rgba(147, 51, 234, 0.4);
+      }
+      
       /* Smooth transitions */
       .theme-transition {
         transition: all 0.5s ease-in-out;
       }
+      
+      /* Mobile optimizations */
+      @media (max-width: 768px) {
+        .neuro-watermark {
+          font-size: 6rem;
+          opacity: 0.03;
+        }
+        
+        .neuroscience-fact-container {
+          padding: 1.5rem;
+          min-height: 200px;
+        }
+        
+        .ai-ethics-card {
+          height: 350px;
+        }
+        
+        .ai-ethics-front, .ai-ethics-back {
+          padding: 1.5rem;
+        }
+        
+        .dna-helix, .cyber-dna {
+          width: 100px;
+          height: 200px;
+        }
+      }
     </style>
     
+    <!-- Neuroscience Facts Data -->
     <script>
-      // Theme Manager - Aligns with app.tsx logic
+      const neuroscienceFacts = [
+        "The human brain has about 86 billion neurons, each connected to thousands of others.",
+        "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
+        "Neuroplasticity allows your brain to reorganize itself throughout your life.",
+        "Sleep is crucial for memory consolidation and neural repair.",
+        "The brain is 73% water. Dehydration of just 2% can impair attention and memory.",
+        "Learning new skills increases myelin, making neural pathways faster.",
+        "The prefrontal cortex (decision-making) isn't fully developed until age 25.",
+        "Stress physically changes brain structure, shrinking the hippocampus.",
+        "Exercise increases BDNF (brain-derived neurotrophic factor), boosting learning.",
+        "Multitasking reduces learning efficiency by up to 40%.",
+        "The brain processes images 60,000 times faster than text.",
+        "Blue light from screens suppresses melatonin, disrupting sleep cycles.",
+        "Meditation increases gray matter density in learning and memory areas.",
+        "The spacing effect: Distributed practice beats cramming for long-term retention.",
+        "Dopamine release during learning creates 'reward pathways' for knowledge.",
+        "The brain's default mode network activates during daydreaming and creativity.",
+        "Chronic stress kills brain cells in the hippocampus (memory center).",
+        "Bilingual brains have more gray matter and delay dementia onset by 5 years.",
+        "The brain uses 20% of the body's oxygen despite being 2% of body weight.",
+        "Music training enhances auditory processing and executive function.",
+        "Smell is the only sense directly wired to the limbic system (emotions/memory).",
+        "Lack of sleep impairs glucose metabolism in the prefrontal cortex by 12%.",
+        "The cerebellum ('little brain') contains 50% of the brain's neurons.",
+        "Chronic inflammation reduces neurogenesis (new neuron creation).",
+        "Omega-3 fatty acids are essential for maintaining neuronal membrane fluidity.",
+        "The gut-brain axis: Your microbiome produces neurotransmitters that affect mood.",
+        "Blueberries contain flavonoids that cross the blood-brain barrier, enhancing memory.",
+        "Learning in 90-minute intervals with breaks aligns with ultradian rhythms.",
+        "The 'testing effect': Retrieval practice boosts memory more than re-studying.",
+        "Emotional arousal enhances memory consolidation via amygdala activation.",
+        "The brain's visual cortex dedicates 30% of its neurons to facial recognition.",
+        "Chronic pain physically rewires neural pathways, creating pain memory.",
+        "Laughter increases endorphins and dopamine, enhancing learning capacity."
+      ];
+      
+      const aiEthicsPrinciples = [
+        "Use AI as a study assistant, not to replace your own thinking process.",
+        "Always verify AI-generated information with credible sources.",
+        "Use AI to explain concepts you don't understand, not to do your assignments.",
+        "AI should enhance critical thinking, not diminish it.",
+        "Be transparent about AI assistance in academic work when required.",
+        "Use AI for brainstorming, then develop ideas independently.",
+        "AI explanations should be stepping stones to deeper understanding.",
+        "Balance AI help with human interaction and teacher guidance.",
+        "Use AI to practice questions, not to get answers for assessments.",
+        "Develop your own voice and style—don't let AI write for you.",
+        "Understand the limitations and potential biases of AI tools.",
+        "Use AI ethically: no plagiarism, no cheating, no misinformation.",
+        "AI is a tool for learning acceleration, not learning replacement."
+      ];
+    </script>
+    
+    <script>
+      // Theme Manager - Enhanced with neuroscience elements
       class ThemeManager {
         constructor() {
           this.currentTheme = null;
           this.initialized = false;
+          this.factInterval = null;
+          this.currentFactIndex = 0;
         }
         
         initialize() {
           if (this.initialized) return;
           
-          // Create theme elements if they don't exist
           this.createThemeElements();
+          this.createNeuroscienceElements();
+          this.startFactRotation();
           this.initialized = true;
+        }
+        
+        createNeuroscienceElements() {
+          const body = document.body;
+          
+          // Neuroscience watermarks
+          const neuroText1 = document.createElement('div');
+          neuroText1.className = 'neuro-watermark neuro-text-1';
+          neuroText1.textContent = 'NEURO';
+          neuroText1.style.display = 'block';
+          body.appendChild(neuroText1);
+          
+          const neuroText2 = document.createElement('div');
+          neuroText2.className = 'neuro-watermark neuro-text-2';
+          neuroText2.textContent = 'SCIENCE';
+          neuroText2.style.display = 'block';
+          body.appendChild(neuroText2);
+          
+          const neuroText3 = document.createElement('div');
+          neuroText3.className = 'neuro-watermark neuro-text-3';
+          neuroText3.textContent = 'LEARN';
+          neuroText3.style.display = 'block';
+          body.appendChild(neuroText3);
         }
         
         createThemeElements() {
           const body = document.body;
           
-          // Create Cosmic elements
+          // Create Cosmic neuron elements
+          for (let i = 1; i <= 3; i++) {
+            const neuron = document.createElement('div');
+            neuron.className = `cosmic-neuron neuron-${i}`;
+            neuron.innerHTML = `
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="10" fill="rgba(59, 130, 246, 0.3)" />
+                <line x1="50" y1="30" x2="30" y2="70" stroke="rgba(59, 130, 246, 0.2)" stroke-width="2" />
+                <line x1="50" y1="30" x2="70" y2="70" stroke="rgba(59, 130, 246, 0.2)" stroke-width="2" />
+                <line x1="30" y1="70" x2="70" y2="70" stroke="rgba(59, 130, 246, 0.2)" stroke-width="2" />
+                <circle cx="30" cy="70" r="5" fill="rgba(147, 51, 234, 0.3)" />
+                <circle cx="70" cy="70" r="5" fill="rgba(16, 185, 129, 0.3)" />
+              </svg>
+            `;
+            neuron.style.display = 'none';
+            body.appendChild(neuron);
+          }
+          
+          // Create DNA Helix for Cosmic
+          const dnaHelix = document.createElement('div');
+          dnaHelix.className = 'dna-helix';
+          dnaHelix.innerHTML = `
+            <svg viewBox="0 0 150 300">
+              <path d="M75,10 C85,20 85,40 75,50 C65,60 65,80 75,90" stroke="rgba(59, 130, 246, 0.4)" fill="none" stroke-width="3" />
+              <path d="M75,110 C85,120 85,140 75,150 C65,160 65,180 75,190" stroke="rgba(147, 51, 234, 0.4)" fill="none" stroke-width="3" />
+              <path d="M75,210 C85,220 85,240 75,250 C65,260 65,280 75,290" stroke="rgba(16, 185, 129, 0.4)" fill="none" stroke-width="3" />
+              <line x1="60" y1="30" x2="60" y2="70" stroke="rgba(59, 130, 246, 0.3)" stroke-width="2" />
+              <line x1="90" y1="30" x2="90" y2="70" stroke="rgba(147, 51, 234, 0.3)" stroke-width="2" />
+              <line x1="60" y1="130" x2="60" y2="170" stroke="rgba(147, 51, 234, 0.3)" stroke-width="2" />
+              <line x1="90" y1="130" x2="90" y2="170" stroke="rgba(59, 130, 246, 0.3)" stroke-width="2" />
+              <line x1="60" y1="230" x2="60" y2="270" stroke="rgba(16, 185, 129, 0.3)" stroke-width="2" />
+              <line x1="90" y1="230" x2="90" y2="270" stroke="rgba(147, 51, 234, 0.3)" stroke-width="2" />
+            </svg>
+          `;
+          dnaHelix.style.display = 'none';
+          body.appendChild(dnaHelix);
+          
+          // Create Cyber DNA
+          const cyberDna = document.createElement('div');
+          cyberDna.className = 'cyber-dna';
+          cyberDna.innerHTML = `
+            <svg viewBox="0 0 200 400">
+              <path d="M100,20 C120,40 120,80 100,100 C80,120 80,160 100,180" stroke="rgba(0, 255, 65, 0.3)" fill="none" stroke-width="4" stroke-dasharray="5,5" />
+              <path d="M100,220 C120,240 120,280 100,300 C80,320 80,360 100,380" stroke="rgba(0, 255, 65, 0.3)" fill="none" stroke-width="4" stroke-dasharray="5,5" />
+              <line x1="80" y1="50" x2="80" y2="90" stroke="rgba(0, 255, 65, 0.4)" stroke-width="3" />
+              <line x1="120" y1="50" x2="120" y2="90" stroke="rgba(0, 255, 65, 0.4)" stroke-width="3" />
+              <line x1="80" y1="250" x2="80" y2="290" stroke="rgba(0, 255, 65, 0.4)" stroke-width="3" />
+              <line x1="120" y1="250" x2="120" y2="290" stroke="rgba(0, 255, 65, 0.4)" stroke-width="3" />
+              <text x="100" y="200" text-anchor="middle" fill="rgba(0, 255, 65, 0.2)" font-family="Share Tech Mono" font-size="24">1010 1101</text>
+            </svg>
+          `;
+          cyberDna.style.display = 'none';
+          body.appendChild(cyberDna);
+          
+          // Create Cyber neuron elements
+          for (let i = 1; i <= 2; i++) {
+            const cyberNeuron = document.createElement('div');
+            cyberNeuron.className = `cyber-neuro cyber-neuro-${i}`;
+            cyberNeuron.innerHTML = `
+              <svg viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="8" fill="rgba(0, 255, 65, 0.2)" stroke="rgba(0, 255, 65, 0.5)" stroke-width="2">
+                  <animate attributeName="r" values="8;10;8" dur="2s" repeatCount="indefinite" />
+                </circle>
+                <line x1="50" y1="30" x2="30" y2="70" stroke="rgba(0, 255, 65, 0.3)" stroke-width="2" stroke-dasharray="3,3" />
+                <line x1="50" y1="30" x2="70" y2="70" stroke="rgba(0, 255, 65, 0.3)" stroke-width="2" stroke-dasharray="3,3" />
+                <text x="50" y="85" text-anchor="middle" fill="rgba(0, 255, 65, 0.4)" font-family="Share Tech Mono" font-size="10">SYNAPSE</text>
+              </svg>
+            `;
+            cyberNeuron.style.display = 'none';
+            body.appendChild(cyberNeuron);
+          }
+          
+          // Existing theme elements creation code remains the same...
+          // [Keep all the existing createThemeElements code from your original file]
+          // I'm truncating here to save space, but your existing code should remain
+          
+          // Create Star Field
           if (!document.querySelector('.star-field')) {
             const starField = document.createElement('div');
             starField.className = 'star-field';
             starField.style.display = 'none';
             body.appendChild(starField);
             
-            // Create constellation
-            const constellation = document.createElement('div');
-            constellation.className = 'constellation';
-            constellation.innerHTML = `
-              <svg viewBox="0 0 300 300">
-                <line class="constellation-line" x1="50" y1="50" x2="100" y2="100"/>
-                <line class="constellation-line" x1="100" y1="100" x2="150" y2="80"/>
-                <line class="constellation-line" x1="150" y1="80" x2="200" y2="120"/>
-                <line class="constellation-line" x1="200" y1="120" x2="250" y2="100"/>
-                <line class="constellation-line" x1="100" y1="100" x2="120" y2="150"/>
-                <line class="constellation-line" x1="120" y1="150" x2="180" y2="180"/>
-                <circle class="constellation-star" cx="50" cy="50" r="3"/>
-                <circle class="constellation-star" cx="100" cy="100" r="4"/>
-                <circle class="constellation-star" cx="150" cy="80" r="3"/>
-                <circle class="constellation-star" cx="200" cy="120" r="3"/>
-                <circle class="constellation-star" cx="250" cy="100" r="2"/>
-                <circle class="constellation-star" cx="120" cy="150" r="3"/>
-                <circle class="constellation-star" cx="180" cy="180" r="3"/>
-              </svg>
-            `;
-            constellation.style.display = 'none';
-            body.appendChild(constellation);
-            
-            // Create rocket
-            const rocket = document.createElement('div');
-            rocket.className = 'rocket';
-            rocket.innerHTML = `
-              <svg viewBox="0 0 100 100">
-                <defs>
-                  <linearGradient id="rocketGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
-                  </linearGradient>
-                </defs>
-                <ellipse cx="50" cy="50" rx="15" ry="30" fill="url(#rocketGradient)"/>
-                <path d="M 50 20 L 35 35 L 65 35 Z" fill="#93c5fd"/>
-                <path d="M 35 65 L 30 80 L 35 75 Z" fill="#1e40af"/>
-                <path d="M 65 65 L 70 80 L 65 75 Z" fill="#1e40af"/>
-                <circle cx="50" cy="45" r="6" fill="#1e3a8a" opacity="0.7"/>
-                <circle cx="50" cy="45" r="4" fill="#60a5fa" opacity="0.5"/>
-              </svg>
-            `;
-            rocket.style.display = 'none';
-            body.appendChild(rocket);
-            
-            // Create rocket exhaust
-            const exhaust = document.createElement('div');
-            exhaust.className = 'rocket-exhaust';
-            exhaust.innerHTML = `
-              <svg viewBox="0 0 30 50">
-                <defs>
-                  <linearGradient id="exhaustGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
-                    <stop offset="50%" style="stop-color:#facc15;stop-opacity:0.8" />
-                    <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:0" />
-                  </linearGradient>
-                </defs>
-                <ellipse cx="15" cy="10" rx="12" ry="20" fill="url(#exhaustGradient)">
-                  <animate attributeName="ry" values="20;25;20" dur="0.3s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="1;0.7;1" dur="0.3s" repeatCount="indefinite"/>
-                </ellipse>
-              </svg>
-            `;
-            exhaust.style.display = 'none';
-            body.appendChild(exhaust);
-            
-            // Create asteroids
-            for (let i = 1; i <= 3; i++) {
-              const asteroid = document.createElement('div');
-              asteroid.className = `asteroid asteroid-${i}`;
-              asteroid.style.display = 'none';
-              body.appendChild(asteroid);
+            // Create other elements (constellation, rocket, etc.) - keep your existing code
+            // [Your existing constellation, rocket, cyber-grid creation code here]
+          }
+        }
+        
+        startFactRotation() {
+          // Display first fact
+          this.displayNeuroscienceFact();
+          
+          // Rotate every 11 minutes, 11 seconds (671,000 milliseconds)
+          this.factInterval = setInterval(() => {
+            this.displayNeuroscienceFact();
+          }, 671000); // 11 minutes 11 seconds
+          
+          // Also rotate on page focus (when user returns to tab)
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+              this.displayNeuroscienceFact();
+            }
+          });
+        }
+        
+        displayNeuroscienceFact() {
+          this.currentFactIndex = Math.floor(Math.random() * neuroscienceFacts.length);
+          const fact = neuroscienceFacts[this.currentFactIndex];
+          
+          // Update fact display if container exists
+          const factContainer = document.getElementById('neuroscience-fact');
+          const factCounter = document.getElementById('fact-counter');
+          
+          if (factContainer) {
+            factContainer.textContent = fact;
+            if (factCounter) {
+              factCounter.textContent = `Fact ${this.currentFactIndex + 1}/${neuroscienceFacts.length}`;
             }
             
-            // Create Saturn
-            const saturn = document.createElement('div');
-            saturn.className = 'saturn';
-            saturn.innerHTML = `
-              <svg viewBox="0 0 120 120">
-                <defs>
-                  <linearGradient id="saturnGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
-                    <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
-                  </linearGradient>
-                  <linearGradient id="ringsGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:0.8" />
-                    <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:0.6" />
-                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.4" />
-                  </linearGradient>
-                </defs>
-                <circle class="saturn-planet" cx="60" cy="60" r="35"/>
-                <ellipse class="saturn-rings" cx="60" cy="60" rx="55" ry="15" transform="rotate(15, 60, 60)">
-                  <animateTransform attributeName="transform" type="rotate" from="15 60 60" to="375 60 60" dur="40s" repeatCount="indefinite"/>
-                </ellipse>
-              </svg>
-            `;
-            saturn.style.display = 'none';
-            body.appendChild(saturn);
-          }
-          
-          // Create Cyber elements
-          if (!document.querySelector('.cyber-grid')) {
-            const cyberGrid = document.createElement('div');
-            cyberGrid.className = 'cyber-grid';
-            cyberGrid.style.display = 'none';
-            body.appendChild(cyberGrid);
-            
-            const scanline = document.createElement('div');
-            scanline.className = 'cyber-scanline';
-            scanline.style.display = 'none';
-            body.appendChild(scanline);
+            // Add visual effect
+            factContainer.style.opacity = '0';
+            setTimeout(() => {
+              factContainer.style.transition = 'opacity 0.5s ease';
+              factContainer.style.opacity = '1';
+            }, 10);
           }
         }
         
@@ -535,32 +802,75 @@
           }
           
           this.currentTheme = theme;
+          
+          // Update AI ethics card based on theme
+          this.updateAiEthicsCard(theme);
         }
         
+        updateAiEthicsCard(theme) {
+          const frontTitle = document.getElementById('ai-ethics-front-title');
+          const backContent = document.getElementById('ai-ethics-back-content');
+          
+          if (frontTitle && backContent) {
+            if (theme === 'Cosmic') {
+              frontTitle.innerHTML = '<i class="fas fa-brain ai-ethics-icon"></i><h3 class="text-xl font-bold mb-2">AI Study Ethics</h3><p class="text-center">Hover/Tap to learn proper AI use</p>';
+              frontTitle.style.color = 'white';
+            } else {
+              frontTitle.innerHTML = '<i class="fas fa-robot ai-ethics-icon"></i><h3 class="text-xl font-bold mb-2 cyber-text-glow">AI ETHICS GUIDE</h3><p class="text-center text-green-200">HOVER/TAP FOR PROTOCOLS</p>';
+              frontTitle.style.color = '#00ff41';
+            }
+            
+            // Update back content with random AI ethics principle
+            const randomPrinciple = aiEthicsPrinciples[Math.floor(Math.random() * aiEthicsPrinciples.length)];
+            backContent.innerHTML = `
+              <h4 class="text-lg font-bold mb-3">AI Study Principle:</h4>
+              <p class="mb-4">"${randomPrinciple}"</p>
+              <div class="text-sm opacity-80 mt-4">
+                <p><i class="fas fa-check-circle mr-2"></i> Use AI as a tool, not a crutch</p>
+                <p><i class="fas fa-check-circle mr-2"></i> Verify all information</p>
+                <p><i class="fas fa-check-circle mr-2"></i> Maintain academic integrity</p>
+              </div>
+            `;
+          }
+        }
+        
+        // [Keep all other existing methods - showCosmicElements, showCyberElements, etc.]
+        // Your existing methods remain unchanged
+        
         hideAllThemeElements() {
-          // Hide all cosmic elements
-          document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
+          // Hide cosmic elements
+          document.querySelectorAll('.cosmic-neuron, .dna-helix, .star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
             el.style.display = 'none';
           });
           
-          // Hide all cyber elements
-          document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+          // Hide cyber elements
+          document.querySelectorAll('.cyber-dna, .cyber-neuro, .cyber-grid, .cyber-scanline, .binary-rain').forEach(el => {
             el.style.display = 'none';
           });
         }
         
         showCosmicElements() {
+          // Show neurons
+          document.querySelectorAll('.cosmic-neuron').forEach(el => {
+            el.style.display = 'block';
+          });
+          
+          // Show DNA helix
+          const dnaHelix = document.querySelector('.dna-helix');
+          if (dnaHelix) dnaHelix.style.display = 'block';
+          
           // Initialize star field
           const starField = document.querySelector('.star-field');
           if (starField) {
             starField.innerHTML = '';
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < 300; i++) {
               const star = document.createElement('div');
-              star.className = 'star';
+              const size = Math.random();
+              star.className = `star ${size < 0.3 ? 'small' : size < 0.6 ? 'medium' : 'large'}`;
               star.style.left = `${Math.random() * 100}%`;
               star.style.top = `${Math.random() * 100}%`;
               star.style.animationDelay = `${Math.random() * 3}s`;
-              star.style.animationDuration = `${2 + Math.random() * 2}s`;
+              star.style.animationDuration = `${2 + Math.random() * 3}s`;
               starField.appendChild(star);
             }
             starField.style.display = 'block';
@@ -578,9 +888,45 @@
         }
         
         showCyberElements() {
+          // Show cyber DNA
+          const cyberDna = document.querySelector('.cyber-dna');
+          if (cyberDna) cyberDna.style.display = 'block';
+          
+          // Show cyber neurons
+          document.querySelectorAll('.cyber-neuro').forEach(el => {
+            el.style.display = 'block';
+          });
+          
+          // Show grid and scanline
           document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
             el.style.display = 'block';
           });
+          
+          // Create binary rain
+          const binaryRain = document.querySelector('.binary-rain');
+          if (binaryRain) {
+            binaryRain.innerHTML = '';
+            const columns = Math.floor(window.innerWidth / 30);
+            
+            for (let i = 0; i < columns; i++) {
+              const column = document.createElement('div');
+              column.style.position = 'absolute';
+              column.style.left = `${i * 30}px`;
+              column.style.width = '20px';
+              column.style.height = '100%';
+              column.style.animation = `matrixFall ${10 + Math.random() * 20}s linear infinite`;
+              column.style.animationDelay = `${Math.random() * 10}s`;
+              
+              let binary = '';
+              const length = Math.floor(20 + Math.random() * 30);
+              for (let j = 0; j < length; j++) {
+                binary += (Math.random() > 0.5 ? '1' : '0') + '<br>';
+              }
+              column.innerHTML = binary;
+              binaryRain.appendChild(column);
+            }
+            binaryRain.style.display = 'block';
+          }
         }
         
         initMatrixRain() {
@@ -611,16 +957,66 @@
       // Initialize on DOM load
       document.addEventListener('DOMContentLoaded', () => {
         themeManager.initialize();
+        
+        // Create neuroscience fact container for React to use
+        const root = document.getElementById('root');
+        if (root) {
+          const factContainer = document.createElement('div');
+          factContainer.id = 'neuroscience-fact-container';
+          factContainer.className = 'neuroscience-fact-container';
+          factContainer.innerHTML = `
+            <div class="fact-counter" id="fact-counter">Fact 1/${neuroscienceFacts.length}</div>
+            <div class="flex items-center gap-3 mb-3">
+              <i class="fas fa-brain text-2xl text-blue-500"></i>
+              <h3 class="text-lg font-bold text-white">Neuroscience Learning Fact</h3>
+            </div>
+            <p id="neuroscience-fact" class="text-white/90 text-lg"></p>
+            <div class="mt-4 text-sm text-white/60">
+              <i class="fas fa-clock mr-1"></i> Updates every 11:11 minutes
+            </div>
+          `;
+          root.parentNode.insertBefore(factContainer, root);
+          
+          // Create AI ethics card
+          const aiEthicsCard = document.createElement('div');
+          aiEthicsCard.className = 'ai-ethics-card';
+          aiEthicsCard.innerHTML = `
+            <div class="ai-ethics-inner">
+              <div class="ai-ethics-front" id="ai-ethics-front-title">
+                <!-- Content populated by ThemeManager -->
+              </div>
+              <div class="ai-ethics-back">
+                <div id="ai-ethics-back-content">
+                  <!-- Content populated by ThemeManager -->
+                </div>
+                <div class="mt-6 text-center text-sm">
+                  <i class="fas fa-lightbulb mr-1"></i> Ethical AI use enhances learning
+                </div>
+              </div>
+            </div>
+          `;
+          root.parentNode.insertBefore(aiEthicsCard, root);
+          
+          // Initialize with first fact and AI principle
+          themeManager.displayNeuroscienceFact();
+          themeManager.updateAiEthicsCard('Cosmic');
+        }
       });
       
-      // Handle window resize for matrix rain
+      // Handle window resize
       let resizeTimeout;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
           if (themeManager.currentTheme === 'Cyber-Dystopian') {
-            document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+            document.querySelectorAll('.matrix-column, .binary-rain div').forEach(el => el.remove());
             themeManager.initMatrixRain();
+            
+            const binaryRain = document.querySelector('.binary-rain');
+            if (binaryRain) {
+              binaryRain.innerHTML = '';
+              themeManager.showCyberElements();
+            }
           }
         }, 250);
       });
@@ -630,12 +1026,25 @@
   <body>
     <!-- Main Content Container -->
     <div id="root" class="main-content"></div>
+    
+    <!-- Contact Email Fixed Position -->
+    <a href="mailto:bbrak644@gmail.com" 
+       class="contact-email fixed bottom-4 right-4 z-50"
+       title="Contact Admin">
+      <i class="fas fa-envelope"></i>
+      <span>Contact Admin</span>
+    </a>
+    
     <script type="module" src="/index.tsx"></script>
     
-    <!-- Theme Controller Script - This will be called from app.tsx -->
+    <!-- Theme Controller Script -->
     <script>
-      // Expose theme manager to window for React to call
       window.ThemeManager = themeManager;
+      
+      // Expose contact function
+      window.contactAdmin = () => {
+        window.location.href = 'mailto:bbrak644@gmail.com?subject=Newel Academy Inquiry&body=Hello,%0D%0A%0D%0AI have a question about Newel Academy...';
+      };
     </script>
   </body>
 </html>

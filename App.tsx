@@ -17,8 +17,6 @@ import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
-// Add this import
-import { ImageOptimizer } from './components/ImageOptimizer';
 
 // Add TypeScript declaration for ThemeManager
 declare global {
@@ -61,7 +59,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
 };
 
 /* ------------------------------------
-   Homepage Component
+   Homepage Component - UPDATED
 ------------------------------------ */
 interface HomepageProps {
   theme: Theme;
@@ -245,11 +243,10 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ].map((feature, index) => (
             <div key={index} className="text-center">
               <div className="h-48 mb-4 overflow-hidden rounded-lg">
-                <ImageOptimizer 
+                <img 
                   src={feature.image} 
                   alt={feature.title}
-                  className="w-full h-full"
-                  scienceThemed={true}
+                  className="w-full h-full object-cover"
                 />
               </div>
               <h3 className={`text-xl font-bold mb-3 font-['Poppins'] ${
@@ -266,87 +263,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ))}
         </div>
 
-        {/* Features Grid - Updated with real images */}
-        <div className="mb-16">
-          <h2 className={`text-4xl font-bold mb-12 text-center font-['Poppins'] ${
-            theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
-          }`}>
-            Why Students Excel with The Newel 
-          </h2>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&h=400&fit=crop&auto=format',
-                title: 'Guided Course Mastery',
-                description: 'Standard Science Curriculum with structured learning paths',
-                color: 'from-cyan-500 to-blue-500'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=600&h=400&fit=crop&auto=format',
-                title: '24/7 Learning Assistant',
-                description: 'Get instant help with homework, assignments, and concept questions',
-                color: 'from-purple-500 to-pink-500'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600&h=400&fit=crop&auto=format',
-                title: 'Expert Tutor Available',
-                description: 'Direct access to certified science tutor for personalized sessions',
-                color: 'from-green-500 to-emerald-500'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=400&fit=crop&auto=format',
-                title: 'Progress Analytics',
-                description: 'Track improvement with detailed performance reports and insights',
-                color: 'from-yellow-500 to-orange-500'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600&h=400&fit=crop&auto=format',
-                title: 'Interactive Challenges',
-                description: 'Engaging quizzes and games to reinforce learning',
-                color: 'from-pink-500 to-rose-500'
-              },
-              {
-                image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop&auto=format',
-                title: 'Comprehensive Resources',
-                description: 'Access to study materials and revision guides',
-                color: 'from-blue-500 to-indigo-500'
-              }
-            ].map((feature, index) => (
-              <div
-                key={index}
-                className={`p-8 rounded-2xl transition-all duration-300 hover:scale-105 hover:shadow-2xl font-['Inter'] ${
-                  theme === 'Cyber-Dystopian'
-                    ? 'cyber-box-glow bg-black border border-green-500/20 hover:border-green-400/50'
-                    : 'bg-white/5 border border-white/10 hover:border-white/30 backdrop-blur-sm'
-                }`}
-              >
-                {/* Image instead of emoji */}
-                <div className="w-full h-48 mb-6 overflow-hidden rounded-xl">
-                  <ImageOptimizer 
-                    src={feature.image} 
-                    alt={feature.title}
-                    className="w-full h-full"
-                    scienceThemed={true}
-                  />
-                </div>
-                
-                <h3 className={`text-xl font-bold mb-3 text-center font-['Poppins'] ${
-                  theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
-                }`}>
-                  {feature.title}
-                </h3>
-                <p className={`text-center ${
-                  theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'
-                }`}>
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Final CTA Section */}
+        {/* Final CTA Section - ONLY THIS SECTION REMAINS AS REQUESTED */}
         <div className={`rounded-3xl p-10 md:p-16 text-center ${
           theme === 'Cyber-Dystopian'
             ? 'cyber-box-glow bg-black border-2 border-green-500/30'
@@ -817,6 +734,9 @@ const App: React.FC = () => {
                 The Newel
               </div>
               <p className="text-sm">Expert Science Tutoring</p>
+              <a href="mailto:bbrak644@gmail.com" className="text-xs text-cyan-300 hover:text-cyan-200 mt-1 inline-block">
+                <i className="fas fa-envelope mr-1"></i> Contact: bbrak644@gmail.com
+              </a>
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/" className="hover:underline">Home</Link>

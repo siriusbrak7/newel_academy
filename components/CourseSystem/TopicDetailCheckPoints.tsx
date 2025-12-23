@@ -47,49 +47,73 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const [finalAssessmentScore, setFinalAssessmentScore] = useState(0);
   const [finalAssessmentCompletionDate, setFinalAssessmentCompletionDate] = useState('');
 
-  // Calculate progress - FIXED: Only count checkpoints 1-4, not including checkpoint 5
-  const progress = useMemo(() => {
-    if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
-    
-    console.log('🔍 DEBUG Progress Calculation - Raw Data:', {
-      checkpoints: checkpoints.map(cp => ({
-        id: cp.id,
-        number: cp.checkpoint_number,
-        title: cp.title
-      })),
-      progressData: checkpointProgress,
-      checkpointProgressKeys: Object.keys(checkpointProgress)
-    });
-    
-    // Count passed checkpoints (checkpoints 1-4 only)
-    let passedCount = 0;
-    const validCheckpointNumbers = [1, 2, 3, 4];
-    
-    checkpoints.forEach(checkpoint => {
-      if (validCheckpointNumbers.includes(checkpoint.checkpoint_number)) {
-        const progress = checkpointProgress[checkpoint.id];
-        const isPassed = progress?.passed || false;
-        if (isPassed) {
-          passedCount++;
-        }
+  // Calculate progress - FIXED: Include checkpoint 5 (final theory) in calculation
+  // Replace the progress calculation in your TopicDetailCheckPoints.tsx (lines 50-85):
+
+// Calculate progress - FIXED: Count checkpoints 1-4 AND check final assessment
+const progress = useMemo(() => {
+  if (checkpoints.length === 0) return { passed: 0, total: 0, percentage: 0 };
+  
+  console.log('🔍 DEBUG Progress Calculation - Raw Data:', {
+    checkpoints: checkpoints.map(cp => ({
+      id: cp.id,
+      number: cp.checkpoint_number,
+      title: cp.title
+    })),
+    progressData: checkpointProgress,
+    checkpointProgressKeys: Object.keys(checkpointProgress),
+    hasPassedFinalAssessment,
+    finalAssessmentScore
+  });
+  
+  // Count passed checkpoints (checkpoints 1-4 only)
+  let passedCount = 0;
+  const validCheckpointNumbers = [1, 2, 3, 4]; // Only 4 checkpoints
+  
+  checkpoints.forEach(checkpoint => {
+    if (validCheckpointNumbers.includes(checkpoint.checkpoint_number)) {
+      const progress = checkpointProgress[checkpoint.id];
+      const isPassed = progress?.passed || false;
+      if (isPassed) {
+        passedCount++;
       }
-    });
-    
-    // Total should only count checkpoints 1-4 (not 5)
-    const totalCheckpoints = checkpoints.filter(cp => 
-      validCheckpointNumbers.includes(cp.checkpoint_number)
-    ).length;
-    
-    const percentage = totalCheckpoints > 0 ? (passedCount / totalCheckpoints) * 100 : 0;
-    
-    console.log('✅ Progress calculation result:', { 
-      passedCount, 
-      totalCheckpoints, 
-      percentage: Math.round(percentage) 
-    });
-    
-    return { passed: passedCount, total: totalCheckpoints, percentage };
-  }, [checkpoints, checkpointProgress]);
+    }
+  });
+  
+  // Total should count checkpoints 1-4
+  const totalCheckpoints = checkpoints.filter(cp => 
+    validCheckpointNumbers.includes(cp.checkpoint_number)
+  ).length;
+  
+  // Calculate base percentage (checkpoints only)
+  let basePercentage = totalCheckpoints > 0 ? (passedCount / totalCheckpoints) * 100 : 0;
+  
+  // If final assessment is passed, show 100% (topic complete)
+  let finalPercentage = basePercentage;
+  if (hasPassedFinalAssessment && passedCount === totalCheckpoints) {
+    finalPercentage = 100; // Topic fully completed
+  }
+  
+  console.log('✅ Fixed Progress calculation result:', { 
+    passedCheckpoints: passedCount, 
+    totalCheckpoints,
+    hasPassedFinalAssessment,
+    basePercentage: Math.round(basePercentage),
+    finalPercentage: Math.round(finalPercentage),
+    checkpointsDetails: checkpoints.map(cp => ({
+      number: cp.checkpoint_number,
+      passed: checkpointProgress[cp.id]?.passed || false,
+      score: checkpointProgress[cp.id]?.score || 0
+    }))
+  });
+  
+  return { 
+    passed: passedCount, 
+    total: totalCheckpoints, 
+    percentage: finalPercentage,
+    isTopicComplete: hasPassedFinalAssessment && passedCount === totalCheckpoints
+  };
+}, [checkpoints, checkpointProgress, hasPassedFinalAssessment]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -121,7 +145,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           setError('No checkpoints found for this topic. Please contact your teacher.');
           setCheckpoints([]);
         } else {
-          // Filter out checkpoint 5 from display (but keep for unlock logic)
+          // Filter out checkpoint 5 from display but keep it for progress calculation
           const checkpointsToShow = checkpointsData.filter(cp => cp.checkpoint_number !== 5);
           setCheckpoints(checkpointsToShow);
           
@@ -129,11 +153,12 @@ export const TopicDetailCheckpoints: React.FC = () => {
           console.log('Loaded checkpoints:', {
             topicId,
             topicTitle: topicData.title,
-            checkpoints: checkpointsToShow.map(cp => ({
+            checkpoints: checkpointsData.map(cp => ({
               id: cp.id,
               number: cp.checkpoint_number,
               title: cp.title,
-              questions: cp.question_count
+              questions: cp.question_count,
+              isFinal: cp.checkpoint_number === 5
             }))
           });
         }
@@ -397,6 +422,18 @@ export const TopicDetailCheckpoints: React.FC = () => {
       setHasPassedFinalAssessment(passed);
       setFinalAssessmentScore(score);
       setFinalAssessmentCompletionDate(new Date().toLocaleDateString());
+
+      // Save checkpoint 5 progress
+      const checkpointsData = await getTopicCheckpoints(topicId);
+      const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 5);
+      
+      if (checkpoint5) {
+        await saveCheckpointProgress(user.username, checkpoint5.id, score, passed);
+        
+        // Refresh progress data
+        const progressData = await getStudentCheckpointProgress(user.username, topicId);
+        setCheckpointProgress(progressData);
+      }
 
       // Update topic progress
       await updateTopicProgress(user.username, subject!, topicId!, {
@@ -914,7 +951,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
               )}
             </div>
           </section>
-        </div> {/* Closing div for md:col-span-2 */}
+        </div>
 
         {/* Right Column - Progress & Final Assessment */}
         <div className="space-y-6">
@@ -1037,8 +1074,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
               </div>
             )}
           </div>
-        </div> {/* Closing div for right column */}
-      </div> {/* Closing div for grid md:grid-cols-3 */}
-    </div> // Closing div for max-w-6xl
+        </div>
+      </div>
+    </div>
   );
 };
