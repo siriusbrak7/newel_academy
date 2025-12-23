@@ -14,7 +14,7 @@ import {
 import { TeacherAssessmentReview } from './components/TeacherAssessmentReview';
 import { SprintChallenge, LeaderboardView } from './components/Gamification';
 import AITutorChat from './components/AITutorChat';
-import { ImageOptimizer } from './components/ImageOptimizer'; // ← Added
+import { ImageOptimizer } from './components/ImageOptimizer';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
@@ -25,8 +25,83 @@ declare global {
     ThemeManager?: {
       setTheme: (theme: string) => void;
     };
+    neuroscienceFacts?: string[];
   }
 }
+
+/* ------------------------------------
+   Neuroscience Insight Component
+------------------------------------ */
+interface NeuroscienceInsightProps {
+  theme: Theme;
+}
+
+const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
+  const [currentFact, setCurrentFact] = useState<string>('');
+  const [facts] = useState<string[]>(window.neuroscienceFacts || [
+    "The human brain has about 86 billion neurons, each connected to thousands of others.",
+    "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
+    "Neuroplasticity allows your brain to reorganize itself throughout your life.",
+    "Sleep is crucial for memory consolidation and neural repair.",
+    "The brain is 73% water. Dehydration of just 2% can impair attention and memory."
+  ]);
+
+  useEffect(() => {
+    const updateFact = () => {
+      if (facts.length > 0) {
+        const idx = Math.floor(Math.random() * facts.length);
+        setCurrentFact(facts[idx]);
+      }
+    };
+
+    updateFact();
+    const interval = setInterval(updateFact, 671000); // 11 minutes 11 seconds
+
+    return () => clearInterval(interval);
+  }, [facts]);
+
+  return (
+    <div 
+      id="neuroscience-fact-container"
+      className={`relative rounded-2xl p-8 mb-12 max-w-4xl mx-auto ${
+        theme === 'Cyber-Dystopian'
+          ? 'cyber-box-glow bg-black/70 border-green-500/30'
+          : 'bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
+      }`}
+    >
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+      
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+        <div className="flex-shrink-0">
+          <div className={`text-4xl ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-blue-400'}`}>
+            <i className="fas fa-brain"></i>
+          </div>
+        </div>
+        
+        <div className="flex-1">
+          <h3 className={`text-2xl font-bold mb-3 font-['Poppins'] ${
+            theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
+          }`}>
+            Neuroscience Insight
+          </h3>
+          
+          <p className={`text-lg leading-relaxed transition-opacity duration-300 ease-in-out ${
+            theme === 'Cyber-Dystopian' ? 'text-green-200/90' : 'text-white/90'
+          }`}>
+            {currentFact || facts[0]}
+          </p>
+          
+          <div className="mt-4 flex items-center gap-2 text-sm opacity-70">
+            <i className="fas fa-clock"></i>
+            <span className={theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}>
+              Updates every 11 minutes
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ------------------------------------
    Route Guard
@@ -253,43 +328,40 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ))}
         </div>
 
-        {/* NEW SECTION: Neuroscience Fact + AI Ethics */}
-        <div className="my-20 max-w-5xl mx-auto space-y-16">
-          {/* Neuroscience Fact Container (injected from index.html) */}
-          <div id="neuroscience-fact-container" className="neuroscience-fact-container mx-auto max-w-3xl" />
+        {/* Neuroscience Insight Component */}
+        <NeuroscienceInsight theme={theme} />
 
-          {/* AI Ethical Use in Learning */}
-          <div className={`p-10 rounded-2xl backdrop-blur-md border ${
-            theme === 'Cyber-Dystopian'
-              ? 'cyber-box-glow bg-black/70 border-green-500/30'
-              : 'bg-white/10 border-white/20'
-          }`}>
-            <h2 className={`text-3xl font-bold mb-8 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-              Ethical Use of AI in Learning
-            </h2>
-            <ul className={`space-y-5 text-lg max-w-3xl mx-auto ${theme === 'Cyber-Dystopian' ? 'text-green-300/90' : 'text-white/90'}`}>
-              <li className="flex items-start gap-4">
-                <span className="text-2xl">🧠</span>
-                <span>Use AI as a study assistant to deepen understanding, not to replace your own thinking.</span>
-              </li>
-              <li className="flex items-start gap-4">
-                <span className="text-2xl">🔍</span>
-                <span>Always verify AI-generated information with credible sources and textbooks.</span>
-              </li>
-              <li className="flex items-start gap-4">
-                <span className="text-2xl">✍️</span>
-                <span>Develop your own answers and explanations — let AI be a guide, not the author.</span>
-              </li>
-              <li className="flex items-start gap-4">
-                <span className="text-2xl">✅</span>
-                <span>Maintain academic integrity: be transparent when AI helped you learn a concept.</span>
-              </li>
-              <li className="flex items-start gap-4">
-                <span className="text-2xl">🌱</span>
-                <span>AI accelerates learning when used ethically — it strengthens, never weakens, your mind.</span>
-              </li>
-            </ul>
-          </div>
+        {/* AI Ethical Use in Learning */}
+        <div className={`p-10 rounded-2xl backdrop-blur-md border mb-20 ${
+          theme === 'Cyber-Dystopian'
+            ? 'cyber-box-glow bg-black/70 border-green-500/30'
+            : 'bg-white/10 border-white/20'
+        }`}>
+          <h2 className={`text-3xl font-bold mb-8 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
+            Ethical Use of AI in Learning
+          </h2>
+          <ul className={`space-y-5 text-lg max-w-3xl mx-auto ${theme === 'Cyber-Dystopian' ? 'text-green-300/90' : 'text-white/90'}`}>
+            <li className="flex items-start gap-4">
+              <span className="text-2xl">🧠</span>
+              <span>Use AI as a study assistant to deepen understanding, not to replace your own thinking.</span>
+            </li>
+            <li className="flex items-start gap-4">
+              <span className="text-2xl">🔍</span>
+              <span>Always verify AI-generated information with credible sources and textbooks.</span>
+            </li>
+            <li className="flex items-start gap-4">
+              <span className="text-2xl">✍️</span>
+              <span>Develop your own answers and explanations — let AI be a guide, not the author.</span>
+            </li>
+            <li className="flex items-start gap-4">
+              <span className="text-2xl">✅</span>
+              <span>Maintain academic integrity: be transparent when AI helped you learn a concept.</span>
+            </li>
+            <li className="flex items-start gap-4">
+              <span className="text-2xl">🌱</span>
+              <span>AI accelerates learning when used ethically — it strengthens, never weakens, your mind.</span>
+            </li>
+          </ul>
         </div>
 
         {/* Final CTA */}
@@ -300,7 +372,6 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               : 'bg-gradient-to-br from-cyan-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
           }`}
         >
-          {/* ... (your existing CTA code unchanged) ... */}
           <div className="inline-block mb-6">
             <div
               className={`px-6 py-2 rounded-full mb-4 ${
@@ -389,6 +460,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
     </div>
   );
 };
+
 /* ------------------------------------
    Main App
 ------------------------------------ */

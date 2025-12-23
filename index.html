@@ -69,6 +69,7 @@
       #root { 
         position: relative; 
         z-index: 10; 
+        min-height: 100vh;
       }
 
       /* ===== COSMIC THEME ===== */
@@ -427,12 +428,12 @@
         "Laughter increases endorphins and dopamine, enhancing learning capacity."
       ];
 
-      document.addEventListener('DOMContentLoaded', () => {
-        const root = document.getElementById('root');
-        if (root && !document.getElementById('neuroscience-fact-container')) {
-          const container = document.createElement('div');
-          container.id = 'neuroscience-fact-container';
-          container.innerHTML = `
+      // This will be called by React app when it's ready
+      window.initNeuroscienceFacts = function(container) {
+        if (!document.getElementById('neuroscience-fact-container') && container) {
+          const neuroscienceContainer = document.createElement('div');
+          neuroscienceContainer.id = 'neuroscience-fact-container';
+          neuroscienceContainer.innerHTML = `
             <div class="fact-content">
               <i class="fas fa-brain"></i>
               <div>
@@ -441,7 +442,9 @@
               </div>
             </div>
           `;
-          root.parentNode.insertBefore(container, root);
+          
+          // Append to the container (after main content)
+          container.appendChild(neuroscienceContainer);
 
           const factElement = document.getElementById('neuroscience-fact');
           const displayFact = () => {
@@ -455,8 +458,14 @@
 
           displayFact();
           setInterval(displayFact, 671000); // 11 minutes 11 seconds
+          
+          return neuroscienceContainer;
         }
-      });
+        return null;
+      };
+
+      // Also expose facts for React to use directly
+      window.neuroscienceFacts = neuroscienceFacts;
     </script>
 
     <!-- Theme Manager -->
@@ -683,6 +692,9 @@
           }
         }, 250);
       });
+
+      // Expose to window
+      window.ThemeManager = themeManager;
     </script>
   </head>
   
@@ -692,6 +704,7 @@
     <script type="module" src="/index.tsx"></script>
     
     <script type="module">
+      // Expose ThemeManager globally for React to use
       window.ThemeManager = themeManager;
     </script>
   </body>
