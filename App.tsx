@@ -81,7 +81,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
   }, [theme]);
 
   return (
-    <div className="min-h-[80vh] flex flex-col justify-center items-center text-center px-4 relative overflow-hidden">
+    <div className="min-h-[80vh] flex flex-col items-center text-center px-4 relative overflow-hidden">
       {/* Background Effects */}
       {theme === 'Cosmic' && (
         <>
@@ -106,19 +106,16 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           {/* Jupiter - Large planet with rings */}
           <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" style={{ animationDuration: '15s' }}>
             <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse" style={{ animationDuration: '8s' }}>
-              {/* Jupiter's stripes */}
               <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
               <div className="absolute top-1/2 w-full h-2 bg-orange-700/50"></div>
               <div className="absolute bottom-1/4 w-full h-1 bg-orange-600/50"></div>
             </div>
-            {/* Jupiter's ring */}
             <div className="absolute -top-2 -left-2 w-16 h-16 border-2 border-orange-400/30 rounded-full"></div>
           </div>
           
           {/* Mercury - Small fast planet */}
           <div className="absolute bottom-1/3 right-1/4 w-16 h-16 animate-float" style={{ animationDuration: '8s', animationDelay: '2s' }}>
             <div className="absolute w-4 h-4 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 animate-pulse" style={{ animationDuration: '3s' }}>
-              {/* Mercury's craters */}
               <div className="absolute top-1 w-1 h-1 bg-gray-700 rounded-full"></div>
               <div className="absolute bottom-2 right-2 w-0.5 h-0.5 bg-gray-800 rounded-full"></div>
             </div>
@@ -137,7 +134,6 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
 
       {theme === 'Cyber-Dystopian' && (
         <>
-          {/* Grid lines */}
           <div className="absolute inset-0 pointer-events-none opacity-10">
             <div className="absolute inset-0" style={{
               backgroundImage: `linear-gradient(to right, #00ff00 1px, transparent 1px),
@@ -146,10 +142,8 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             }}></div>
           </div>
           
-          {/* Scanning line */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-scan"></div>
           
-          {/* Digital particles */}
           <div className="absolute inset-0 pointer-events-none">
             {particles.map((p, i) => (
               <div
@@ -170,9 +164,9 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
       )}
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-6xl mx-auto">
+      <div className="relative z-10 max-w-6xl mx-auto w-full">
         {/* Hero Section */}
-        <div className="mb-16">
+        <div className="mb-16 pt-12">
           <div className="inline-block mb-6">
             <div className={`px-6 py-2 rounded-full mb-4 ${
               theme === 'Cyber-Dystopian'
@@ -220,10 +214,19 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </div>
         </div>
 
-        {/* Value Proposition - Updated with real images */}
-        <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 ${
+        {/* === INSERTED SECTION: Neuroscience Fact + AI Ethics Card === */}
+        <div className="my-20 max-w-4xl mx-auto space-y-10">
+          {/* Neuroscience Fact Container (injected from index.html) */}
+          <div id="neuroscience-fact-container" className="neuroscience-fact-container mx-auto"></div>
+
+          {/* AI Ethics Flip Card (injected from index.html) */}
+          <div className="ai-ethics-card mx-auto max-w-lg"></div>
+        </div>
+
+        {/* Value Proposition - Feature Cards */}
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 my-20 p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm ${
           theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : ''
-        } p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm`}>
+        }`}>
           {[
             { 
               image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=300&fit=crop&auto=format',
@@ -263,12 +266,13 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           ))}
         </div>
 
-        {/* Final CTA Section - ONLY THIS SECTION REMAINS AS REQUESTED */}
-        <div className={`rounded-3xl p-10 md:p-16 text-center ${
+        {/* Final CTA Section */}
+        <div className={`rounded-3xl p-10 md:p-16 text-center my-20 ${
           theme === 'Cyber-Dystopian'
             ? 'cyber-box-glow bg-black border-2 border-green-500/30'
             : 'bg-gradient-to-br from-cyan-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
         }`}>
+          {/* ... rest of your CTA section unchanged ... */}
           <div className="inline-block mb-6">
             <div className={`px-6 py-2 rounded-full mb-4 ${
               theme === 'Cyber-Dystopian'
