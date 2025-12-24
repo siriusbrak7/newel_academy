@@ -82,7 +82,7 @@ const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
           <h3 className={`text-2xl font-bold mb-3 font-['Poppins'] ${
             theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
           }`}>
-            Neuroscience fact of the moment...
+            Neuroscience facts...
           </h3>
           
           <p className={`text-lg leading-relaxed transition-opacity duration-300 ease-in-out ${
