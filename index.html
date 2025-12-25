@@ -308,6 +308,65 @@
       pointer-events: none;
     }
 
+      /* ===== CYBER GLITCH EFFECT ===== */
+  .cyber-glitch {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cyber-glitch::before,
+  .cyber-glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: inherit;
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+    animation: glitch-anim 0.3s infinite;
+    opacity: 0.8;
+  }
+
+  .cyber-glitch::before {
+    left: 2px;
+    text-shadow: -2px 0 #ff00ff;
+    animation-delay: 0.1s;
+  }
+
+  .cyber-glitch::after {
+    left: -2px;
+    text-shadow: 2px 0 #00ffff;
+  }
+
+  @keyframes glitch-anim {
+    0% { clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%); }
+    20% { clip-path: polygon(0 15%, 100% 15%, 100% 60%, 0 60%); }
+    40% { clip-path: polygon(0 30%, 100% 30%, 100% 75%, 0 75%); }
+    60% { clip-path: polygon(0 45%, 100% 45%, 100% 90%, 0 90%); }
+    80% { clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%); }
+    100% { clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%); }
+  }
+
+  /* ===== GRID PATTERN BACKGROUND ===== */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(rgba(0, 255, 157, 0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 157, 0.15) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: center center;
+  }
+
+  /* Optional: Add a subtle animation to the grid */
+  .bg-grid-pattern.animated {
+    animation: grid-shift 20s linear infinite;
+  }
+
+  @keyframes grid-shift {
+    0% { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
+  }
+
     /* ===== COMMON UTILITIES ===== */
     .glass-morphism {
       background: rgba(255, 255, 255, 0.05);

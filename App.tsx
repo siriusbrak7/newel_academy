@@ -25,10 +25,12 @@ import { initializeSupabase, sessionService } from './services/supabaseService';
 declare global {
   interface Window {
     ThemeManager?: {
-      setTheme: (theme: string) => void;
+      setTheme: (theme: string) => void | Promise<void>;
       applyThemeClasses: (element: HTMLElement, theme: string) => void;
       getCurrentTheme: () => string;
       getCurrentCssClass: () => string;
+      getThemeConfig?: () => any;  // Optional since React might not use it
+      instance?: any;              // Optional internal reference
     };
     neuroscienceFacts?: string[];
   }
@@ -150,7 +152,7 @@ const Homepage: React.FC<HomepageProps> = React.memo(({ theme, onOpenAuth }) => 
             {particles.map((p, i) => (
               <div
                 key={i}
-                className="absolute rounded-full bg-white/30 animate-pulse"
+                className="absolute rounded-full bg-white/30 animate-pulse-soft"
                 style={{
                   left: `${p.x}%`,
                   top: `${p.y}%`,
@@ -162,22 +164,22 @@ const Homepage: React.FC<HomepageProps> = React.memo(({ theme, onOpenAuth }) => 
               />
             ))}
           </div>
-          {/* Decorative Planets - aria-hidden for accessibility */}
-          <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" aria-hidden="true" style={{ animationDuration: '15s' }}>
-            <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse">
-              <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
-              <div className="absolute top-1/2 w-full h-2 bg-orange-700/50"></div>
-            </div>
+                  {/* Decorative Planets - aria-hidden for accessibility */}
+        <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" aria-hidden="true" style={{ animationDuration: '15s' }}>
+          <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse-soft">
+            <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
+            <div className="absolute top-1/2 w-full h-2 bg-orange-700/50"></div>
           </div>
+        </div>
         </>
-      )}
+        )}
 
-      {theme === 'Cyber-Dystopian' && (
+        {theme === 'Cyber-Dystopian' && (
         <div className="absolute inset-0 pointer-events-none opacity-10" aria-hidden="true">
           <div className="absolute inset-0 bg-grid-pattern" />
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-scan" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-cyber-scan" />
         </div>
-      )}
+        )}
 
       {/* Main Content */}
       <div className="relative z-10 max-w-6xl mx-auto w-full">
