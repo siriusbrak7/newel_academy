@@ -29,14 +29,41 @@ import {
   ChevronDown, Lightbulb, Atom
 } from 'lucide-react';
 
-import { 
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, 
-  BarElement, Title, Tooltip, Legend, ArcElement, Filler 
+// COMPLETE Chart.js registration
+import {
+  Chart,
+  LineController,
+  BarController,
+  DoughnutController,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
 } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
 
-// Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler);
+Chart.register(
+  LineController,
+  BarController,
+  DoughnutController,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
+
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
 // jsPDF Safe Import
 let jsPDF: any;

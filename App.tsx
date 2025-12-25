@@ -1,5 +1,19 @@
 ﻿import React, { useState, useEffect, useCallback, useMemo, Suspense, Component, ReactNode } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Chart, LineController, CategoryScale, LinearScale, PointElement, LineElement, BarController, BarElement, DoughnutController, ArcElement } from 'chart.js';
+
+// Register all Chart.js components you're using
+Chart.register(
+  LineController, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement,
+  BarController,
+  BarElement,
+  DoughnutController,
+  ArcElement
+);
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import AuthModal from './components/AuthModal';
