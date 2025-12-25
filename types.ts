@@ -9,16 +9,19 @@ export type Theme = 'Cosmic' | 'Cyber-Dystopian';
 // USER & AUTH
 // =======================
 
+// types.ts - Add id property to User type if missing
 export interface User {
+  id?: string; // Make it optional if it wasn't there
   username: string;
-  password?: string;
   role: Role;
+  password?: string;
   approved: boolean;
   securityQuestion: string;
   securityAnswer: string;
   gradeLevel?: string;
   assignedStudents?: string[];
-  lastLogin?: number;
+  lastLogin: number;
+  createdAt?: number;
   loginHistory?: number[];
 }
 

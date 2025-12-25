@@ -101,6 +101,7 @@ export const saveSession = (user: User | null) => {
 // AUTHENTICATION
 // =====================================================
 
+// services/storageService.ts - Fix the authenticateUser function
 export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
   try {
     // We map usernames to an internal email format for Supabase Auth
@@ -131,7 +132,8 @@ export const authenticateUser = async (username: string, password: string): Prom
       approved: profile.approved,
       securityQuestion: profile.security_question,
       securityAnswer: profile.security_answer,
-      gradeLevel: profile.grade_level
+      gradeLevel: profile.grade_level,
+      lastLogin: Date.now() // ADD THIS REQUIRED FIELD
     };
   } catch (error: any) {
     console.error('Login Error:', error.message);

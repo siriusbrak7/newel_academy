@@ -1,8 +1,8 @@
-// components/AuthModal.tsx
+// components/AuthModal.tsx - COMPLETE FIXED VERSION
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { SECURITY_QUESTIONS } from '../constants';
-import { authenticateUser, registerUser, recoverPassword } from '../services/storageService';
+import { supabase } from '../services/supabaseClient';
 import { X } from 'lucide-react';
 
 interface AuthModalProps {
@@ -45,20 +45,95 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     setError('');
 
     try {
-      const user = await authenticateUser(formData.username, formData.password);
+      console.log('🔐 Attempting login for:', formData.username);
       
-      if (!user) {
+      // Convert username to email format for Supabase Auth
+      const email = `${formData.username.toLowerCase()}@newel.academy`;
+      
+      console.log('📧 Using email:', email);
+      
+      // Use Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: formData.password
+      });
+
+      if (error) {
+        console.error('❌ Supabase auth error:', error.message);
         setError('Invalid username or password');
+        setLoading(false);
         return;
       }
 
-      if (!user.approved) {
+      if (!data.user) {
+        console.error('❌ No user data returned');
+        setError('Authentication failed');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Supabase auth successful, user ID:', data.user.id);
+
+      // Get user profile from your users table
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('❌ Profile fetch error:', profileError.message);
+        setError('User profile not found');
+        setLoading(false);
+        return;
+      }
+
+      if (!profile) {
+        console.error('❌ No profile data');
+        setError('User profile not found');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Profile found:', profile.username);
+
+      if (!profile.approved) {
+        console.log('⚠️ Account not approved');
         setError('Account pending admin approval');
+        setLoading(false);
         return;
       }
 
+      // Update last login
+      await supabase
+        .from('users')
+        .update({ 
+          last_login: new Date().toISOString(),
+          login_history: [...(profile.login_history || []), new Date().toISOString()].slice(-10)
+        })
+        .eq('id', data.user.id);
+
+      // Create User object
+      const user: User = {
+        id: data.user.id,
+        username: profile.username,
+        role: profile.role as Role,
+        approved: profile.approved,
+        securityQuestion: profile.security_question || '',
+        securityAnswer: profile.security_answer || '',
+        gradeLevel: profile.grade_level || undefined,
+        assignedStudents: profile.assigned_students || undefined,
+        lastLogin: Date.now(),
+        createdAt: new Date(profile.created_at).getTime(),
+        loginHistory: profile.login_history 
+          ? profile.login_history.map((d: string) => new Date(d).getTime())
+          : []
+      };
+
+      console.log('✅ Login successful, calling onLogin');
       onLogin(user);
     } catch (err: any) {
+      console.error('❌ Login error:', err);
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -73,47 +148,150 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     setLoading(true);
     setError('');
 
+    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
+    // Validate required fields
+    if (!formData.username || !formData.password || !formData.securityAnswer) {
+      setError('All fields are required');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const result = await registerUser({
-        username: formData.username,
+      console.log('📝 Starting registration for:', formData.username);
+
+      // Check if username already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('username')
+        .eq('username', formData.username)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ Username check error:', checkError);
+        setError('Error checking username availability');
+        setLoading(false);
+        return;
+      }
+
+      if (existingUser) {
+        console.log('❌ Username already exists');
+        setError('Username already exists');
+        setLoading(false);
+        return;
+      }
+
+      // Create user in Supabase Auth
+      const email = `${formData.username.toLowerCase()}@newel.academy`;
+      console.log('📧 Creating auth user with email:', email);
+      
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
         password: formData.password,
-        role: formData.role,
-        gradeLevel: formData.role === 'student' ? formData.gradeLevel : undefined,
-        securityQuestion: formData.securityQuestion,
-        securityAnswer: formData.securityAnswer
+        options: {
+          data: {
+            username: formData.username,
+            role: formData.role
+          }
+        }
       });
 
-      if (result.success) {
-        setSuccess(result.message);
-        
-        if (formData.role === 'admin') {
-          const adminUser: User = {
-            username: formData.username,
-            role: 'admin',
-            approved: true,
-            securityQuestion: formData.securityQuestion,
-            securityAnswer: formData.securityAnswer.toLowerCase(),
-            lastLogin: Date.now()
-          };
-          setTimeout(() => onLogin(adminUser), 1500);
-        } else {
-          setTimeout(() => {
-            setSuccess('');
-            setMode('login');
-            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
-          }, 2000);
-        }
+      if (authError) {
+        console.error('❌ Supabase auth error:', authError.message);
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!authData.user) {
+        console.error('❌ No user created in auth');
+        setError('Registration failed - no user created');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Auth user created, ID:', authData.user.id);
+
+      // Create profile in your users table
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          username: formData.username,
+          password_hash: btoa(formData.password),
+          role: formData.role,
+          approved: formData.role === 'admin',
+          security_question: formData.securityQuestion,
+          security_answer: formData.securityAnswer.toLowerCase(),
+          grade_level: formData.role === 'student' ? formData.gradeLevel : null,
+          created_at: new Date().toISOString(),
+          last_login: formData.role === 'admin' ? new Date().toISOString() : null,
+          login_history: formData.role === 'admin' ? [new Date().toISOString()] : []
+        });
+
+      if (profileError) {
+        console.error('❌ Profile creation error:', profileError);
+        setError('Profile creation failed: ' + profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Profile created successfully');
+
+      const successMessage = formData.role === 'admin' 
+        ? 'Admin account created successfully!' 
+        : 'Registration successful! Awaiting admin approval.';
+      
+      setSuccess(successMessage);
+
+      // If admin, auto-login
+      if (formData.role === 'admin') {
+        console.log('🔄 Auto-logging in admin...');
+        setTimeout(async () => {
+          const { data: loginData } = await supabase.auth.signInWithPassword({
+            email,
+            password: formData.password
+          });
+          
+          if (loginData?.user) {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', loginData.user.id)
+              .single();
+              
+            if (profile) {
+              const adminUser: User = {
+                id: loginData.user.id,
+                username: profile.username,
+                role: profile.role as Role,
+                approved: profile.approved,
+                securityQuestion: profile.security_question || '',
+                securityAnswer: profile.security_answer || '',
+                gradeLevel: profile.grade_level || undefined,
+                lastLogin: Date.now(),
+                createdAt: new Date(profile.created_at).getTime()
+              };
+              onLogin(adminUser);
+            }
+          }
+        }, 1500);
       } else {
-        setError(result.message);
+        // Switch to login for regular users
+        setTimeout(() => {
+          setSuccess('');
+          setMode('login');
+          setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+        }, 2000);
       }
     } catch (err: any) {
-      setError('Registration failed.');
+      console.error('❌ Registration error:', err);
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -134,20 +312,38 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     }
 
     try {
-      const result = await recoverPassword(
-        formData.username,
-        formData.securityAnswer,
-        formData.password
-      );
+      console.log('🔐 Starting password recovery for:', formData.username);
 
-      if (result.success) {
-        setSuccess(result.message);
-        setTimeout(() => setMode('login'), 2000);
-      } else {
-        setError(result.message);
+      // Find user by username and verify security answer
+      const { data: userProfile, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', formData.username)
+        .single();
+
+      if (userError || !userProfile) {
+        console.error('❌ User not found:', userError?.message);
+        setError('User not found');
+        setLoading(false);
+        return;
       }
+
+      if (userProfile.security_answer !== formData.securityAnswer.toLowerCase()) {
+        console.error('❌ Incorrect security answer');
+        setError('Incorrect security answer');
+        setLoading(false);
+        return;
+      }
+
+      // For password reset, we need to be authenticated
+      console.log('⚠️ Password reset requires user to be logged in');
+      setError('Please contact admin for password reset, or use email recovery');
+      setLoading(false);
+      return;
+
     } catch (err: any) {
-      setError('Recovery failed.');
+      console.error('❌ Recovery error:', err);
+      setError(err.message || 'Password recovery failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -200,6 +396,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
           className="w-full p-3 rounded bg-black/40 border border-white/10 text-white"
           required
           disabled={loading}
+          autoComplete="username"
         />
 
         <input
@@ -211,6 +408,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
           className="w-full p-3 rounded bg-black/40 border border-white/10 text-white"
           required
           disabled={loading}
+          autoComplete={mode === 'recover' ? 'new-password' : 'current-password'}
         />
 
         {(mode === 'register' || mode === 'recover') && (
@@ -224,6 +422,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
               className="w-full p-3 rounded bg-black/40 border border-white/10 text-white"
               required
               disabled={loading}
+              autoComplete="new-password"
             />
 
             <select
@@ -249,6 +448,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
               className="w-full p-3 rounded bg-black/40 border border-white/10 text-white"
               required
               disabled={loading}
+              autoComplete="off"
             />
           </>
         )}

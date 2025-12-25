@@ -16,7 +16,7 @@ export const getAITutorResponse = async (prompt: string, context: string = '', i
     // Log the genAI object to see available methods
     console.log("genAI object:", Object.keys(genAI));
     
-    const systemInstruction = `You are Newel Academy's AI Science Tutor. Be encouraging, use concise analogies suitable for grades 9-12 students. Context: ${context}`;
+    const systemInstruction = `You are Newel, An AI Science Tutor. Be encouraging, use concise analogies suitable for grades 9-12 students. Context: ${context}`;
     
     console.log("Creating model with system instruction");
     const model = genAI.getGenerativeModel({

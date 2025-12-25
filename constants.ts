@@ -60,7 +60,8 @@ export const DEMO_USERS: User[] = [
     role: 'admin',
     approved: true,
     securityQuestion: SECURITY_QUESTIONS[4],
-    securityAnswer: 'newelacademy'
+    securityAnswer: 'newelacademy',
+    lastLogin: 0
   },
   {
     username: 'teacher_demo',
@@ -68,16 +69,18 @@ export const DEMO_USERS: User[] = [
     role: 'teacher',
     approved: true,
     securityQuestion: SECURITY_QUESTIONS[0],
-    securityAnswer: 'demo'
+    securityAnswer: 'demo',
+    lastLogin: 0
   },
   {
     username: 'student_demo',
     password: 'Learn123!',
     role: 'student',
     approved: true,
-    gradeLevel: '12', 
+    gradeLevel: '12',
     securityQuestion: SECURITY_QUESTIONS[1],
-    securityAnswer: 'demo'
+    securityAnswer: 'demo',
+    lastLogin: 0
   }
 ];
 
