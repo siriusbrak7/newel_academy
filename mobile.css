@@ -1,15 +1,25 @@
-/* mobile.css - Mobile-first responsive fixes */
+/* mobile.css - Enhanced Mobile-First Responsive Fixes with Theme Support */
 
-/* Base mobile adjustments */
+/* ===== GLOBAL RESPONSIVE ADJUSTMENTS ===== */
 @media (max-width: 768px) {
-  /* Font size reductions */
+  /* Font Scaling */
   html {
     font-size: 14px;
   }
   
+  /* Theme-aware body adjustments */
+  .cosmic-theme {
+    background: radial-gradient(ellipse at center, #0f172a 0%, #020617 100%) !important;
+  }
+  
+  .cyber-theme {
+    background: linear-gradient(135deg, #000814 0%, #001d3d 100%) !important;
+  }
+  
+  /* Typography */
   h1 {
-    font-size: 2rem !important;
-    line-height: 2.5rem !important;
+    font-size: 1.75rem !important;
+    line-height: 2.25rem !important;
   }
   
   h2 {
@@ -20,150 +30,305 @@
     font-size: 1.25rem !important;
   }
   
-  /* Navbar mobile fixes */
+  /* Navbar Mobile Optimizations */
   nav {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     height: 3.5rem !important;
   }
   
-  .text-3xl {
-    font-size: 1.75rem !important;
+  /* Theme-specific navbar backgrounds */
+  .cosmic-theme nav {
+    background: rgba(15, 23, 42, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.2) !important;
   }
   
-  /* Hide text on small icons */
-  .hidden\\/sm\\:inline {
-    display: none !important;
+  .cyber-theme nav {
+    background: rgba(0, 8, 20, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid rgba(0, 255, 157, 0.2) !important;
   }
   
-  /* Button touch targets */
-  button, a[role="button"] {
-    min-height: 44px !important;
-    min-width: 44px !important;
+  /* Logo Text Sizing */
+  .text-3xl, .text-2xl {
+    font-size: 1.5rem !important;
   }
   
-  /* Grid adjustments */
-  .grid-cols-1 {
+  /* Theme-specific text glow adjustments */
+  .cosmic-theme .cosmic-text-glow {
+    text-shadow: 
+      0 0 10px rgba(56, 189, 248, 0.6),
+      0 0 20px rgba(56, 189, 248, 0.4) !important;
+  }
+  
+  .cyber-theme .cyber-text-glow {
+    text-shadow: 
+      0 0 8px rgba(0, 255, 157, 0.8),
+      0 0 16px rgba(0, 255, 157, 0.4) !important;
+  }
+  
+  /* Prevent horizontal scroll from background animations */
+  body {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+  }
+
+  /* ===== GRID SYSTEM OVERRIDES ===== */
+  .grid-cols-1,
+  .grid-cols-2,
+  .grid-cols-3,
+  .md\:grid-cols-2, 
+  .md\:grid-cols-3, 
+  .md\:grid-cols-4 {
     grid-template-columns: 1fr !important;
   }
   
-  .grid-cols-2 {
-    grid-template-columns: 1fr !important;
+  /* Exception for very small grids like Quick Stats */
+  .grid-cols-2.gap-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1rem !important;
   }
   
-  .grid-cols-3 {
-    grid-template-columns: 1fr !important;
+  /* Theme-aware grid adjustments */
+  .cosmic-theme .grid > * {
+    background: rgba(30, 41, 59, 0.5) !important;
+    border: 1px solid rgba(56, 189, 248, 0.1) !important;
   }
   
-  .md\\:grid-cols-2, .md\\:grid-cols-3, .md\\:grid-cols-4 {
-    grid-template-columns: 1fr !important;
+  .cyber-theme .grid > * {
+    background: rgba(0, 29, 61, 0.5) !important;
+    border: 1px solid rgba(0, 255, 157, 0.1) !important;
   }
   
-  /* Padding reductions */
+  /* ===== SPACING & LAYOUT ===== */
   .p-8 {
-    padding: 1.5rem !important;
+    padding: 1.25rem !important;
   }
   
   .p-6 {
     padding: 1rem !important;
   }
   
-  /* Margin adjustments */
+  .p-4 {
+    padding: 0.75rem !important;
+  }
+  
+  /* Stack spacing */
   .space-y-8 > * + * {
     margin-top: 1.5rem !important;
   }
   
-  /* Modal positioning fix */
-  .fixed.inset-0 {
-    padding: 1rem !important;
+  .space-y-6 > * + * {
+    margin-top: 1.25rem !important;
   }
   
-  /* Sidebar full width on mobile */
+  .space-y-4 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  /* ===== COMPONENT SPECIFICS ===== */
+  
+  /* Sidebar Mobile Full Width */
   .fixed.right-0.w-80 {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 85% !important;
+    max-width: 320px !important;
   }
   
-  /* Table responsive */
+  /* Sidebar theme backgrounds */
+  .cosmic-theme .fixed.right-0.w-80 > div {
+    background: rgba(15, 23, 42, 0.98) !important;
+    backdrop-filter: blur(30px) !important;
+  }
+  
+  .cyber-theme .fixed.right-0.w-80 > div {
+    background: rgba(0, 8, 20, 0.98) !important;
+    backdrop-filter: blur(30px) !important;
+  }
+  
+  /* Chart Container Heights */
+  .h-64 {
+    height: 220px !important;
+  }
+  
+  .h-80 {
+    height: 260px !important;
+  }
+  
+  /* Table Horizontal Scroll Wrapper */
   table {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    background: transparent !important;
   }
   
-  /* Card adjustments */
+  /* Theme-aware table styling */
+  .cosmic-theme table {
+    background: rgba(30, 41, 59, 0.5) !important;
+  }
+  
+  .cyber-theme table {
+    background: rgba(0, 29, 61, 0.5) !important;
+  }
+  
+  /* Button Touch Targets (Apple HIG recommendation) */
+  button, a[role="button"], input[type="submit"] {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  
+  /* Theme-aware button active states */
+  .cosmic-theme button:active {
+    background: rgba(56, 189, 248, 0.2) !important;
+  }
+  
+  .cyber-theme button:active {
+    background: rgba(0, 255, 157, 0.2) !important;
+  }
+  
+  /* Form Inputs */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS */
+  }
+  
+  /* Theme-aware form inputs */
+  .cosmic-theme input,
+  .cosmic-theme select,
+  .cosmic-theme textarea {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  }
+  
+  .cyber-theme input,
+  .cyber-theme select,
+  .cyber-theme textarea {
+    background: rgba(0, 29, 61, 0.7) !important;
+    border: 1px solid rgba(0, 255, 157, 0.3) !important;
+  }
+
+  /* Dashboard Cards */
   .rounded-2xl {
     border-radius: 1rem !important;
   }
   
-  .rounded-3xl {
-    border-radius: 1.25rem !important;
+  .rounded-xl {
+    border-radius: 0.75rem !important;
   }
   
-  /* Chart container fixes */
-  .h-64 {
-    height: 200px !important;
+  /* Theme-aware card styling */
+  .cosmic-theme .rounded-2xl,
+  .cosmic-theme .rounded-xl {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border: 1px solid rgba(56, 189, 248, 0.2) !important;
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.1) !important;
   }
   
-  /* Input/select touch targets */
-  input, select, textarea {
-    font-size: 16px !important; /* Prevents iOS zoom */
-    min-height: 44px !important;
+  .cyber-theme .rounded-2xl,
+  .cyber-theme .rounded-xl {
+    background: rgba(0, 29, 61, 0.6) !important;
+    border: 1px solid rgba(0, 255, 157, 0.2) !important;
+    box-shadow: 0 4px 20px rgba(0, 255, 157, 0.1) !important;
   }
   
-  /* Hide non-essential elements on mobile */
-  .mobile\\:hidden {
+  /* Hide specific desktop utility classes */
+  .md\:hidden {
+    display: flex !important;
+  }
+  
+  .hidden.md\:flex {
     display: none !important;
   }
   
-  /* Show mobile-specific elements */
-  .mobile\\:block {
-    display: block !important;
-  }
-  
-  /* Flex column on mobile */
-  .mobile\\:flex-col {
-    flex-direction: column !important;
-  }
-  
-  /* Mobile menu button */
-  .mobile-menu-button {
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
+  /* Mobile-specific theme animations optimization */
+  @media (prefers-reduced-motion: no-preference) {
+    .cosmic-theme .space-object,
+    .cosmic-theme .quantum-ring {
+      display: none !important; /* Disable heavy animations on mobile */
+    }
+    
+    .cyber-theme .cyber-scanline {
+      animation-duration: 4s !important; /* Slow down scanline on mobile */
+    }
+    
+    .cyber-theme .matrix-rain {
+      font-size: 12px !important; /* Smaller matrix rain on mobile */
+      opacity: 0.2 !important; /* More subtle */
+    }
   }
 }
 
-/* Very small phones */
+/* ===== SMALL PHONES (iPhone SE, etc) ===== */
 @media (max-width: 375px) {
   html {
     font-size: 13px;
   }
   
   .px-6 {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
   }
   
-  .gap-6 {
-    gap: 1rem !important;
+  .px-4 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  
+  /* Quick stats single column on tiny screens */
+  .grid-cols-2.gap-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .text-2xl {
+    font-size: 1.25rem !important;
+  }
+  
+  /* Adjust navbar for very small screens */
+  nav {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  
+  /* Smaller theme indicators */
+  .hidden.md\:flex.items-center.gap-2.px-3 {
+    display: none !important; /* Hide theme indicator on very small screens */
+  }
+  
+  /* Adjust sidebar width */
+  .fixed.right-0.w-80 {
+    width: 90% !important;
+    max-width: 280px !important;
   }
 }
 
-/* Tablet adjustments */
+/* ===== TABLET PORTRAIT ===== */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .md\\:grid-cols-2 {
+  .md\:grid-cols-3 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
   
-  .md\\:grid-cols-3 {
-    grid-template-columns: repeat(2, 1fr) !important;
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  
+  .max-w-7xl {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  
+  /* Tablet-specific theme adjustments */
+  .cosmic-theme .max-w-7xl {
+    background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.1) 0%, transparent 50%) !important;
+  }
+  
+  .cyber-theme .max-w-7xl {
+    background: linear-gradient(135deg, rgba(0, 255, 157, 0.05) 0%, transparent 50%) !important;
   }
 }
 
-/* Landscape orientation fixes */
+/* ===== LANDSCAPE ORIENTATION (Mobile) ===== */
 @media (max-height: 600px) and (orientation: landscape) {
   .h-screen {
     height: auto !important;
@@ -171,6 +336,126 @@
   }
   
   nav {
+    position: relative !important;
     height: 3rem !important;
+  }
+  
+  /* Reduce top padding when nav is not sticky */
+  .pt-20 {
+    padding-top: 1rem !important;
+  }
+  
+  /* Landscape-specific theme adjustments */
+  .cosmic-theme nav {
+    background: rgba(15, 23, 42, 0.85) !important;
+  }
+  
+  .cyber-theme nav {
+    background: rgba(0, 8, 20, 0.85) !important;
+  }
+  
+  /* Optimize animations for landscape */
+  .cosmic-theme .stellar-dust {
+    animation-duration: 8s !important;
+  }
+  
+  .cyber-theme .cyber-grid-overlay {
+    background-size: 80px 80px !important;
+  }
+}
+
+/* ===== DARK MODE ADJUSTMENTS ===== */
+@media (prefers-color-scheme: dark) {
+  /* Ensure theme colors work properly in forced dark mode */
+  .cosmic-theme {
+    color-scheme: dark;
+  }
+  
+  .cyber-theme {
+    color-scheme: dark;
+  }
+  
+  /* Adjust scrollbars for dark mode */
+  .cosmic-theme ::-webkit-scrollbar {
+    width: 8px;
+    background: rgba(15, 23, 42, 0.5);
+  }
+  
+  .cosmic-theme ::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.3);
+    border-radius: 4px;
+  }
+  
+  .cyber-theme ::-webkit-scrollbar {
+    width: 8px;
+    background: rgba(0, 8, 20, 0.5);
+  }
+  
+  .cyber-theme ::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 157, 0.3);
+    border-radius: 4px;
+  }
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS FOR LOW-END DEVICES ===== */
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  /* Disable all animations for performance */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  /* Simplify theme backgrounds */
+  .cosmic-theme {
+    background: #0f172a !important;
+  }
+  
+  .cyber-theme {
+    background: #000814 !important;
+  }
+  
+  /* Remove complex shadows and glows */
+  .cosmic-text-glow,
+  .cyber-text-glow,
+  .cosmic-box-glow,
+  .cyber-box-glow {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Remove backdrop filters for performance */
+  nav,
+  .fixed.right-0.w-80 > div,
+  .rounded-2xl,
+  .rounded-xl {
+    backdrop-filter: none !important;
+  }
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .cosmic-theme,
+  .cyber-theme {
+    background: white !important;
+    color: black !important;
+  }
+  
+  nav,
+  .fixed.right-0.w-80 {
+    display: none !important;
+  }
+  
+  /* Remove all animations and decorative elements */
+  .stellar-dust,
+  .constellation-field,
+  .space-object,
+  .quantum-ring,
+  .cyber-grid-overlay,
+  .cyber-scanline,
+  .matrix-rain {
+    display: none !important;
   }
 }

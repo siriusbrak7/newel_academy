@@ -1,5 +1,5 @@
 // src/components/CourseSystem/AssessmentManager.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Assessment, Question, Submission } from '../../types';
 import { getAITutorResponse } from "../../services/geminiService";
@@ -9,15 +9,47 @@ import {
   ArrowLeft, Wand2, Loader2, ClipboardList, FileText, PenTool 
 } from 'lucide-react';
 
+// --- UTILITY: Secure ID Generation ---
+const generateId = (): string => {
+  // 1. Preferred: Native modern API
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // 2. Fallback: Secure Random Values (Standard Polyfill)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+      (Number(c) ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> (Number(c) / 4)).toString(16)
+    );
+  }
+
+  // 3. Last Resort: Timestamp + Performance Counter (Non-Cryptographic but unique enough for UI)
+  console.warn("Crypto API unavailable. Using timestamp fallback for ID.");
+  const timestamp = Date.now().toString(36);
+  const performancePart = (performance.now() * 1000).toString(36).replace('.', '');
+  const randomPart = Math.random().toString(36).substring(2, 8);
+  return `${timestamp}-${performancePart}-${randomPart}`;
+};
+
 export const AssessmentManager: React.FC = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [activeTab, setActiveTab] = useState<'create' | 'grade'>('create');
+  
+  // Loading States
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
   const [gradeProgress, setGradeProgress] = useState('');
+  
+  // Editing State
   const [editingSub, setEditingSub] = useState<Submission | null>(null);
   const [editScore, setEditScore] = useState(0);
   const [editFeedback, setEditFeedback] = useState('');
+  
+  // Creation Form State
   const [form, setForm] = useState({ 
     title: '', 
     subject: 'Biology', 
@@ -35,8 +67,10 @@ export const AssessmentManager: React.FC = () => {
   const navigate = useNavigate();
   const user = getStoredSession();
 
+  // Load Data
   useEffect(() => {
     const loadData = async () => {
+      setIsLoadingData(true);
       try {
         const a = await getAssessments();
         const s = await getSubmissions();
@@ -44,95 +78,112 @@ export const AssessmentManager: React.FC = () => {
         setSubmissions(s);
       } catch (error) {
         console.error('Error loading assessments:', error);
+        alert('Failed to load assessment data. Please refresh.');
+      } finally {
+        setIsLoadingData(false);
       }
     };
     loadData();
   }, [activeTab]);
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editingSub) {
+        setEditingSub(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingSub]);
+
+  // --- MEMOIZED DATA ---
+  // Performance Fix: Avoid finding assessment on every render of the modal
+  const currentReviewAssessment = useMemo(() => {
+    if (!editingSub) return null;
+    return assessments.find(a => a.id === editingSub.assessmentId);
+  }, [assessments, editingSub]);
+
+  // --- HANDLERS ---
+
   const handleAddQuestion = () => {
-  if (!qForm.text) {
-    alert("Question text required");
-    return;
-  }
-  
-  const generateId = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
+    if (!qForm.text) {
+      alert("Question text required");
+      return;
+    }
+
+    const newQ: Question = {
+      id: generateId(),
+      text: qForm.text,
+      type: qForm.type as 'MCQ' | 'THEORY',
+      difficulty: 'IGCSE', 
+      topic: form.subject,
+      options: qForm.type === 'MCQ' ? [qForm.optA, qForm.optB, qForm.optC, qForm.optD].filter(Boolean) : [],
+      correctAnswer: qForm.type === 'MCQ' 
+        ? (qForm.correct === 'A' ? qForm.optA : 
+           qForm.correct === 'B' ? qForm.optB : 
+           qForm.correct === 'C' ? qForm.optC : qForm.optD)
+        : '',
+      modelAnswer: qForm.type === 'THEORY' ? qForm.modelAnswer : undefined
+    };
+
+    if (qForm.type === 'MCQ' && newQ.options.length < 2) {
+      alert("MCQs need at least 2 options");
+      return;
+    }
+    
+    if (qForm.type === 'THEORY' && !qForm.modelAnswer) {
+      alert("Model answer required for auto-grading");
+      return;
+    }
+
+    setQuestions([...questions, newQ]);
+    setQForm({ 
+      text: '', type: 'MCQ', 
+      optA: '', optB: '', optC: '', optD: '', 
+      correct: 'A', modelAnswer: '' 
     });
   };
-
-  const newQ: Question = {
-    id: generateId(), // UUID format
-    text: qForm.text,
-    type: qForm.type as 'MCQ' | 'THEORY',
-    difficulty: 'IGCSE', 
-    topic: form.subject,
-    options: qForm.type === 'MCQ' ? [qForm.optA, qForm.optB, qForm.optC, qForm.optD].filter(Boolean) : [],
-    correctAnswer: qForm.type === 'MCQ' 
-      ? (qForm.correct === 'A' ? qForm.optA : 
-         qForm.correct === 'B' ? qForm.optB : 
-         qForm.correct === 'C' ? qForm.optC : qForm.optD)
-      : '',
-    modelAnswer: qForm.type === 'THEORY' ? qForm.modelAnswer : undefined
-  };
-
-  if (qForm.type === 'MCQ' && newQ.options.length < 2) {
-    alert("MCQs need at least 2 options");
-    return;
-  }
-  
-  if (qForm.type === 'THEORY' && !qForm.modelAnswer) {
-    alert("Model answer required for auto-grading");
-    return;
-  }
-
-  setQuestions([...questions, newQ]);
-  setQForm({ 
-    text: '', type: 'MCQ', 
-    optA: '', optB: '', optC: '', optD: '', 
-    correct: 'A', modelAnswer: '' 
-  });
-};
 
   const handleSave = async () => {
-  if (!form.title || !user) {
-    alert("Title required");
-    return;
-  }
-  
-  if (questions.length === 0) {
-    alert("Add at least one question");
-    return;
-  }
+    if (!form.title || !user) {
+      alert("Title required and user must be logged in.");
+      return;
+    }
+    
+    if (questions.length === 0) {
+      alert("Add at least one question");
+      return;
+    }
 
-  // Generate UUID-like ID
-  const generateId = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+    setIsPublishing(true);
+    try {
+      const newAssessment: Assessment = {
+        id: generateId(),
+        title: form.title,
+        subject: form.subject,
+        questions: questions.map(q => ({
+          ...q,
+          // Ensure fresh IDs if they were temp (though generateId handles this now)
+          id: generateId() 
+        })),
+        assignedTo: ['all'],
+        targetGrade: form.targetGrade,
+        createdBy: user.username
+      };
+      
+      await saveAssessment(newAssessment);
+      alert("Assessment Published! Students can now see this in their 'My Assignments'.");
+      
+      setForm({ title: '', subject: 'Biology', targetGrade: '9' });
+      setQuestions([]);
+    } catch (error) {
+      console.error("Save failed:", error);
+      alert("Failed to publish assessment. Please try again.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
-
-  const newAssessment: Assessment = {
-    id: generateId(), // Use UUID format
-    title: form.title,
-    subject: form.subject,
-    questions: questions.map(q => ({
-      ...q,
-      id: q.id.startsWith('temp_') ? generateId() : q.id // Ensure UUID for questions too
-    })),
-    assignedTo: ['all'],
-    targetGrade: form.targetGrade,
-    createdBy: user.username
-  };
-  
-  await saveAssessment(newAssessment);
-  alert("Assessment Published! Students can now see this in their 'My Assignments'.");
-  
-  setForm({ title: '', subject: 'Biology', targetGrade: '9' });
-  setQuestions([]);
-};
 
   const handleBatchAutoGrade = async () => {
     const ungraded = submissions.filter(s => !s.graded);
@@ -144,68 +195,74 @@ export const AssessmentManager: React.FC = () => {
     setIsGrading(true);
     let count = 0;
 
-    for (const sub of ungraded) {
-      setGradeProgress(`Grading ${sub.username}...`);
-      const assessment = assessments.find(a => a.id === sub.assessmentId);
-      if (!assessment) continue;
+    try {
+      for (const sub of ungraded) {
+        setGradeProgress(`Grading ${sub.username}...`);
+        const assessment = assessments.find(a => a.id === sub.assessmentId);
+        if (!assessment) continue;
 
-      let totalScore = 0;
-      let feedbackBuffer = "";
+        let totalScore = 0;
+        let feedbackBuffer = "";
 
-      for (const q of assessment.questions) {
-        const studentAns = sub.answers[q.id] || "No Answer";
-        
-        if (q.type === 'MCQ') {
-          if (studentAns === q.correctAnswer) {
-            totalScore += (100 / assessment.questions.length);
-          }
-        } else {
-          const prompt = `
-            Act as a teacher grading a student answer.
-            Question: "${q.text}"
-            Model Answer (Rubric): "${q.modelAnswer}"
-            Student Answer: "${studentAns}"
-            
-            Evaluate the student answer against the model answer.
-            Return ONLY a JSON object with no markdown formatting:
-            {
-              "score": number (0-100 integer),
-              "feedback": "brief constructive feedback string (max 2 sentences)"
-            }
-          `;
+        for (const q of assessment.questions) {
+          const studentAns = sub.answers?.[q.id] || "No Answer";
           
-          try {
-            const raw = await getAITutorResponse(prompt);
-            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            const result = JSON.parse(clean);
+          if (q.type === 'MCQ') {
+            if (studentAns === q.correctAnswer) {
+              totalScore += (100 / assessment.questions.length);
+            }
+          } else {
+            // SECURITY: Use JSON.stringify to prevent prompt injection
+            const prompt = `
+              Act as a teacher grading a student answer.
+              Question: ${JSON.stringify(q.text || '')}
+              Model Answer (Rubric): ${JSON.stringify(q.modelAnswer || '')}
+              Student Answer: ${JSON.stringify(studentAns)}
+              
+              Evaluate the student answer against the model answer.
+              Return ONLY a JSON object with no markdown formatting:
+              {
+                "score": number (0-100 integer),
+                "feedback": "brief constructive feedback string (max 2 sentences)"
+              }
+            `;
             
-            totalScore += (result.score / assessment.questions.length);
-            feedbackBuffer += `[Q] ${q.text.substring(0,30)}...\n[Feedback] ${result.feedback}\n\n`;
-          } catch (e) {
-            console.error("AI Grade Error", e);
-            feedbackBuffer += `[Q] ${q.text} - Manual Review Needed (AI Error)\n`;
+            try {
+              const raw = await getAITutorResponse(prompt);
+              const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+              const result = JSON.parse(clean);
+              
+              totalScore += (result.score / assessment.questions.length);
+              feedbackBuffer += `[Q] ${q.text.substring(0,30)}...\n[Feedback] ${result.feedback}\n\n`;
+            } catch (e) {
+              console.error("AI Grade Error", e);
+              feedbackBuffer += `[Q] ${q.text} - Manual Review Needed (AI Error)\n`;
+            }
           }
         }
+
+        const gradedSub: Submission = {
+          ...sub,
+          graded: true,
+          score: Math.round(totalScore),
+          feedback: feedbackBuffer || "Auto-graded successfully.",
+          newelGraded: true
+        };
+        await saveSubmission(gradedSub);
+        count++;
       }
 
-      const gradedSub: Submission = {
-        ...sub,
-        graded: true,
-        score: Math.round(totalScore),
-        feedback: feedbackBuffer || "Auto-graded successfully.",
-        newelGraded: true
-      };
-      await saveSubmission(gradedSub);
-      count++;
+      const refreshed = await getSubmissions();
+      setSubmissions(refreshed);
+      alert(`Batch graded ${count} submissions!`);
+      
+    } catch (error) {
+      console.error("Batch grading failed:", error);
+      alert(`Grading interrupted: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGrading(false);
+      setGradeProgress('');
     }
-
-    setIsGrading(false);
-    setGradeProgress('');
-    
-    const refreshed = await getSubmissions();
-    setSubmissions(refreshed);
-
-    alert(`Batch graded ${count} submissions!`);
   };
 
   const openReviewModal = (sub: Submission) => {
@@ -217,21 +274,40 @@ export const AssessmentManager: React.FC = () => {
   const handleUpdateGrade = async () => {
     if (!editingSub) return;
     
-    const updated: Submission = {
-      ...editingSub,
-      score: editScore,
-      feedback: editFeedback,
-      graded: true,
-    };
-    
-    await saveSubmission(updated);
-    
-    const refreshed = await getSubmissions();
-    setSubmissions(refreshed);
+    setIsUpdating(true);
+    try {
+      const updated: Submission = {
+        ...editingSub,
+        score: editScore,
+        feedback: editFeedback,
+        graded: true,
+      };
+      
+      await saveSubmission(updated);
+      
+      const refreshed = await getSubmissions();
+      setSubmissions(refreshed);
 
-    setEditingSub(null);
-    alert("Grade updated successfully!");
+      setEditingSub(null);
+      alert("Grade updated successfully!");
+    } catch (error) {
+      console.error("Update failed:", error);
+      alert("Failed to update grade.");
+    } finally {
+      setIsUpdating(false);
+    }
   };
+
+  if (isLoadingData) {
+    return (
+      <div className="max-w-4xl mx-auto pb-20 flex justify-center items-center h-64">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="animate-spin text-cyan-400" size={32} />
+          <p className="text-white/50">Loading Assessment Manager...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -248,20 +324,20 @@ export const AssessmentManager: React.FC = () => {
       <div className="flex gap-4 mb-6">
         <button 
           onClick={() => setActiveTab('create')} 
-          className={`px-4 py-2 rounded-lg font-bold ${
+          className={`px-4 py-2 rounded-lg font-bold transition-colors ${
             activeTab === 'create' 
               ? 'bg-purple-600 text-white' 
-              : 'bg-white/10 text-white/50'
+              : 'bg-white/10 text-white/50 hover:bg-white/20'
           }`}
         >
           Create & Assign
         </button>
         <button 
           onClick={() => setActiveTab('grade')} 
-          className={`px-4 py-2 rounded-lg font-bold ${
+          className={`px-4 py-2 rounded-lg font-bold transition-colors ${
             activeTab === 'grade' 
               ? 'bg-cyan-600 text-white' 
-              : 'bg-white/10 text-white/50'
+              : 'bg-white/10 text-white/50 hover:bg-white/20'
           }`}
         >
           Grade Submissions
@@ -271,7 +347,7 @@ export const AssessmentManager: React.FC = () => {
       {/* REVIEW MODAL */}
       {editingSub && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-white/20 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className="bg-slate-900 border border-white/20 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
             <div className="p-6 border-b border-white/10 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white">Review & Edit Grade</h3>
@@ -285,13 +361,14 @@ export const AssessmentManager: React.FC = () => {
             </div>
 
             <div className="flex-grow overflow-y-auto p-6 space-y-6">
-              {/* Questions Review */}
-              {(() => {
-                const assessment = assessments.find(a => a.id === editingSub.assessmentId);
-                if (!assessment) return <p>Assessment data not found.</p>;
-                
-                return assessment.questions.map((q, idx) => {
-                  const studentAnswer = editingSub.answers[q.id] || "No Answer";
+              {/* Questions Review using useMemo result */}
+              {!currentReviewAssessment ? (
+                <div className="text-red-400 text-center p-4 border border-red-500/30 bg-red-900/10 rounded-lg">
+                  Assessment data not found. It may have been deleted.
+                </div>
+              ) : (
+                currentReviewAssessment.questions.map((q, idx) => {
+                  const studentAnswer = editingSub.answers?.[q.id] || "No Answer";
                   const isCorrect = q.type === 'MCQ' && studentAnswer === q.correctAnswer;
                   
                   return (
@@ -329,8 +406,8 @@ export const AssessmentManager: React.FC = () => {
                       </div>
                     </div>
                   );
-                });
-              })()}
+                })
+              )}
             </div>
 
             <div className="p-6 border-t border-white/10 bg-black/20">
@@ -356,9 +433,11 @@ export const AssessmentManager: React.FC = () => {
               </div>
               <button 
                 onClick={handleUpdateGrade}
-                className="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2"
+                disabled={isUpdating}
+                className="w-full mt-4 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
               >
-                <CheckCircle size={20}/> Save & Finalize Grade
+                {isUpdating ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle size={20}/>}
+                {isUpdating ? 'Saving...' : 'Save & Finalize Grade'}
               </button>
             </div>
           </div>
@@ -402,16 +481,16 @@ export const AssessmentManager: React.FC = () => {
               <div className="bg-white/10 p-1 rounded-lg flex text-xs">
                 <button 
                   onClick={() => setQForm({...qForm, type: 'MCQ'})}
-                  className={`px-3 py-1 rounded ${
-                    qForm.type === 'MCQ' ? 'bg-blue-600 text-white' : 'text-white/50'
+                  className={`px-3 py-1 rounded transition-colors ${
+                    qForm.type === 'MCQ' ? 'bg-blue-600 text-white' : 'text-white/50 hover:bg-white/10'
                   }`}
                 >
                   MCQ
                 </button>
                 <button 
                   onClick={() => setQForm({...qForm, type: 'THEORY'})}
-                  className={`px-3 py-1 rounded ${
-                    qForm.type === 'THEORY' ? 'bg-orange-600 text-white' : 'text-white/50'
+                  className={`px-3 py-1 rounded transition-colors ${
+                    qForm.type === 'THEORY' ? 'bg-orange-600 text-white' : 'text-white/50 hover:bg-white/10'
                   }`}
                 >
                   Theory
@@ -479,7 +558,7 @@ export const AssessmentManager: React.FC = () => {
               <h5 className="text-white font-bold mb-3 text-sm">
                 Added Questions ({questions.length})
               </h5>
-              <ul className="space-y-2 max-h-64 overflow-y-auto pr-2">
+              <ul className="space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                 {questions.map((q, i) => (
                   <li key={i} className="text-white/70 text-xs border-b border-white/5 pb-2 last:border-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -507,9 +586,11 @@ export const AssessmentManager: React.FC = () => {
 
           <button 
             onClick={handleSave} 
-            className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
+            disabled={isPublishing}
+            className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            <Save size={18} /> Publish Assessment
+            {isPublishing ? <Loader2 className="animate-spin" size={18}/> : <Save size={18} />}
+            {isPublishing ? 'Publishing...' : 'Publish Assessment'}
           </button>
         </div>
       )}
@@ -534,7 +615,7 @@ export const AssessmentManager: React.FC = () => {
             </p>
           )}
 
-          <div className="space-y-3 max-h-[500px] overflow-y-auto mb-8">
+          <div className="space-y-3 max-h-[500px] overflow-y-auto mb-8 custom-scrollbar">
             {submissions.filter(s => !s.graded).length === 0 && (
               <div className="text-white/30 italic text-center py-12 border border-dashed border-white/10 rounded-xl">
                 No pending submissions to grade.
@@ -569,7 +650,7 @@ export const AssessmentManager: React.FC = () => {
           <h3 className="text-xl font-bold text-white mb-4 pt-4 border-t border-white/10">
             Graded History
           </h3>
-          <div className="space-y-3 max-h-[300px] overflow-y-auto">
+          <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
             {submissions.filter(s => s.graded).map((sub, i) => {
               const assessment = assessments.find(a => a.id === sub.assessmentId);
               return (
