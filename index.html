@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The Newel • Ace Scientific Concepts...</title>
+  <title>The Newel • Ace Scientific Concepts</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,8 +12,8 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Pacifico&display=swap" rel="stylesheet">
+  <!-- Google Fonts (Aligned with Blueprint) -->
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   
   <!-- Custom Tailwind Config -->
   <script>
@@ -22,785 +22,171 @@
       theme: {
         extend: {
           fontFamily: {
-            'display': ['Poppins', 'sans-serif'],
-            'body': ['Inter', 'sans-serif'],
-            'mono': ['JetBrains Mono', 'monospace'],
-            'cursive': ['Pacifico', 'cursive'],
-          },
-          animation: {
-            'fade-in': 'fadeIn 0.6s ease-out',
-            'fade-in-up': 'fadeInUp 0.7s ease-out',
-            'fade-in-down': 'fadeInDown 0.7s ease-out',
-            'float': 'float 8s ease-in-out infinite',
-            'pulse-soft': 'pulseSoft 4s ease-in-out infinite',
-            'glow': 'glow 2s ease-in-out infinite',
-            'shimmer': 'shimmer 8s infinite',
-            'orbit': 'orbit 40s linear infinite',
-            'nebula-pulse': 'nebulaPulse 20s ease-in-out infinite',
-            'matrix-rain': 'matrixRain 20s linear infinite',
-            'cyber-scan': 'cyberScan 3s linear infinite',
-            'particle-float': 'particleFloat 15s linear infinite',
-            'star-twinkle': 'starTwinkle 3s ease-in-out infinite',
-            'quantum-spin': 'quantumSpin 30s linear infinite',
-            'energy-wave': 'energyWave 4s ease-in-out infinite',
-            'hologram-flicker': 'hologramFlicker 0.3s ease-in-out infinite',
-          },
-          keyframes: {
-            fadeIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
-            fadeInUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            fadeInDown: { '0%': { opacity: '0', transform: 'translateY(-20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            float: { '0%, 100%': { transform: 'translateY(0) rotate(0deg)' }, '50%': { transform: 'translateY(-30px) rotate(1deg)' } },
-            pulseSoft: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.7' } },
-            glow: { '0%, 100%': { filter: 'brightness(1)' }, '50%': { filter: 'brightness(1.3)' } },
-            shimmer: { '0%': { backgroundPosition: '-500px 0' }, '100%': { backgroundPosition: '500px 0' } },
-            orbit: { 'from': { transform: 'rotate(0deg) translateX(150px) rotate(0deg)' }, 'to': { transform: 'rotate(360deg) translateX(150px) rotate(-360deg)' } },
-            nebulaPulse: { '0%, 100%': { opacity: '0.3', transform: 'scale(1)' }, '50%': { opacity: '0.5', transform: 'scale(1.1)' } },
-            matrixRain: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100vh)' } },
-            cyberScan: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100vh)' } },
-            particleFloat: { '0%': { transform: 'translateY(100vh) translateX(0)' }, '100%': { transform: 'translateY(-100px) translateX(100px)' } },
-            starTwinkle: { '0%, 100%': { opacity: '1', transform: 'scale(1)' }, '50%': { opacity: '0.3', transform: 'scale(0.8)' } },
-            quantumSpin: { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } },
-            energyWave: { '0%, 100%': { transform: 'scale(1)', opacity: '0.3' }, '50%': { transform: 'scale(1.2)', opacity: '0.6' } },
-            hologramFlicker: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.8' } },
+            'logo': ['Pacifico', 'cursive'],       // For Brand
+            'body': ['Inter', 'sans-serif'],       // For UI
+            'tech': ['JetBrains Mono', 'monospace'], // For Stats/Data
           },
           colors: {
             cosmic: {
-              primary: '#0f172a',
-              secondary: '#1e293b',
-              accent: '#38bdf8',
-              highlight: '#a78bfa',
-              nebula: '#7c3aed',
+              bg: '#1e1b4b',      // Midnight Indigo
+              void: '#000000',    // Pitch Black
+              primary: '#06b6d4', // Cyan-400
+              secondary: '#8b5cf6', // Purple-500
+              accent: '#ec4899',  // Pink-500
             },
             cyber: {
-              primary: '#000814',
-              secondary: '#001d3d',
-              neon: '#00ff9d',
-              matrix: '#00ff41',
-              grid: '#003049',
+              bg: '#000000',      // Solid Black
+              text: '#00FF00',    // Neon Green
+              dim: '#003300',     // Dark Green
             }
           },
           backgroundImage: {
-            'cosmic-gradient': 'radial-gradient(ellipse at bottom, #0f172a 0%, #020617 100%)',
-            'cyber-gradient': 'linear-gradient(135deg, #000814 0%, #001d3d 100%)',
-            'stellar-dust': 'radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.1) 0%, transparent 70%)',
-            'quantum-grid': 'linear-gradient(rgba(0, 255, 157, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 157, 0.1) 1px, transparent 1px)',
+            // Blueprint: Radial Gradient Midnight Indigo -> Pitch Black
+            'deep-space': 'radial-gradient(circle at center, #1e1b4b 0%, #000000 100%)', 
+            'neon-gradient': 'linear-gradient(to right, #06b6d4, #8b5cf6)',
           },
+          animation: {
+            'twinkle': 'twinkle 4s ease-in-out infinite',
+            'float': 'float 6s ease-in-out infinite', // Updated to 6s per blueprint
+            'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+            'scanline': 'scanline 3s linear infinite',
+          },
+          keyframes: {
+            twinkle: { '0%, 100%': { opacity: '1', transform: 'scale(1)' }, '50%': { opacity: '0.3', transform: 'scale(0.8)' } },
+            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
+            pulseGlow: { '0%, 100%': { boxShadow: '0 0 15px rgba(6, 182, 212, 0.4)' }, '50%': { boxShadow: '0 0 25px rgba(6, 182, 212, 0.7)' } },
+            scanline: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100vh)' } },
+          }
         }
       }
     }
   </script>
   
   <style>
-    /* ===== BASE STYLES ===== */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    /* ===== BLUEPRINT COMPONENT CLASSES ===== */
     
+    /* 1. Global Reset */
     body {
       margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      font-family: 'Inter', sans-serif;
-      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: background 0.5s ease, color 0.5s ease;
       overflow-x: hidden;
     }
-    
-    #root {
-      position: relative;
-      z-index: 10;
-      min-height: 100vh;
-    }
 
-    /* ===== COSMIC THEME ENHANCEMENTS ===== */
+    #root { min-height: 100vh; position: relative; z-index: 10; }
+
+    /* 2. Theme: Cosmic (Default) */
     .cosmic-theme {
-      background: radial-gradient(ellipse at bottom, #0f172a 0%, #020617 100%) !important;
-      position: relative;
-      color: #e2e8f0 !important;
-      font-family: 'Poppins', sans-serif;
-      overflow-x: hidden;
-      min-height: 100vh;
-    }
-    
-    .cosmic-theme::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: 
-        radial-gradient(circle at 15% 25%, rgba(56, 189, 248, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 85% 75%, rgba(167, 139, 250, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.1) 0%, transparent 60%);
-      z-index: 0;
-      pointer-events: none;
-      animation: nebulaPulse 20s ease-in-out infinite;
-    }
-    
-    .stellar-dust {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-      background-image: radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
-      animation: energyWave 4s ease-in-out infinite;
-    }
-    
-    .constellation-field {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      pointer-events: none;
-    }
-    
-    .star {
-      position: absolute;
-      background: white;
-      border-radius: 50%;
-      animation: starTwinkle 3s ease-in-out infinite;
-      box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
-    }
-    
-    .space-object {
-      position: fixed;
-      border-radius: 50%;
-      z-index: 0;
-      pointer-events: none;
-      animation: orbit 40s linear infinite;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(167, 139, 250, 0.3));
-      box-shadow: 
-        inset 0 0 20px rgba(255, 255, 255, 0.1),
-        0 0 40px rgba(56, 189, 248, 0.2);
-    }
-    
-    .quantum-ring {
-      position: fixed;
-      border: 2px solid rgba(56, 189, 248, 0.3);
-      border-radius: 50%;
-      animation: quantumSpin 30s linear infinite;
-      pointer-events: none;
-    }
-    
-    .cosmic-text-glow {
-      text-shadow: 
-        0 0 20px rgba(56, 189, 248, 0.6),
-        0 0 40px rgba(56, 189, 248, 0.4),
-        0 0 60px rgba(56, 189, 248, 0.2);
-    }
-    
-    .cosmic-box-glow {
-      background: rgba(15, 23, 42, 0.7);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      box-shadow: 
-        0 0 30px rgba(56, 189, 248, 0.3),
-        inset 0 0 30px rgba(56, 189, 248, 0.1);
+      background: radial-gradient(circle at center, #1e1b4b 0%, #000000 120%) !important;
+      color: #f8fafc; /* Slate-50 */
+      font-family: 'Inter', sans-serif;
     }
 
-    /* ===== CYBER THEME ENHANCEMENTS ===== */
-    .cyber-theme {
-      background: linear-gradient(135deg, #000814 0%, #001d3d 100%) !important;
-      position: relative;
-      color: #00ff9d !important;
-      font-family: 'JetBrains Mono', monospace;
-      overflow-x: hidden;
-      min-height: 100vh;
-    }
-    
-    .cyber-theme::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        linear-gradient(rgba(0, 255, 157, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 157, 0.05) 1px, transparent 1px);
-      background-size: 50px 50px;
-      z-index: 0;
-      pointer-events: none;
-    }
-    
-    .cyber-grid-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        linear-gradient(rgba(0, 255, 157, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 157, 0.03) 1px, transparent 1px);
-      background-size: 100px 100px;
-      z-index: 0;
-      pointer-events: none;
-      animation: shimmer 8s infinite;
-    }
-    
-    .cyber-scanline {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, #00ff9d, transparent);
-      z-index: 1;
-      pointer-events: none;
-      animation: cyberScan 3s linear infinite;
-      box-shadow: 0 0 10px #00ff9d;
-    }
-    
-    .matrix-rain {
-      position: fixed;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      color: #00ff9d;
-      text-shadow: 0 0 8px #00ff9d;
-      line-height: 1.5;
-      opacity: 0.4;
-      animation: matrixRain 20s linear infinite;
-      pointer-events: none;
-    }
-    
-    .cyber-text-glow {
-      text-shadow: 
-        0 0 10px rgba(0, 255, 157, 0.8),
-        0 0 20px rgba(0, 255, 157, 0.6),
-        0 0 30px rgba(0, 255, 157, 0.4);
-    }
-    
-    .cyber-box-glow {
-      background: rgba(0, 8, 20, 0.8);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(0, 255, 157, 0.4);
-      box-shadow: 
-        0 0 20px rgba(0, 255, 157, 0.3),
-        inset 0 0 20px rgba(0, 255, 157, 0.1);
-    }
-    
-    .hologram-effect {
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .hologram-effect::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: linear-gradient(
-        45deg,
-        transparent 30%,
-        rgba(0, 255, 157, 0.1) 50%,
-        transparent 70%
-      );
-      animation: hologramFlicker 0.3s ease-in-out infinite;
-      pointer-events: none;
-    }
-
-      /* ===== CYBER GLITCH EFFECT ===== */
-  .cyber-glitch {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .cyber-glitch::before,
-  .cyber-glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: inherit;
-    clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
-    animation: glitch-anim 0.3s infinite;
-    opacity: 0.8;
-  }
-
-  .cyber-glitch::before {
-    left: 2px;
-    text-shadow: -2px 0 #ff00ff;
-    animation-delay: 0.1s;
-  }
-
-  .cyber-glitch::after {
-    left: -2px;
-    text-shadow: 2px 0 #00ffff;
-  }
-
-  @keyframes glitch-anim {
-    0% { clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%); }
-    20% { clip-path: polygon(0 15%, 100% 15%, 100% 60%, 0 60%); }
-    40% { clip-path: polygon(0 30%, 100% 30%, 100% 75%, 0 75%); }
-    60% { clip-path: polygon(0 45%, 100% 45%, 100% 90%, 0 90%); }
-    80% { clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%); }
-    100% { clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%); }
-  }
-
-  /* ===== GRID PATTERN BACKGROUND ===== */
-  .bg-grid-pattern {
-    background-image: 
-      linear-gradient(rgba(0, 255, 157, 0.15) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0, 255, 157, 0.15) 1px, transparent 1px);
-    background-size: 40px 40px;
-    background-position: center center;
-  }
-
-  /* Optional: Add a subtle animation to the grid */
-  .bg-grid-pattern.animated {
-    animation: grid-shift 20s linear infinite;
-  }
-
-  @keyframes grid-shift {
-    0% { background-position: 0 0; }
-    100% { background-position: 40px 40px; }
-  }
-
-    /* ===== COMMON UTILITIES ===== */
-    .glass-morphism {
+    /* GlassCard Function Implementation */
+    .glass-card {
       background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .text-gradient {
-      background-clip: text;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    
-    .gradient-border {
-      position: relative;
-      background: linear-gradient(white, white) padding-box,
-                  linear-gradient(45deg, #38bdf8, #a78bfa) border-box;
-      border: 2px solid transparent;
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.1); /* Cyan glow 10% */
+      border-radius: 24px;
     }
 
-    /* ===== PERFORMANCE OPTIMIZATIONS ===== */
-    @media (prefers-reduced-motion: reduce) {
-      .cosmic-theme::before,
-      .stellar-dust,
-      .space-object,
-      .quantum-ring,
-      .cyber-scanline,
-      .matrix-rain {
-        animation: none !important;
-      }
+    /* NeonButton Function Implementation */
+    .neon-button {
+      background: linear-gradient(to right, #06b6d4, #8b5cf6);
+      color: white;
+      font-weight: 700;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+    }
+    .neon-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.6);
     }
 
-    /* ===== MOBILE OPTIMIZATIONS ===== */
-    @media (max-width: 768px) {
-      .space-object {
-        display: none;
-      }
-      
-      .quantum-ring {
-        display: none;
-      }
-      
-      .cyber-theme::before {
-        background-size: 30px 30px;
-      }
-      
-      .cyber-grid-overlay {
-        background-size: 50px 50px;
-      }
+    /* Typography Utilities */
+    .font-brand { font-family: 'Pacifico', cursive; }
+    .font-ui { font-family: 'Inter', sans-serif; }
+    .font-data { font-family: 'JetBrains Mono', monospace; }
+
+    /* 3. Theme: Cyber-Dystopian */
+    .cyber-theme {
+      background: #000000 !important;
+      color: #00FF00 !important; /* Neon Green */
+      font-family: 'JetBrains Mono', monospace !important;
     }
+
+    /* Dystopian Overrides */
+    .cyber-theme .glass-card {
+      background: rgba(0, 20, 0, 0.8);
+      border: 1px solid #00FF00;
+      border-radius: 0; /* Square corners for cyber feel */
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    .cyber-theme .neon-button {
+      background: #000000;
+      border: 1px solid #00FF00;
+      color: #00FF00;
+      box-shadow: 0 0 5px #00FF00;
+      background-image: none; /* Remove gradient */
+    }
+
+    .cyber-theme .font-brand {
+      font-family: 'JetBrains Mono', monospace; /* No cursive in dystopia */
+      text-transform: uppercase;
+    }
+
+    /* Cyber Scanline Overlay */
+    .cyber-overlay {
+      pointer-events: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      background-size: 100% 2px, 3px 100%;
+      z-index: 9999;
+      display: none;
+    }
+    .cyber-theme .cyber-overlay { display: block; }
   </style>
-  
-  <!-- Neuroscience Facts (For React Dashboard Integration) -->
+
+  <!-- Theme Manager (Simplified for React Integration) -->
   <script>
     window.neuroscienceFacts = [
-      "The human brain contains ~86 billion neurons, each making thousands of connections—forming a neural universe within your skull.",
-      "Your brain generates about 20 watts of electricity—enough to dimly light a room, powering every thought and memory.",
-      "Neuroplasticity means your brain rewires itself daily—learning literally reshapes your neural architecture.",
-      "During sleep, your brain consolidates memories like a librarian organizing the day's experiences into long-term storage.",
-      "Dehydration of just 2% impairs cognitive function—your brain is 73% water, demanding constant hydration.",
-      "Learning thickens the myelin sheath around neurons, creating neural superhighways for faster signal transmission.",
-      "The prefrontal cortex—responsible for decision-making—matures around age 25, explaining youthful impulsivity.",
-      "Chronic stress shrinks the hippocampus, your brain's memory center, while exercise grows it back.",
-      "Exercise releases BDNF (brain-derived neurotrophic factor), fertilizing neurons for growth and connection.",
-      "True multitasking reduces efficiency by 40%—your brain switches tasks, never truly processes simultaneously.",
-      "The visual cortex processes images 60,000× faster than text—evolution prioritized visual survival data.",
-      "Blue light from screens suppresses melatonin by 23%, disrupting the circadian rhythm essential for memory consolidation.",
-      "Meditation increases gray matter density in the prefrontal cortex and hippocampus within 8 weeks.",
-      "Spaced repetition beats cramming—distributing study sessions leverages the spacing effect for durable memory.",
-      "Dopamine release during learning creates reward pathways, making knowledge acquisition inherently pleasurable.",
-      "The default mode network activates during daydreaming—your brain's creative incubator for breakthrough insights.",
-      "Chronic stress kills hippocampal neurons—each stressful moment literally erodes your memory capacity.",
-      "Bilingual brains delay dementia onset by 5 years—language switching builds cognitive reserve.",
-      "Despite being 2% of body weight, your brain consumes 20% of your oxygen and calories—metabolic powerhouse.",
-      "Music training enhances auditory processing and executive function—rhythm and melody train neural coordination.",
-      "Smell bypasses thalamic processing, connecting directly to the limbic system—why scents trigger vivid memories.",
-      "Sleep deprivation reduces prefrontal glucose metabolism by 12%, impairing judgment and impulse control.",
-      "The cerebellum contains 50% of brain neurons—this 'little brain' coordinates movement with millisecond precision.",
-      "Chronic inflammation inhibits neurogenesis—your brain's ability to grow new neurons declines with systemic inflammation.",
-      "Omega-3 fatty acids maintain neuronal membrane fluidity—essential for neurotransmitter release and receptor function.",
-      "The gut microbiome produces 90% of serotonin—your digestive system literally influences your mood and cognition.",
-      "Blueberry flavonoids cross the blood-brain barrier, enhancing memory by protecting neurons from oxidative stress.",
-      "90-minute learning intervals align with ultradian rhythms—your brain's natural focus cycles.",
-      "Retrieval practice (testing) strengthens memory more than re-studying—the testing effect builds durable knowledge.",
-      "Emotional arousal via amygdala activation creates indelible memories—emotion tags experiences for priority storage.",
-      "Facial recognition occupies 30% of visual cortex neurons—evolution prioritized social cognition.",
-      "Chronic pain rewires neural pathways, creating 'pain memory' that persists beyond tissue healing.",
-      "Laughter increases endorphins and dopamine by 27%, creating optimal neurochemical conditions for learning."
+      "The human brain contains ~86 billion neurons.",
+      "Your brain generates about 20 watts of electricity.",
+      "Neuroplasticity means your brain rewires itself daily.",
+      "The visual cortex processes images 60,000× faster than text."
     ];
-  </script>
 
-  <!-- Advanced Theme Manager -->
-  <script>
-    class AdvancedThemeManager {
-      constructor() {
-        this.currentTheme = null;
-        this.isInitialized = false;
-        this.themeElements = new Map();
-        this.performanceMode = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      }
-
-      async initialize() {
-        if (this.isInitialized) return;
-        
-        try {
-          this.createThemeElements();
-          this.setupEventListeners();
-          this.isInitialized = true;
-          
-          // Initial theme based on time of day (optional)
-          const hour = new Date().getHours();
-          const preferredTheme = hour >= 18 || hour < 6 ? 'cyber' : 'cosmic';
-          this.setTheme(preferredTheme, true);
-        } catch (error) {
-          console.error('Theme initialization failed:', error);
-        }
-      }
-
-      createThemeElements() {
-        const body = document.body;
-        
-        // Create cosmic elements
-        const cosmicElements = {
-          stellarDust: this.createElement('div', 'stellar-dust'),
-          constellationField: this.createElement('div', 'constellation-field'),
-          quantumRing1: this.createElement('div', 'quantum-ring'),
-          quantumRing2: this.createElement('div', 'quantum-ring'),
-          spaceObject1: this.createElement('div', 'space-object object-1'),
-          spaceObject2: this.createElement('div', 'space-object object-2'),
-        };
-        
-        // Create cyber elements
-        const cyberElements = {
-          gridOverlay: this.createElement('div', 'cyber-grid-overlay'),
-          scanline: this.createElement('div', 'cyber-scanline'),
-          matrixContainer: this.createElement('div', 'matrix-container'),
-        };
-        
-        // Store elements
-        this.themeElements.set('cosmic', cosmicElements);
-        this.themeElements.set('cyber', cyberElements);
-        
-        // Append all to body
-        Object.values(cosmicElements).forEach(el => body.appendChild(el));
-        Object.values(cyberElements).forEach(el => body.appendChild(el));
-        
-        // Initialize matrix rain
-        this.initMatrixRain();
-        this.createStars(200);
-        
-        // Position cosmic elements
-        this.positionCosmicElements();
-      }
-
-      createElement(tag, className) {
-        const element = document.createElement(tag);
-        element.className = className;
-        return element;
-      }
-
-      createStars(count) {
-        const field = this.themeElements.get('cosmic')?.constellationField;
-        if (!field) return;
-        
-        for (let i = 0; i < count; i++) {
-          const star = document.createElement('div');
-          star.className = 'star';
-          star.style.width = `${Math.random() * 3 + 1}px`;
-          star.style.height = star.style.width;
-          star.style.left = `${Math.random() * 100}%`;
-          star.style.top = `${Math.random() * 100}%`;
-          star.style.animationDelay = `${Math.random() * 3}s`;
-          star.style.opacity = Math.random();
-          field.appendChild(star);
-        }
-      }
-
-      positionCosmicElements() {
-        const elements = this.themeElements.get('cosmic');
-        if (!elements) return;
-        
-        // Quantum rings
-        elements.quantumRing1.style.width = '500px';
-        elements.quantumRing1.style.height = '500px';
-        elements.quantumRing1.style.top = 'calc(50% - 250px)';
-        elements.quantumRing1.style.left = 'calc(50% - 250px)';
-        elements.quantumRing1.style.animationDuration = '40s';
-        
-        elements.quantumRing2.style.width = '300px';
-        elements.quantumRing2.style.height = '300px';
-        elements.quantumRing2.style.top = 'calc(50% - 150px)';
-        elements.quantumRing2.style.left = 'calc(50% - 150px)';
-        elements.quantumRing2.style.animationDuration = '30s';
-        elements.quantumRing2.style.animationDirection = 'reverse';
-        
-        // Space objects
-        elements.spaceObject1.style.width = '60px';
-        elements.spaceObject1.style.height = '60px';
-        elements.spaceObject1.style.top = '20%';
-        elements.spaceObject1.style.left = '15%';
-        
-        elements.spaceObject2.style.width = '40px';
-        elements.spaceObject2.style.height = '40px';
-        elements.spaceObject2.style.top = '70%';
-        elements.spaceObject2.style.left = '80%';
-        elements.spaceObject2.style.animationDuration = '50s';
-      }
-
-      initMatrixRain() {
-        const container = this.themeElements.get('cyber')?.matrixContainer;
-        if (!container) return;
-        
-        const columns = Math.floor(window.innerWidth / 20);
-        const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789';
-        
-        for (let i = 0; i < columns; i++) {
-          const column = document.createElement('div');
-          column.className = 'matrix-rain';
-          column.style.left = `${i * 20}px`;
-          column.style.animationDelay = `${Math.random() * 20}s`;
-          column.style.animationDuration = `${15 + Math.random() * 10}s`;
-          
-          // Generate random characters
-          let text = '';
-          const length = Math.floor(10 + Math.random() * 20);
-          for (let j = 0; j < length; j++) {
-            text += chars[Math.floor(Math.random() * chars.length)] + '\n';
-          }
-          column.textContent = text;
-          container.appendChild(column);
-        }
-      }
-
-      async setTheme(theme, silent = false) {
-        if (theme === this.currentTheme) return;
-        
-        const body = document.body;
-        const oldTheme = this.currentTheme;
-        
-        // Start transition
-        body.style.opacity = '0.7';
-        body.style.transform = 'scale(0.98)';
-        
-        await this.sleep(300); // Smooth transition
-        
-        // Remove old theme classes
-        body.classList.remove('cosmic-theme', 'cyber-theme', 'transition-all');
-        
-        // Hide all theme elements
-        this.themeElements.forEach(elements => {
-          Object.values(elements).forEach(el => {
-            el.style.display = 'none';
-          });
-        });
-        
-        // Apply new theme
-        if (theme === 'cosmic') {
-          body.classList.add('cosmic-theme', 'animate-fade-in');
-          const elements = this.themeElements.get('cosmic');
-          if (elements) {
-            Object.values(elements).forEach(el => {
-              el.style.display = 'block';
-            });
-          }
-        } else {
-          body.classList.add('cyber-theme', 'animate-fade-in');
-          const elements = this.themeElements.get('cyber');
-          if (elements) {
-            Object.values(elements).forEach(el => {
-              el.style.display = 'block';
-            });
-          }
-        }
-        
-        this.currentTheme = theme;
-        
-        // Complete transition
-        await this.sleep(50);
-        body.style.opacity = '1';
-        body.style.transform = 'scale(1)';
-        
-        // Dispatch custom event for React components
-        if (!silent) {
-          window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }));
-        }
-      }
-
-      setupEventListeners() {
-        // Performance mode detection
-        const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-        motionQuery.addEventListener('change', (e) => {
-          this.performanceMode = e.matches;
-          this.updateAnimations();
-        });
-        
-        // Window resize
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-          clearTimeout(resizeTimeout);
-          resizeTimeout = setTimeout(() => {
-            if (this.currentTheme === 'cyber') {
-              this.themeElements.get('cyber')?.matrixContainer?.remove();
-              this.initMatrixRain();
-            }
-          }, 250);
-        });
-      }
-
-      updateAnimations() {
-        const allElements = [
-          ...Object.values(this.themeElements.get('cosmic') || {}),
-          ...Object.values(this.themeElements.get('cyber') || {})
-        ];
-        
-        allElements.forEach(el => {
-          if (this.performanceMode) {
-            el.style.animation = 'none';
-          } else {
-            el.style.animation = '';
-          }
-        });
-      }
-
-      sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-      }
-    }
-
-    // Initialize theme manager
-    const themeManager = new AdvancedThemeManager();
-    
-    document.addEventListener('DOMContentLoaded', () => {
-      themeManager.initialize();
-    });
-  </script>
-
-  <!-- Theme Integration Bridge for React Components -->
-  <script>
-    // Bridge for React theme integration
-    (function() {
-      // Wait for DOM to be ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initBridge);
+      window.ThemeManager = {
+    setTheme: (themeName) => {
+      const body = document.body;
+      if (themeName === 'Cyber-Dystopian') {
+        body.classList.remove('cosmic-theme');
+        body.classList.add('cyber-theme');
       } else {
-        initBridge();
+        body.classList.remove('cyber-theme');
+        body.classList.add('cosmic-theme');
       }
-
-      function initBridge() {
-        window.ThemeManager = {
-          setTheme: async (theme) => {
-            // Normalize theme names between React and HTML
-            let normalizedTheme = theme.toLowerCase();
-            if (normalizedTheme.includes('cyber')) {
-              normalizedTheme = 'cyber';
-            } else if (normalizedTheme.includes('cosmic')) {
-              normalizedTheme = 'cosmic';
-            }
-            
-            // Use the theme manager instance
-            await window.ThemeManager.instance.setTheme(normalizedTheme);
-            
-            // Dispatch for React components with proper naming
-            window.dispatchEvent(new CustomEvent('themeChanged', { 
-              detail: { 
-                theme: theme, 
-                normalizedTheme: normalizedTheme 
-              } 
-            }));
-          },
-          
-          getCurrentTheme: () => {
-            const current = window.ThemeManager.instance.currentTheme;
-            // Convert back to React-friendly format
-            if (current === 'cosmic') return 'Cosmic';
-            if (current === 'cyber') return 'Cyber-Dystopian';
-            return 'Cosmic';
-          },
-          
-          getCurrentCssClass: () => {
-            const current = window.ThemeManager.instance.currentTheme;
-            if (current === 'cosmic') return 'cosmic-theme';
-            if (current === 'cyber') return 'cyber-theme';
-            return 'cosmic-theme';
-          },
-          
-          getThemeConfig: () => {
-            const current = window.ThemeManager.getCurrentTheme();
-            return {
-              Cosmic: {
-                cssClass: 'cosmic-theme',
-                colors: {
-                  primary: '#0f172a',
-                  secondary: '#1e293b',
-                  accent: '#38bdf8',
-                },
-                font: 'font-sans'
-              },
-              'Cyber-Dystopian': {
-                cssClass: 'cyber-theme',
-                colors: {
-                  primary: '#000814',
-                  secondary: '#001d3d',
-                  accent: '#00ff9d',
-                },
-                font: 'font-mono'
-              }
-            }[current];
-          },
-          
-          instance: themeManager,
-          
-          // Helper method for React components
-          applyThemeClasses: (element, theme) => {
-            if (!element) return;
-            
-            // Remove existing theme classes
-            element.classList.remove('cosmic-theme', 'cyber-theme');
-            
-            // Add new theme class
-            if (theme === 'Cosmic') {
-              element.classList.add('cosmic-theme');
-            } else if (theme === 'Cyber-Dystopian') {
-              element.classList.add('cyber-theme');
-            }
-          }
-        };
+      // Dispatch event for React
+      window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: themeName } }));
+    },
+    
+    getCurrentTheme: () => {
+      const body = document.body;
+      if (body.classList.contains('cyber-theme')) {
+        return 'Cyber-Dystopian';
       }
-    })();
+      return 'Cosmic'; // Default
+    }
+  };
   </script>
 </head>
-
 <body class="cosmic-theme">
-  <div id="root" class="main-content"></div>
-  
+  <div class="cyber-overlay"></div> <!-- Scanlines -->
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

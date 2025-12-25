@@ -1,4 +1,4 @@
-/* mobile.css - Enhanced Mobile-First Responsive Fixes with Theme Support */
+/* mobile.css - Aligned with Newel Academy Blueprint */
 
 /* ===== GLOBAL RESPONSIVE ADJUSTMENTS ===== */
 @media (max-width: 768px) {
@@ -9,453 +9,185 @@
   
   /* Theme-aware body adjustments */
   .cosmic-theme {
-    background: radial-gradient(ellipse at center, #0f172a 0%, #020617 100%) !important;
+    /* Matches index.html Deep Space Gradient */
+    background: radial-gradient(circle at center, #1e1b4b 0%, #000000 120%) !important;
+    background-attachment: fixed !important; /* Prevents background scroll jitter */
   }
   
   .cyber-theme {
-    background: linear-gradient(135deg, #000814 0%, #001d3d 100%) !important;
+    /* Matches index.html Solid Black */
+    background: #000000 !important;
   }
   
-  /* Typography */
+  /* Typography Scaling */
   h1 {
-    font-size: 1.75rem !important;
-    line-height: 2.25rem !important;
+    font-size: 2rem !important;
+    line-height: 2.5rem !important;
+  }
+
+  /* Pacifico Font Adjustments for Mobile */
+  .font-brand {
+    font-size: 1.8rem !important;
+    letter-spacing: 0.05em;
   }
   
-  h2 {
-    font-size: 1.5rem !important;
-  }
-  
-  h3 {
-    font-size: 1.25rem !important;
-  }
+  h2 { font-size: 1.5rem !important; }
+  h3 { font-size: 1.25rem !important; }
   
   /* Navbar Mobile Optimizations */
   nav {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
-    height: 3.5rem !important;
+    height: 4rem !important;
   }
   
   /* Theme-specific navbar backgrounds */
   .cosmic-theme nav {
-    background: rgba(15, 23, 42, 0.95) !important;
-    backdrop-filter: blur(20px) !important;
-    border-bottom: 1px solid rgba(56, 189, 248, 0.2) !important;
+    background: rgba(30, 27, 75, 0.95) !important; /* Indigo-950 */
+    backdrop-filter: blur(15px) !important;
+    border-bottom: 1px solid rgba(6, 182, 212, 0.2) !important; /* Cyan border */
   }
   
   .cyber-theme nav {
-    background: rgba(0, 8, 20, 0.95) !important;
-    backdrop-filter: blur(20px) !important;
-    border-bottom: 1px solid rgba(0, 255, 157, 0.2) !important;
+    background: rgba(0, 0, 0, 0.95) !important;
+    border-bottom: 1px solid #00FF00 !important; /* Neon Green */
   }
   
-  /* Logo Text Sizing */
-  .text-3xl, .text-2xl {
-    font-size: 1.5rem !important;
-  }
-  
-  /* Theme-specific text glow adjustments */
-  .cosmic-theme .cosmic-text-glow {
-    text-shadow: 
-      0 0 10px rgba(56, 189, 248, 0.6),
-      0 0 20px rgba(56, 189, 248, 0.4) !important;
-  }
-  
-  .cyber-theme .cyber-text-glow {
-    text-shadow: 
-      0 0 8px rgba(0, 255, 157, 0.8),
-      0 0 16px rgba(0, 255, 157, 0.4) !important;
-  }
-  
-  /* Prevent horizontal scroll from background animations */
+  /* Prevent horizontal scroll */
   body {
     overflow-x: hidden;
-    position: relative;
     width: 100%;
   }
 
   /* ===== GRID SYSTEM OVERRIDES ===== */
-  .grid-cols-1,
-  .grid-cols-2,
-  .grid-cols-3,
-  .md\:grid-cols-2, 
-  .md\:grid-cols-3, 
-  .md\:grid-cols-4 {
+  .grid-cols-1, .grid-cols-2, .grid-cols-3,
+  .md\:grid-cols-2, .md\:grid-cols-3, .md\:grid-cols-4 {
     grid-template-columns: 1fr !important;
   }
   
-  /* Exception for very small grids like Quick Stats */
+  /* Exception for Quick Stats (2x2 grid on mobile) */
   .grid-cols-2.gap-4 {
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 1rem !important;
+    gap: 0.75rem !important;
   }
-  
-  /* Theme-aware grid adjustments */
-  .cosmic-theme .grid > * {
-    background: rgba(30, 41, 59, 0.5) !important;
-    border: 1px solid rgba(56, 189, 248, 0.1) !important;
-  }
-  
-  .cyber-theme .grid > * {
-    background: rgba(0, 29, 61, 0.5) !important;
-    border: 1px solid rgba(0, 255, 157, 0.1) !important;
-  }
-  
-  /* ===== SPACING & LAYOUT ===== */
-  .p-8 {
-    padding: 1.25rem !important;
-  }
-  
-  .p-6 {
-    padding: 1rem !important;
-  }
-  
-  .p-4 {
-    padding: 0.75rem !important;
-  }
-  
-  /* Stack spacing */
-  .space-y-8 > * + * {
-    margin-top: 1.5rem !important;
-  }
-  
-  .space-y-6 > * + * {
-    margin-top: 1.25rem !important;
-  }
-  
-  .space-y-4 > * + * {
-    margin-top: 1rem !important;
-  }
-  
+
   /* ===== COMPONENT SPECIFICS ===== */
   
+  /* Glass Card Mobile Overrides */
+  .glass-card {
+    border-radius: 16px !important;
+    padding: 1.5rem !important;
+    /* Reduce blur slightly for mobile performance */
+    backdrop-filter: blur(8px) !important; 
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+
+  .cosmic-theme .glass-card {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .cyber-theme .glass-card {
+    background: #000000 !important;
+    border: 1px solid #00FF00 !important;
+    border-radius: 0 !important; /* Square edges for cyber */
+  }
+
+  /* Neon Button Mobile Targets */
+  .neon-button {
+    width: 100%; /* Full width buttons on mobile */
+    justify-content: center;
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
   /* Sidebar Mobile Full Width */
   .fixed.right-0.w-80 {
     width: 85% !important;
     max-width: 320px !important;
   }
   
-  /* Sidebar theme backgrounds */
+  /* Sidebar Styling */
   .cosmic-theme .fixed.right-0.w-80 > div {
-    background: rgba(15, 23, 42, 0.98) !important;
-    backdrop-filter: blur(30px) !important;
+    background: #1e1b4b !important;
+    border-left: 1px solid rgba(6, 182, 212, 0.3);
   }
   
   .cyber-theme .fixed.right-0.w-80 > div {
-    background: rgba(0, 8, 20, 0.98) !important;
-    backdrop-filter: blur(30px) !important;
+    background: #000000 !important;
+    border-left: 1px solid #00FF00;
   }
   
-  /* Chart Container Heights */
-  .h-64 {
-    height: 220px !important;
-  }
-  
-  .h-80 {
-    height: 260px !important;
-  }
-  
-  /* Table Horizontal Scroll Wrapper */
-  table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    background: transparent !important;
-  }
-  
-  /* Theme-aware table styling */
-  .cosmic-theme table {
-    background: rgba(30, 41, 59, 0.5) !important;
-  }
-  
-  .cyber-theme table {
-    background: rgba(0, 29, 61, 0.5) !important;
-  }
-  
-  /* Button Touch Targets (Apple HIG recommendation) */
-  button, a[role="button"], input[type="submit"] {
-    min-height: 44px !important;
-    min-width: 44px !important;
-  }
-  
-  /* Theme-aware button active states */
-  .cosmic-theme button:active {
-    background: rgba(56, 189, 248, 0.2) !important;
-  }
-  
-  .cyber-theme button:active {
-    background: rgba(0, 255, 157, 0.2) !important;
-  }
-  
-  /* Form Inputs */
+  /* Form Inputs Touch Targets */
   input, select, textarea {
-    font-size: 16px !important; /* Prevents auto-zoom on iOS */
+    font-size: 16px !important; /* Prevents iOS auto-zoom */
+    padding: 0.75rem !important;
   }
   
-  /* Theme-aware form inputs */
-  .cosmic-theme input,
-  .cosmic-theme select,
-  .cosmic-theme textarea {
-    background: rgba(30, 41, 59, 0.7) !important;
-    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  .cosmic-theme input {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(6, 182, 212, 0.3) !important;
+    color: white !important;
   }
   
-  .cyber-theme input,
-  .cyber-theme select,
-  .cyber-theme textarea {
-    background: rgba(0, 29, 61, 0.7) !important;
-    border: 1px solid rgba(0, 255, 157, 0.3) !important;
+  .cyber-theme input {
+    background: black !important;
+    border: 1px solid #003300 !important;
+    color: #00FF00 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+  .cyber-theme input:focus {
+    border-color: #00FF00 !important;
+    box-shadow: 0 0 5px #00FF00 !important;
   }
 
-  /* Dashboard Cards */
-  .rounded-2xl {
-    border-radius: 1rem !important;
+  /* Hide decorative float animations on mobile to save battery */
+  .animate-float, 
+  .animate-pulse-glow {
+    animation: none !important;
   }
   
-  .rounded-xl {
-    border-radius: 0.75rem !important;
-  }
-  
-  /* Theme-aware card styling */
-  .cosmic-theme .rounded-2xl,
-  .cosmic-theme .rounded-xl {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border: 1px solid rgba(56, 189, 248, 0.2) !important;
-    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.1) !important;
-  }
-  
-  .cyber-theme .rounded-2xl,
-  .cyber-theme .rounded-xl {
-    background: rgba(0, 29, 61, 0.6) !important;
-    border: 1px solid rgba(0, 255, 157, 0.2) !important;
-    box-shadow: 0 4px 20px rgba(0, 255, 157, 0.1) !important;
-  }
-  
-  /* Hide specific desktop utility classes */
-  .md\:hidden {
-    display: flex !important;
-  }
-  
-  .hidden.md\:flex {
-    display: none !important;
-  }
-  
-  /* Mobile-specific theme animations optimization */
-  @media (prefers-reduced-motion: no-preference) {
-    .cosmic-theme .space-object,
-    .cosmic-theme .quantum-ring {
-      display: none !important; /* Disable heavy animations on mobile */
-    }
-    
-    .cyber-theme .cyber-scanline {
-      animation-duration: 4s !important; /* Slow down scanline on mobile */
-    }
-    
-    .cyber-theme .matrix-rain {
-      font-size: 12px !important; /* Smaller matrix rain on mobile */
-      opacity: 0.2 !important; /* More subtle */
-    }
+  /* Ensure Icons are visible even without animation */
+  .fa-atom, .fa-flask, .fa-dna {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 
 /* ===== SMALL PHONES (iPhone SE, etc) ===== */
 @media (max-width: 375px) {
-  html {
-    font-size: 13px;
-  }
+  html { font-size: 13px; }
   
-  .px-6 {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-  }
+  .text-6xl { font-size: 2.5rem !important; } /* Fix Hero Title */
   
-  .px-4 {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-  }
-  
-  /* Quick stats single column on tiny screens */
+  /* Force single column for stats on tiny screens */
   .grid-cols-2.gap-4 {
     grid-template-columns: 1fr !important;
   }
-  
-  .text-2xl {
-    font-size: 1.25rem !important;
-  }
-  
-  /* Adjust navbar for very small screens */
-  nav {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-  }
-  
-  /* Smaller theme indicators */
-  .hidden.md\:flex.items-center.gap-2.px-3 {
-    display: none !important; /* Hide theme indicator on very small screens */
-  }
-  
-  /* Adjust sidebar width */
-  .fixed.right-0.w-80 {
-    width: 90% !important;
-    max-width: 280px !important;
-  }
 }
 
-/* ===== TABLET PORTRAIT ===== */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .md\:grid-cols-3 {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  
-  .md\:grid-cols-4 {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-  
-  .max-w-7xl {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-  
-  /* Tablet-specific theme adjustments */
-  .cosmic-theme .max-w-7xl {
-    background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.1) 0%, transparent 50%) !important;
-  }
-  
-  .cyber-theme .max-w-7xl {
-    background: linear-gradient(135deg, rgba(0, 255, 157, 0.05) 0%, transparent 50%) !important;
-  }
-}
-
-/* ===== LANDSCAPE ORIENTATION (Mobile) ===== */
+/* ===== LANDSCAPE ===== */
 @media (max-height: 600px) and (orientation: landscape) {
-  .h-screen {
-    height: auto !important;
-    min-height: 100vh !important;
-  }
+  .min-h-screen { height: auto !important; }
+  .py-20 { padding-top: 2rem !important; padding-bottom: 2rem !important; }
   
-  nav {
-    position: relative !important;
-    height: 3rem !important;
-  }
-  
-  /* Reduce top padding when nav is not sticky */
-  .pt-20 {
-    padding-top: 1rem !important;
-  }
-  
-  /* Landscape-specific theme adjustments */
-  .cosmic-theme nav {
-    background: rgba(15, 23, 42, 0.85) !important;
-  }
-  
-  .cyber-theme nav {
-    background: rgba(0, 8, 20, 0.85) !important;
-  }
-  
-  /* Optimize animations for landscape */
-  .cosmic-theme .stellar-dust {
-    animation-duration: 8s !important;
-  }
-  
-  .cyber-theme .cyber-grid-overlay {
-    background-size: 80px 80px !important;
-  }
+  /* Fix sticky nav taking up too much space */
+  nav { position: relative !important; }
 }
 
-/* ===== DARK MODE ADJUSTMENTS ===== */
-@media (prefers-color-scheme: dark) {
-  /* Ensure theme colors work properly in forced dark mode */
-  .cosmic-theme {
-    color-scheme: dark;
+/* ===== PERFORMANCE (Low Power Mode) ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
   }
   
-  .cyber-theme {
-    color-scheme: dark;
-  }
-  
-  /* Adjust scrollbars for dark mode */
-  .cosmic-theme ::-webkit-scrollbar {
-    width: 8px;
-    background: rgba(15, 23, 42, 0.5);
-  }
-  
-  .cosmic-theme ::-webkit-scrollbar-thumb {
-    background: rgba(56, 189, 248, 0.3);
-    border-radius: 4px;
-  }
-  
-  .cyber-theme ::-webkit-scrollbar {
-    width: 8px;
-    background: rgba(0, 8, 20, 0.5);
-  }
-  
-  .cyber-theme ::-webkit-scrollbar-thumb {
-    background: rgba(0, 255, 157, 0.3);
-    border-radius: 4px;
-  }
-}
-
-/* ===== PERFORMANCE OPTIMIZATIONS FOR LOW-END DEVICES ===== */
-@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
-  /* Disable all animations for performance */
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  
-  /* Simplify theme backgrounds */
-  .cosmic-theme {
-    background: #0f172a !important;
-  }
-  
-  .cyber-theme {
-    background: #000814 !important;
-  }
-  
-  /* Remove complex shadows and glows */
-  .cosmic-text-glow,
-  .cyber-text-glow,
-  .cosmic-box-glow,
-  .cyber-box-glow {
-    box-shadow: none !important;
-    text-shadow: none !important;
-  }
-  
-  /* Remove backdrop filters for performance */
-  nav,
-  .fixed.right-0.w-80 > div,
-  .rounded-2xl,
-  .rounded-xl {
+  .glass-card {
     backdrop-filter: none !important;
-  }
-}
-
-/* ===== PRINT STYLES ===== */
-@media print {
-  .cosmic-theme,
-  .cyber-theme {
-    background: white !important;
-    color: black !important;
+    background: #1e1b4b !important; /* Solid fallback */
   }
   
-  nav,
-  .fixed.right-0.w-80 {
-    display: none !important;
-  }
-  
-  /* Remove all animations and decorative elements */
-  .stellar-dust,
-  .constellation-field,
-  .space-object,
-  .quantum-ring,
-  .cyber-grid-overlay,
-  .cyber-scanline,
-  .matrix-rain {
-    display: none !important;
+  .cyber-overlay {
+    display: none !important; /* Hide scanlines */
   }
 }
