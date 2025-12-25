@@ -39,20 +39,31 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
   // --------------------
   // LOGIN
   // --------------------
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  // In AuthModal.tsx, update the handleLogin function:
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      const user = await authenticateUser(formData.username, formData.password);
-      onLogin(user);
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    // Custom authentication
+    const user = await authenticateUser(formData.username, formData.password);
+    
+    // Store in localStorage for session persistence
+    localStorage.setItem('newel_currentUser', JSON.stringify(user));
+    
+    // Update app state
+    onLogin(user);
+    
+    // Optional: Close modal
+    if (onClose) onClose();
+    
+  } catch (err: any) {
+    setError(err.message || 'Login failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // --------------------
   // REGISTER

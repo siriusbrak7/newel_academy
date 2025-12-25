@@ -58,28 +58,27 @@ export const initStorage = async (): Promise<void> => {
 
 export const getStoredSession = async (): Promise<User | null> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return null;
-
-    // Fetch profile data from our custom users table
+    // Check localStorage for custom session
+    const stored = localStorage.getItem('newel_currentUser');
+    if (!stored) return null;
+    
+    const user: User = JSON.parse(stored);
+    
+    // Optional: Verify user still exists in database
     const { data: profile } = await supabase
       .from('users')
-      .select('*')
-      .eq('id', session.user.id)
+      .select('approved')
+      .eq('username', user.username)
       .single();
-
-    if (!profile) return null;
-
-    return {
-      username: profile.username,
-      role: profile.role,
-      approved: profile.approved,
-      securityQuestion: profile.security_question || '',
-      securityAnswer: profile.security_answer || '',
-      gradeLevel: profile.grade_level || undefined,
-      lastLogin: profile.last_login ? new Date(profile.last_login).getTime() : Date.now()
-    };
-  } catch {
+    
+    if (!profile || !profile.approved) {
+      localStorage.removeItem('newel_currentUser');
+      return null;
+    }
+    
+    return user;
+  } catch (error) {
+    console.error('Session retrieval error:', error);
     return null;
   }
 };
@@ -112,88 +111,145 @@ import { User, Role } from '../types';
  * Uses Supabase Auth + checks approval in custom users table
  */
 export const authenticateUser = async (username: string, password: string): Promise<User> => {
-  const email = `${username.trim().toLowerCase()}@newel.academy`;
+  try {
+    console.log('🔐 Custom auth login for:', username);
+    
+    // 1. Query ONLY your custom users table
+    const { data: profile, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username.trim())
+      .single();
 
-  // 1. Sign in to Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+    if (error || !profile) {
+      console.error('❌ User not found in custom table:', error?.message);
+      throw new Error('Invalid username or password');
+    }
 
-  if (authError) throw new Error(authError.message);
-  if (!authData.user) throw new Error("Login failed");
+    console.log('📋 Found user in custom table:', {
+      username: profile.username,
+      approved: profile.approved,
+      role: profile.role
+    });
 
-  // 2. Get profile data from custom 'users' table
-  const { data: profile, error: pError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', authData.user.id)
-    .single();
+    // 2. Check approval
+    if (!profile.approved) {
+      console.log('⚠️ Account not approved');
+      throw new Error('Account pending admin approval');
+    }
 
-  if (pError || !profile) throw new Error("User profile not found");
-  if (!profile.approved) throw new Error("Account pending admin approval");
+    // 3. Password comparison (base64)
+    const inputHash = btoa(password);
+    console.log('🔑 Password check:', {
+      inputHash,
+      storedHash: profile.password_hash,
+      match: inputHash === profile.password_hash
+    });
 
-  // 3. Update last login in background
-  const now = new Date().toISOString();
-  const history = [...(profile.login_history || []), now].slice(-10);
-  await supabase.from('users').update({ 
-    last_login: now, 
-    login_history: history 
-  }).eq('id', authData.user.id);
+    if (!profile.password_hash) {
+      console.error('❌ No password hash in database');
+      throw new Error('Account configuration error');
+    }
 
-  // 4. Return formatted User object
-  return {
-    id: profile.id,
-    username: profile.username,
-    role: profile.role as Role,
-    approved: profile.approved,
-    securityQuestion: profile.security_question || '',
-    securityAnswer: profile.security_answer || '',
-    gradeLevel: profile.grade_level || undefined,
-    assignedStudents: profile.assigned_students || undefined,
-    lastLogin: Date.now(),
-    createdAt: new Date(profile.created_at).getTime(),
-    loginHistory: history.map(d => new Date(d).getTime())
-  };
+    if (inputHash !== profile.password_hash) {
+      console.error('❌ Password mismatch');
+      throw new Error('Invalid username or password');
+    }
+
+    // 4. Update login history
+    const now = new Date().toISOString();
+    const history = [...(profile.login_history || []), now].slice(-10);
+    
+    await supabase
+      .from('users')
+      .update({ 
+        last_login: now,
+        login_history: history,
+        updated_at: now
+      })
+      .eq('id', profile.id);
+
+    // 5. Return user object
+    const user: User = {
+      id: profile.id,
+      username: profile.username,
+      role: profile.role as Role,
+      approved: profile.approved,
+      securityQuestion: profile.security_question || '',
+      securityAnswer: profile.security_answer || '',
+      gradeLevel: profile.grade_level || undefined,
+      assignedStudents: profile.assigned_students || undefined,
+      lastLogin: Date.now(),
+      createdAt: new Date(profile.created_at).getTime(),
+      loginHistory: history.map((d: string) => new Date(d).getTime())
+    };
+
+    console.log('✅ Login successful for:', user.username);
+    return user;
+    
+  } catch (err: any) {
+    console.error('❌ Login error:', err);
+    throw new Error(err.message || 'Login failed. Please try again.');
+  }
 };
 
 /**
  * REGISTER
  */
 export const registerUser = async (formData: any): Promise<{success: boolean, message: string}> => {
-  const email = `${formData.username.trim().toLowerCase()}@newel.academy`;
+  try {
+    console.log('📝 Custom registration for:', formData.username);
 
-  // 1. Create Supabase Auth User
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password: formData.password,
-  });
+    // 1. Check if username exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', formData.username.trim())
+      .maybeSingle();
 
-  if (authError) throw authError;
-  if (!authData.user) throw new Error("Registration failed");
+    if (existingUser) {
+      console.log('❌ Username already exists');
+      throw new Error('Username already exists');
+    }
 
-  // 2. Create entry in custom 'users' table
-  const { error: profileError } = await supabase.from('users').insert({
-    id: authData.user.id,
-    username: formData.username.trim(),
-    role: formData.role,
-    approved: formData.role === 'admin', // Admins auto-approved for setup
-    security_question: formData.securityQuestion,
-    security_answer: formData.securityAnswer.toLowerCase().trim(),
-    grade_level: formData.role === 'student' ? formData.gradeLevel : null,
-    created_at: new Date().toISOString()
-  });
+    // 2. Create user in custom table ONLY
+    const passwordHash = btoa(formData.password);
+    
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        username: formData.username.trim(),
+        password_hash: passwordHash,
+        role: formData.role,
+        approved: formData.role === 'admin',
+        security_question: formData.securityQuestion,
+        security_answer: formData.securityAnswer.toLowerCase().trim(),
+        grade_level: formData.role === 'student' ? formData.gradeLevel : null,
+        created_at: new Date().toISOString()
+      })
+      .select('*')
+      .single();
 
-  if (profileError) {
-    // Cleanup auth user if profile fails
-    await supabase.auth.admin.deleteUser(authData.user.id);
-    throw profileError;
+    if (insertError) {
+      console.error('❌ User creation error:', insertError);
+      throw new Error('Registration failed: ' + insertError.message);
+    }
+
+    console.log('✅ User created in custom table:', newUser.username);
+    
+    const successMessage = formData.role === 'admin' 
+      ? 'Admin account created successfully!' 
+      : 'Registration successful! Awaiting admin approval.';
+    
+    return {
+      success: true,
+      message: successMessage
+    };
+    
+  } catch (err: any) {
+    console.error('❌ Registration error:', err);
+    throw new Error(err.message || 'Registration failed. Please try again.');
   }
-
-  return {
-    success: true,
-    message: formData.role === 'admin' ? "Admin created!" : "Registered! Awaiting approval."
-  };
 };
 
 /**
@@ -220,11 +276,11 @@ export const recoverPassword = async (username: string, securityAnswer: string, 
 
 export const signOut = async (): Promise<void> => {
   try {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    
-    // Clear any leftover local storage if applicable
+    // Clear custom session
     localStorage.removeItem('newel_currentUser');
+    
+    // Optional: Clear any Supabase Auth session if exists
+    await supabase.auth.signOut();
     
     console.log('✅ User signed out successfully');
   } catch (error) {
