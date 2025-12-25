@@ -102,114 +102,120 @@ export const saveSession = (user: User | null) => {
 // =====================================================
 
 // services/storageService.ts - Fix the authenticateUser function
-export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
-  try {
-    // We map usernames to an internal email format for Supabase Auth
-    const email = `${username.toLowerCase()}@newel.academy`;
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+// services/storageService.ts 
 
-    if (error || !data.user) throw error;
-
-    const { data: profile, error: pError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
-
-    if (pError || !profile) throw new Error("Profile not found");
-    if (!profile.approved) throw new Error("Awaiting Admin Approval");
-
-    // Update last login
-    await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', data.user.id);
-
-    return {
-      username: profile.username,
-      role: profile.role,
-      approved: profile.approved,
-      securityQuestion: profile.security_question,
-      securityAnswer: profile.security_answer,
-      gradeLevel: profile.grade_level,
-      lastLogin: Date.now() // ADD THIS REQUIRED FIELD
-    };
-  } catch (error: any) {
-    console.error('Login Error:', error.message);
-    throw error;
-  }
-};
-
-// Add this to your imports if not there
+// ... existing imports ...
 import { User, Role } from '../types';
 
 /**
- * UPDATED: Returns userId so AuthModal can use it
+ * AUTHENTICATE
+ * Uses Supabase Auth + checks approval in custom users table
  */
-export const registerUser = async (userData: any): Promise<{success: boolean, message: string, userId?: string}> => {
-  try {
-    const email = `${userData.username.toLowerCase()}@newel.academy`;
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password: userData.password,
-    });
+export const authenticateUser = async (username: string, password: string): Promise<User> => {
+  const email = `${username.trim().toLowerCase()}@newel.academy`;
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error("Auth creation failed");
+  // 1. Sign in to Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
 
-    const { error: profileError } = await supabase.from('users').insert({
-      id: authData.user.id,
-      username: userData.username,
-      role: userData.role,
-      approved: userData.role === 'admin',
-      grade_level: userData.gradeLevel,
-      security_question: userData.securityQuestion,
-      security_answer: userData.securityAnswer.toLowerCase()
-    });
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error("Login failed");
 
-    if (profileError) throw profileError;
+  // 2. Get profile data from custom 'users' table
+  const { data: profile, error: pError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', authData.user.id)
+    .single();
 
-    return { 
-      success: true, 
-      message: userData.role === 'admin' ? "Admin created!" : "Registered! Awaiting approval.",
-      userId: authData.user.id // Return this for the modal
-    };
-  } catch (error: any) {
-    return { success: false, message: error.message };
-  }
+  if (pError || !profile) throw new Error("User profile not found");
+  if (!profile.approved) throw new Error("Account pending admin approval");
+
+  // 3. Update last login in background
+  const now = new Date().toISOString();
+  const history = [...(profile.login_history || []), now].slice(-10);
+  await supabase.from('users').update({ 
+    last_login: now, 
+    login_history: history 
+  }).eq('id', authData.user.id);
+
+  // 4. Return formatted User object
+  return {
+    id: profile.id,
+    username: profile.username,
+    role: profile.role as Role,
+    approved: profile.approved,
+    securityQuestion: profile.security_question || '',
+    securityAnswer: profile.security_answer || '',
+    gradeLevel: profile.grade_level || undefined,
+    assignedStudents: profile.assigned_students || undefined,
+    lastLogin: Date.now(),
+    createdAt: new Date(profile.created_at).getTime(),
+    loginHistory: history.map(d => new Date(d).getTime())
+  };
 };
 
 /**
- * NEW: Password Recovery (Previously in the deleted file)
+ * REGISTER
  */
-export const recoverPassword = async (username: string, securityAnswer: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
-  try {
-    // 1. Verify security answer in database
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, security_answer')
-      .eq('username', username)
-      .single();
+export const registerUser = async (formData: any): Promise<{success: boolean, message: string}> => {
+  const email = `${formData.username.trim().toLowerCase()}@newel.academy`;
 
-    if (error || !data) return { success: false, message: 'User not found' };
-    if (data.security_answer !== securityAnswer.toLowerCase()) {
-      return { success: false, message: 'Incorrect security answer' };
-    }
+  // 1. Create Supabase Auth User
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password: formData.password,
+  });
 
-    // 2. Use Supabase Admin API or standard update (requires user to be logged in usually)
-    // For a fully custom "ForgotPassword" without email, we'd need a backend function.
-    // This simple version assumes the user is updating their own record.
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword
-    });
+  if (authError) throw authError;
+  if (!authData.user) throw new Error("Registration failed");
 
-    if (updateError) throw updateError;
+  // 2. Create entry in custom 'users' table
+  const { error: profileError } = await supabase.from('users').insert({
+    id: authData.user.id,
+    username: formData.username.trim(),
+    role: formData.role,
+    approved: formData.role === 'admin', // Admins auto-approved for setup
+    security_question: formData.securityQuestion,
+    security_answer: formData.securityAnswer.toLowerCase().trim(),
+    grade_level: formData.role === 'student' ? formData.gradeLevel : null,
+    created_at: new Date().toISOString()
+  });
 
-    return { success: true, message: 'Password reset successful' };
-  } catch (error: any) {
-    return { success: false, message: error.message || 'Recovery failed' };
+  if (profileError) {
+    // Cleanup auth user if profile fails
+    await supabase.auth.admin.deleteUser(authData.user.id);
+    throw profileError;
   }
+
+  return {
+    success: true,
+    message: formData.role === 'admin' ? "Admin created!" : "Registered! Awaiting approval."
+  };
+};
+
+/**
+ * RECOVER (Simple version)
+ */
+export const recoverPassword = async (username: string, securityAnswer: string, newPassword: string): Promise<void> => {
+  // 1. Verify username and answer
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('id, security_answer')
+    .eq('username', username.trim())
+    .single();
+
+  if (error || !profile) throw new Error("User not found");
+  if (profile.security_answer !== securityAnswer.toLowerCase().trim()) {
+    throw new Error("Incorrect security answer");
+  }
+
+  // Note: Standard Supabase Auth requires a session or email link to update password.
+  // For a custom "hard-reset", you would usually use a Supabase Edge Function (Admin API).
+  // This client-side update only works if the user manages to log in.
+  throw new Error("Please contact your administrator to reset your password.");
 };
 
 export const signOut = async (): Promise<void> => {
