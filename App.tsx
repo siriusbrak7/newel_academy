@@ -24,9 +24,9 @@ import { initializeSupabase, sessionService } from './services/supabaseService';
 declare global {
   interface Window {
     ThemeManager?: {
-      getCurrentTheme: any;
-      getCurrentCssClass: any;
       setTheme: (theme: string) => void;
+      getCurrentTheme?: () => string;
+      getCurrentCssClass?: () => string;
     };
     neuroscienceFacts?: string[];
   }
@@ -73,7 +73,6 @@ interface HomepageProps {
 }
 
 const Homepage: React.FC<HomepageProps> = React.memo(({ theme, onOpenAuth }) => {
-  // REPLACED IMAGES WITH ICONS & SYMBOLS
   const features = useMemo(() => [
     {
       icon: 'fa-solid fa-atom',
@@ -227,10 +226,20 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Sync Theme with Index.html Bridge
+  // Sync Theme with Index.html Bridge - FIXED with safety check
   useEffect(() => {
     if (initializing) return;
-    window.ThemeManager?.setTheme(theme);
+    
+    const applyTheme = () => {
+      if (window.ThemeManager?.setTheme) {
+        window.ThemeManager.setTheme(theme);
+      } else {
+        // Retry if ThemeManager not ready yet
+        setTimeout(applyTheme, 100);
+      }
+    };
+    
+    applyTheme();
   }, [theme, initializing]);
 
   // Handlers

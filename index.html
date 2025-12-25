@@ -151,7 +151,7 @@
     .cyber-theme .cyber-overlay { display: block; }
   </style>
 
-  <!-- Theme Manager (Simplified for React Integration) -->
+  <!-- Theme Manager (Fixed with all required methods) -->
   <script>
     window.neuroscienceFacts = [
       "The human brain contains ~86 billion neurons.",
@@ -160,28 +160,36 @@
       "The visual cortex processes images 60,000× faster than text."
     ];
 
-      window.ThemeManager = {
-    setTheme: (themeName) => {
-      const body = document.body;
-      if (themeName === 'Cyber-Dystopian') {
-        body.classList.remove('cosmic-theme');
-        body.classList.add('cyber-theme');
-      } else {
-        body.classList.remove('cyber-theme');
-        body.classList.add('cosmic-theme');
+    window.ThemeManager = {
+      setTheme: (themeName) => {
+        const body = document.body;
+        if (themeName === 'Cyber-Dystopian') {
+          body.classList.remove('cosmic-theme');
+          body.classList.add('cyber-theme');
+        } else {
+          body.classList.remove('cyber-theme');
+          body.classList.add('cosmic-theme');
+        }
+        // Dispatch event for React
+        window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: themeName } }));
+      },
+      
+      getCurrentTheme: () => {
+        const body = document.body;
+        if (body.classList.contains('cyber-theme')) {
+          return 'Cyber-Dystopian';
+        }
+        return 'Cosmic'; // Default
+      },
+      
+      getCurrentCssClass: () => {
+        const body = document.body;
+        if (body.classList.contains('cyber-theme')) {
+          return 'cyber-theme';
+        }
+        return 'cosmic-theme';
       }
-      // Dispatch event for React
-      window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: themeName } }));
-    },
-    
-    getCurrentTheme: () => {
-      const body = document.body;
-      if (body.classList.contains('cyber-theme')) {
-        return 'Cyber-Dystopian';
-      }
-      return 'Cosmic'; // Default
-    }
-  };
+    };
   </script>
 </head>
 <body class="cosmic-theme">
