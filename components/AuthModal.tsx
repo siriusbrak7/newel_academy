@@ -39,106 +39,83 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
   // --------------------
   // LOGIN
   // --------------------
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  // In your AuthModal.tsx handleLogin function, use this instead:
 
-    try {
-      console.log('🔐 Attempting login for:', formData.username);
-      
-      // Convert username to email format for Supabase Auth
-      const email = `${formData.username.toLowerCase()}@newel.academy`;
-      
-      console.log('📧 Using email:', email);
-      
-      // Use Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: formData.password
-      });
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-      if (error) {
-        console.error('❌ Supabase auth error:', error.message);
-        setError('Invalid username or password');
-        setLoading(false);
-        return;
-      }
+  try {
+    console.log('🔐 Custom auth login for:', formData.username);
+    
+    // Query your custom users table directly
+    const { data: profile, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', formData.username.trim())
+      .single();
 
-      if (!data.user) {
-        console.error('❌ No user data returned');
-        setError('Authentication failed');
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ Supabase auth successful, user ID:', data.user.id);
-
-      // Get user profile from your users table
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('❌ Profile fetch error:', profileError.message);
-        setError('User profile not found');
-        setLoading(false);
-        return;
-      }
-
-      if (!profile) {
-        console.error('❌ No profile data');
-        setError('User profile not found');
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ Profile found:', profile.username);
-
-      if (!profile.approved) {
-        console.log('⚠️ Account not approved');
-        setError('Account pending admin approval');
-        setLoading(false);
-        return;
-      }
-
-      // Update last login
-      await supabase
-        .from('users')
-        .update({ 
-          last_login: new Date().toISOString(),
-          login_history: [...(profile.login_history || []), new Date().toISOString()].slice(-10)
-        })
-        .eq('id', data.user.id);
-
-      // Create User object
-      const user: User = {
-        id: data.user.id,
-        username: profile.username,
-        role: profile.role as Role,
-        approved: profile.approved,
-        securityQuestion: profile.security_question || '',
-        securityAnswer: profile.security_answer || '',
-        gradeLevel: profile.grade_level || undefined,
-        assignedStudents: profile.assigned_students || undefined,
-        lastLogin: Date.now(),
-        createdAt: new Date(profile.created_at).getTime(),
-        loginHistory: profile.login_history 
-          ? profile.login_history.map((d: string) => new Date(d).getTime())
-          : []
-      };
-
-      console.log('✅ Login successful, calling onLogin');
-      onLogin(user);
-    } catch (err: any) {
-      console.error('❌ Login error:', err);
-      setError(err.message || 'Login failed. Please try again.');
-    } finally {
+    if (error || !profile) {
+      console.error('❌ User not found:', error?.message);
+      setError('Invalid username or password');
       setLoading(false);
+      return;
     }
-  };
+
+    // Check password (base64 comparison)
+    const inputHash = btoa(formData.password);
+    if (profile.password_hash !== inputHash) {
+      console.log('❌ Password mismatch');
+      console.log('   Input hash:', inputHash);
+      console.log('   Stored hash:', profile.password_hash);
+      setError('Invalid username or password');
+      setLoading(false);
+      return;
+    }
+
+    if (!profile.approved) {
+      console.log('⚠️ Account not approved');
+      setError('Account pending admin approval');
+      setLoading(false);
+      return;
+    }
+
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ 
+        last_login: new Date().toISOString(),
+        login_history: [...(profile.login_history || []), new Date().toISOString()].slice(-10)
+      })
+      .eq('id', profile.id);
+
+    // Create User object
+    const user: User = {
+      id: profile.id,
+      username: profile.username,
+      role: profile.role as Role,
+      approved: profile.approved,
+      securityQuestion: profile.security_question || '',
+      securityAnswer: profile.security_answer || '',
+      gradeLevel: profile.grade_level || undefined,
+      assignedStudents: profile.assigned_students || undefined,
+      lastLogin: Date.now(),
+      createdAt: new Date(profile.created_at).getTime(),
+      loginHistory: profile.login_history 
+        ? profile.login_history.map((d: string) => new Date(d).getTime())
+        : []
+    };
+
+    console.log('✅ Login successful, calling onLogin');
+    onLogin(user);
+  } catch (err: any) {
+    console.error('❌ Login error:', err);
+    setError(err.message || 'Login failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // --------------------
   // REGISTER
