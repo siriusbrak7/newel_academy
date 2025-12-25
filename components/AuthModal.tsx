@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { SECURITY_QUESTIONS } from '../constants';
-import { authenticateUser, registerUser } from '../services/authService';
+import { authenticateUser, registerUser } from '../services/storageService';
 import { X } from 'lucide-react';
 
 interface AuthModalProps {
