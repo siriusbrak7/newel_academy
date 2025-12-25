@@ -1,36 +1,23 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Use Vite environment variable
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({ apiKey });
-}
-
-export const getAITutorResponse = async (prompt: string, context: string = ''): Promise<string> => {
-  if (!ai) {
-    return "AI service is not configured. Please check your VITE_GEMINI_API_KEY environment variable.";
-  }
+export const getAITutorResponse = async (prompt: string, context: string = '', isJson: boolean = false): Promise<string> => {
+  if (!apiKey) return "AI service is not configured.";
 
   try {
-    const systemInstruction = `You are an enthusiastic and helpful AI Science Tutor for Newel Academy. 
-    Your goal is to help students (grades 9-12) master scientific concepts. 
-    Be encouraging, concise, and use analogies suitable for teenagers. 
-    If the user asks about non-science topics, politely steer them back to science.
-    Current Context: ${context}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction,
-      }
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      systemInstruction: `You are Newel Academy's AI Science Tutor. Encouraging, concise analogies for grades 9-12. Context: ${context}`
     });
 
-    return response.text || "I'm having trouble thinking right now. Try again?";
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Sorry, I encountered an error connecting to the science database.";
+    return isJson ? '{"score": 0, "feedback": "AI Error"}' : "Connection error.";
   }
 };

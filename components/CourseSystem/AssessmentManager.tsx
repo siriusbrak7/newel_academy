@@ -169,7 +169,7 @@ export const AssessmentManager: React.FC = () => {
         })),
         assignedTo: ['all'],
         targetGrade: form.targetGrade,
-        createdBy: user.username
+        createdBy: (await user).username
       };
       
       await saveAssessment(newAssessment);

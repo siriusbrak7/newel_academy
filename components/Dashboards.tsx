@@ -957,7 +957,10 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       });
       
       const labels = Object.keys(scores);
-      const values = labels.map(l => scores[l].total / scores[l].count);
+      const values = labels.map(l => {
+        const score = scores[l].total / scores[l].count;
+        return isNaN(score) ? 0 : Math.round(score);
+      });
       setSubjectLabels(labels);
       setSubjectScores(values);
       

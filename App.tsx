@@ -30,7 +30,8 @@ import { SprintChallenge, LeaderboardView } from './components/Gamification';
 import AITutorChat from './components/AITutorChat';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
-import { initializeSupabase, sessionService } from './services/supabaseService';
+// Import directly from storageService now
+import { getStoredSession, signOut } from './services/storageService';
 
 // ============================================================================
 // GLOBAL TYPES
@@ -222,17 +223,17 @@ const App: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
-  // Initialize
+  // Initialize Auth on Load
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeSupabase();
-        const storedUser = sessionService.getSession();
-        if (storedUser) {
-          const validated = await sessionService.validateSession().catch(() => null);
-          setAuth({ loggedIn: !!validated, user: validated || storedUser });
+        // Use the new async session getter from storageService
+        const validatedUser = await getStoredSession();
+        if (validatedUser) {
+          setAuth({ loggedIn: true, user: validatedUser });
         }
-        setTheme(DEFAULT_THEME);
+      } catch (err) {
+        console.error("Initialization failed:", err);
       } finally {
         setInitializing(false);
       }
@@ -240,7 +241,7 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Sync Theme with Index.html Bridge - FIXED with safety check
+  // Sync Theme with Index.html Bridge
   useEffect(() => {
     if (initializing) return;
     
@@ -248,7 +249,6 @@ const App: React.FC = () => {
       if (window.ThemeManager?.setTheme) {
         window.ThemeManager.setTheme(theme);
       } else {
-        // Retry if ThemeManager not ready yet
         setTimeout(applyTheme, 100);
       }
     };
@@ -258,19 +258,17 @@ const App: React.FC = () => {
 
   // Handlers
   const handleLogin = useCallback((user: User) => {
-    const now = Date.now();
-    const updatedUser = { ...user, lastLogin: now, loginHistory: [...(user.loginHistory || []), now] };
-    sessionService.saveSession(updatedUser);
-    setAuth({ loggedIn: true, user: updatedUser });
+    setAuth({ loggedIn: true, user });
     setShowAuthModal(false);
   }, []);
 
-  const handleLogout = useCallback(() => {
-    sessionService.clearSession();
+  const handleLogout = useCallback(async () => {
+    await signOut(); // Call the signOut from storageService
     setAuth({ loggedIn: false, user: null });
     setSidebarOpen(false);
   }, []);
 
+  // LOADING SCREEN
   if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1e1b4b] text-white">
@@ -284,6 +282,7 @@ const App: React.FC = () => {
   const isCyber = theme === 'Cyber-Dystopian';
 
   return (
+    // ... rest of your return code starts here
     <div className="min-h-screen flex flex-col relative z-10">
       <Navbar
         user={auth.user}

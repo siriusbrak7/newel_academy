@@ -1,7 +1,6 @@
 ﻿// services/storageService.ts
 
-import { 
-  User, 
+import {  
   CourseStructure, 
   UserProgress, 
   Assessment, 
@@ -11,7 +10,8 @@ import {
   StudentStats, 
   Submission, 
   Announcement, 
-  Material 
+  Material,
+  
 } from '../types';
 import { supabase } from './supabaseClient';
 
@@ -56,14 +56,34 @@ export const initStorage = async (): Promise<void> => {
 // SESSION MANAGEMENT
 // =====================================================
 
-export const getStoredSession = (): User | null => {
+export const getStoredSession = async (): Promise<User | null> => {
   try {
-    const raw = localStorage.getItem('newel_currentUser');
-    return raw ? JSON.parse(raw) : null;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    // Fetch profile data from our custom users table
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!profile) return null;
+
+    return {
+      username: profile.username,
+      role: profile.role,
+      approved: profile.approved,
+      securityQuestion: profile.security_question || '',
+      securityAnswer: profile.security_answer || '',
+      gradeLevel: profile.grade_level || undefined,
+      lastLogin: profile.last_login ? new Date(profile.last_login).getTime() : Date.now()
+    };
   } catch {
     return null;
   }
 };
+
 
 export const saveSession = (user: User | null) => {
   try {
@@ -83,36 +103,124 @@ export const saveSession = (user: User | null) => {
 
 export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
   try {
+    // We map usernames to an internal email format for Supabase Auth
+    const email = `${username.toLowerCase()}@newel.academy`;
+    
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: `${username}@newel.academy`,
-      password: password
+      email,
+      password
     });
 
-    if (error || !data.user) return null;
+    if (error || !data.user) throw error;
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: pError } = await supabase
       .from('users')
       .select('*')
       .eq('id', data.user.id)
       .single();
 
-    if (profileError || !profile) return null;
-    if (!profile.approved) return null;
+    if (pError || !profile) throw new Error("Profile not found");
+    if (!profile.approved) throw new Error("Awaiting Admin Approval");
+
+    // Update last login
+    await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', data.user.id);
 
     return {
       username: profile.username,
       role: profile.role,
       approved: profile.approved,
-      securityQuestion: profile.security_question || '',
-      securityAnswer: profile.security_answer || '',
-      gradeLevel: profile.grade_level || undefined,
-      assignedStudents: profile.assigned_students || undefined,
-      lastLogin: Date.now(),
-      loginHistory: profile.login_history ? profile.login_history.map((d: string) => new Date(d).getTime()) : undefined
+      securityQuestion: profile.security_question,
+      securityAnswer: profile.security_answer,
+      gradeLevel: profile.grade_level
     };
+  } catch (error: any) {
+    console.error('Login Error:', error.message);
+    throw error;
+  }
+};
+
+// Add this to your imports if not there
+import { User, Role } from '../types';
+
+/**
+ * UPDATED: Returns userId so AuthModal can use it
+ */
+export const registerUser = async (userData: any): Promise<{success: boolean, message: string, userId?: string}> => {
+  try {
+    const email = `${userData.username.toLowerCase()}@newel.academy`;
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password: userData.password,
+    });
+
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Auth creation failed");
+
+    const { error: profileError } = await supabase.from('users').insert({
+      id: authData.user.id,
+      username: userData.username,
+      role: userData.role,
+      approved: userData.role === 'admin',
+      grade_level: userData.gradeLevel,
+      security_question: userData.securityQuestion,
+      security_answer: userData.securityAnswer.toLowerCase()
+    });
+
+    if (profileError) throw profileError;
+
+    return { 
+      success: true, 
+      message: userData.role === 'admin' ? "Admin created!" : "Registered! Awaiting approval.",
+      userId: authData.user.id // Return this for the modal
+    };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+
+/**
+ * NEW: Password Recovery (Previously in the deleted file)
+ */
+export const recoverPassword = async (username: string, securityAnswer: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    // 1. Verify security answer in database
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, security_answer')
+      .eq('username', username)
+      .single();
+
+    if (error || !data) return { success: false, message: 'User not found' };
+    if (data.security_answer !== securityAnswer.toLowerCase()) {
+      return { success: false, message: 'Incorrect security answer' };
+    }
+
+    // 2. Use Supabase Admin API or standard update (requires user to be logged in usually)
+    // For a fully custom "ForgotPassword" without email, we'd need a backend function.
+    // This simple version assumes the user is updating their own record.
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (updateError) throw updateError;
+
+    return { success: true, message: 'Password reset successful' };
+  } catch (error: any) {
+    return { success: false, message: error.message || 'Recovery failed' };
+  }
+};
+
+export const signOut = async (): Promise<void> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    
+    // Clear any leftover local storage if applicable
+    localStorage.removeItem('newel_currentUser');
+    
+    console.log('✅ User signed out successfully');
   } catch (error) {
-    console.error('Auth error', error);
-    return null;
+    console.error('❌ Sign out error:', error);
   }
 };
 
@@ -241,6 +349,8 @@ export const deleteUser = async (username: string): Promise<void> => {
   }
 };
 
+
+
 // =====================================================
 // COURSE MANAGEMENT (OPTIMIZED)
 // =====================================================
@@ -250,8 +360,7 @@ export const deleteUser = async (username: string): Promise<void> => {
  */
 export const getCourses = async (): Promise<CourseStructure> => {
   try {
-    // Optimization: Questions table NOT selected. This prevents massive payload.
-    const { data: topicsData, error: topicsError } = await supabase
+    const { data: topicsData, error } = await supabase
       .from('topics')
       .select(`
         *,
@@ -259,10 +368,9 @@ export const getCourses = async (): Promise<CourseStructure> => {
         subtopics (*),
         subject:subject_id (name)
       `)
-      .order('sort_order', { ascending: true })
-      .order('title', { ascending: true });
+      .order('sort_order', { ascending: true });
 
-    if (topicsError) throw topicsError;
+    if (error) throw error;
 
     const courses: CourseStructure = {};
     
@@ -273,31 +381,20 @@ export const getCourses = async (): Promise<CourseStructure> => {
         courses[subjectName] = {};
       }
 
-      const subtopics: string[] = (topic.subtopics || [])
-        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
-        .map((s: any) => s.name);
-
-      const materials: Material[] = (topic.materials || []).map((m: any) => {
-        const content = m.type === 'file' 
-          ? (m.storage_path || m.content || '')
-          : (m.content || '');
-        
-        return {
-          id: m.id,
-          title: m.title,
-          type: m.type as 'text' | 'link' | 'file',
-          content: content
-        };
-      });
-
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
         gradeLevel: topic.grade_level || '9',
         description: topic.description || '',
-        subtopics: subtopics,
-        materials: materials,
-        subtopicQuestions: {}, // Optimized: Empty initially
+        subtopics: (topic.subtopics || [])
+          .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+          .map((s: any) => s.name),
+        materials: (topic.materials || []).map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          type: m.type as 'text' | 'link' | 'file',
+          content: m.content || m.storage_path || ''
+        })),
         checkpoints_required: topic.checkpoints_required || 3,
         checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
         final_assessment_required: topic.final_assessment_required !== false
@@ -306,6 +403,7 @@ export const getCourses = async (): Promise<CourseStructure> => {
 
     return courses;
   } catch (error) {
+    console.error('getCourses Optimization Error:', error);
     return {};
   }
 };
@@ -498,47 +596,41 @@ export const updateTopicProgress = async (
 
 export const getAssessments = async (): Promise<Assessment[]> => {
   try {
-    const { data: assessmentsData, error: assessmentsError } = await supabase
+    // We use the join syntax '*, questions(*)' to pull related rows immediately
+    const { data, error } = await supabase
       .from('assessments')
-      .select('*')
+      .select(`
+        *,
+        questions (*)
+      `)
       .order('created_at', { ascending: false });
 
-    if (assessmentsError) throw assessmentsError;
+    if (error) throw error;
 
-    const assessments: Assessment[] = [];
-    
-    // Note: Fetching questions in loop is unavoidable here due to structure mapping, 
-    // but less frequent than course listing.
-    for (const item of assessmentsData || []) {
-      const { data: questionsData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('assessment_id', item.id);
-
-      assessments.push({
-        id: item.id,
-        title: item.title,
-        subject: item.subject || '',
-        questions: (questionsData || []).map((q: any) => ({
-          id: q.id,
-          text: q.text,
-          type: q.type,
-          difficulty: q.difficulty || 'IGCSE',
-          topic: item.subject || '',
-          options: q.options || [],
-          correctAnswer: q.correct_answer || '',
-          modelAnswer: q.model_answer
-        })),
-        assignedTo: item.assigned_to || [],
-        targetGrade: item.target_grade || 'all',
-        createdBy: item.created_by || 'system'
-      });
-    }
-    return assessments;
-  } catch {
+    return (data || []).map(item => ({
+      id: item.id,
+      title: item.title,
+      subject: item.subject || '',
+      questions: (item.questions || []).map((q: any) => ({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        difficulty: q.difficulty || 'IGCSE',
+        topic: item.subject || '',
+        options: q.options || [],
+        correctAnswer: q.correct_answer || '',
+        modelAnswer: q.model_answer
+      })),
+      assignedTo: item.assigned_to || [],
+      targetGrade: item.target_grade || 'all',
+      createdBy: item.created_by || 'system'
+    }));
+  } catch (error) {
+    console.error('getAssessments Optimization Error:', error);
     return [];
   }
 };
+
 
 export const saveAssessment = async (assessment: Assessment): Promise<void> => {
   try {

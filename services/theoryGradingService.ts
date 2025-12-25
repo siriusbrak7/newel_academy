@@ -83,53 +83,32 @@ export const getStudentTheorySubmissions = async (userId: string): Promise<Theor
 };
 
 // AI Auto-grading for theory questions
-export const aiGradeTheoryAnswer = async (
-  submissionId: string,
-  questionText: string,
-  studentAnswer: string,
-  modelAnswer?: string
-): Promise<number> => {
+export const aiGradeTheoryAnswer = async (submissionId: string, questionText: string, studentAnswer: string, modelAnswer?: string): Promise<number> => {
   try {
-    const prompt = `Please grade this student's answer to a science theory question.
+    const prompt = `Grade this student answer. 
+    Q: ${questionText} 
+    Rubric: ${modelAnswer || 'General Science Accuracy'} 
+    Student: ${studentAnswer}
+    Return JSON: { "score": number, "feedback": "string" }`;
 
-QUESTION: ${questionText}
+    // Call with isJson = true
+    const rawResponse = await getAITutorResponse(prompt, 'grading_assistant', true);
+    const result = JSON.parse(rawResponse);
 
-MODEL ANSWER (if available): ${modelAnswer || 'Not provided'}
-
-STUDENT'S ANSWER: ${studentAnswer}
-
-Please provide:
-1. A score from 0-100 based on accuracy, completeness, and understanding
-2. Brief feedback (max 100 words)
-
-Format your response as:
-SCORE: [number]
-FEEDBACK: [text]`;
-
-    const response = await getAITutorResponse(prompt, 'grading');
-    
-    // Parse the response
-    const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
-    const feedbackMatch = response.match(/FEEDBACK:\s*(.+)/i);
-    
-    const score = scoreMatch ? parseInt(scoreMatch[1]) : 50; // Default 50 if parsing fails
-    const feedback = feedbackMatch ? feedbackMatch[1].trim() : 'AI grading completed.';
-
-    // Update the submission with AI grading
     const { error } = await supabase
       .from('theory_submissions')
       .update({
-        ai_suggested_score: Math.min(100, Math.max(0, score)),
+        ai_suggested_score: result.score,
+        teacher_feedback: result.feedback, // Storing AI feedback here initially
         status: 'ai_graded'
       })
       .eq('id', submissionId);
 
     if (error) throw error;
-
-    return score;
+    return result.score;
   } catch (error) {
     console.error('AI grading error:', error);
-    throw error;
+    return 0;
   }
 };
 

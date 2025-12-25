@@ -127,7 +127,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         }
 
         // Load checkpoint progress
-        const progressData = await getStudentCheckpointProgress(storedUser.username, topicId!);
+        const progressData = await getStudentCheckpointProgress((await storedUser).username, topicId!);
         setCheckpointProgress(progressData);
 
         // Load final assessment
@@ -259,6 +259,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
     }
   };
 
+  // --- UPDATED HANDLERS (With Correct Bracing) ---
+
   const handleCheckpointComplete = async (checkpointId: string, score: number, passed: boolean) => {
     if (!user) return;
 
@@ -281,7 +283,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
           .single();
 
         if (userData && topicId) {
-          // Note: main_assessment_passed is technically the final theory, but we track progress here too
           await supabase
             .from('user_progress')
             .upsert({
@@ -292,7 +293,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
         }
       }
 
-      setActiveCheckpoint(null);
+      // NOTE: We do NOT set activeCheckpoint to null here anymore
+      // This allows the student to see the review.
       if (passed) alert(`🎉 Checkpoint Passed!`);
 
     } catch (error) {
@@ -310,7 +312,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
       setFinalAssessmentCompletionDate(new Date().toLocaleDateString());
 
       const checkpointsData = await getTopicCheckpoints(topicId);
-      // Assuming Checkpoint 5 is the system ID for final assessment storage
       const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 5);
       
       if (checkpoint5) {
@@ -336,7 +337,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         }
       }
 
-      setActiveFinalQuiz(false);
+      // NOTE: We do NOT set activeFinalQuiz to false here anymore.
       alert(passed ? '🎉 Topic Completed! Final Assessment Passed!' : 'Keep practicing.');
     } catch (error) {
       console.error('Error updating final assessment:', error);

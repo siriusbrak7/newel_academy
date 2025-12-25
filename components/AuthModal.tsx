@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { SECURITY_QUESTIONS } from '../constants';
-import { authService } from '../services/supabaseService';
+import { authenticateUser, registerUser, recoverPassword } from '../services/storageService';
 import { X } from 'lucide-react';
 
 interface AuthModalProps {
@@ -44,9 +44,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     setLoading(true);
     setError('');
 
-    
     try {
-      const user = await authService.login(formData.username, formData.password);
+      const user = await authenticateUser(formData.username, formData.password);
       
       if (!user) {
         setError('Invalid username or password');
@@ -59,9 +58,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
       }
 
       onLogin(user);
-    } catch (err) {
-      setError('Login failed. Please try again.');
-      console.error('Login error:', err);
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -81,14 +79,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
       return;
     }
 
-    if (!formData.username || !formData.password || !formData.securityAnswer) {
-      setError('All fields are required');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const result = await authService.register({
+      const result = await registerUser({
         username: formData.username,
         password: formData.password,
         role: formData.role,
@@ -100,7 +92,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
       if (result.success) {
         setSuccess(result.message);
         
-        // If admin, auto-login
         if (formData.role === 'admin') {
           const adminUser: User = {
             username: formData.username,
@@ -112,7 +103,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
           };
           setTimeout(() => onLogin(adminUser), 1500);
         } else {
-          // Switch to login for regular users
           setTimeout(() => {
             setSuccess('');
             setMode('login');
@@ -122,9 +112,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
       } else {
         setError(result.message);
       }
-    } catch (err) {
-      setError('Registration failed. Please try again.');
-      console.error('Registration error:', err);
+    } catch (err: any) {
+      setError('Registration failed.');
     } finally {
       setLoading(false);
     }
@@ -145,7 +134,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     }
 
     try {
-      const result = await authService.recoverPassword(
+      const result = await recoverPassword(
         formData.username,
         formData.securityAnswer,
         formData.password
@@ -153,23 +142,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
 
       if (result.success) {
         setSuccess(result.message);
-        
-        // Try to login after successful password reset
-        setTimeout(async () => {
-          const user = await authService.login(formData.username, formData.password);
-          if (user) {
-            onLogin(user);
-          } else {
-            setMode('login');
-            setError('Password reset successful. Please login with new password.');
-          }
-        }, 1500);
+        setTimeout(() => setMode('login'), 2000);
       } else {
         setError(result.message);
       }
-    } catch (err) {
-      setError('Password recovery failed. Please try again.');
-      console.error('Recovery error:', err);
+    } catch (err: any) {
+      setError('Recovery failed.');
     } finally {
       setLoading(false);
     }

@@ -153,7 +153,7 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
               correctAnswer: correctOptionText,
               isCorrect: isCorrect,
               options: q.options,
-              explanation: q.explanation // Include explanation
+              explanation: q.explanation
             });
           }
         });
@@ -194,101 +194,66 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
     const isTheory = checkpoint?.checkpoint_number === 5;
     
     return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="quiz-result-title">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
         {!isTheory && showConfetti && <Confetti />}
         
-        <div className="bg-slate-900 border border-white/20 rounded-2xl max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden my-8 shadow-2xl">
+        <div className="bg-slate-900 border border-white/20 rounded-2xl max-w-2xl w-full flex flex-col max-h-[90vh]">
           
-          <div className="p-8 text-center border-b border-white/10 shrink-0 bg-slate-900 z-10">
-            <h2 id="quiz-result-title" className="text-2xl font-bold text-white mb-4">
-              {isTheory ? 'Submitted! 📝' : score >= passThreshold ? 'Checkpoint Passed! 🎉' : 'Review Your Answers'}
+          <div className="p-8 text-center border-b border-white/10">
+            <h2 className="text-2xl font-bold text-white">
+              {isTheory ? 'Submitted for Grading! 📝' : score >= passThreshold ? 'Checkpoint Passed! 🎉' : 'Review Needed'}
             </h2>
-
-            {!isTheory ? (
-              <div className="space-y-2 mb-2">
-                <div className="text-5xl font-bold text-cyan-400" aria-label={`Score: ${Math.round(score)} percent`}>
-                  {Math.round(score)}%
-                </div>
-                <div className={`text-lg font-bold ${score >= passThreshold ? 'text-green-400' : 'text-red-400'}`}>
-                  {score >= passThreshold ? `✓ Passed (Required: ${passThreshold}%)` : `✗ Need ${passThreshold}% to pass`}
-                </div>
-              </div>
-            ) : (
-              <div className="text-lg font-bold text-purple-400 mb-4">
-                Submitted for Teacher Grading
+            <div className="text-5xl font-bold text-cyan-400 my-4">
+              {isTheory ? '✓' : `${Math.round(score)}%`}
+            </div>
+            {!isTheory && (
+              <div className={`text-lg font-bold ${score >= passThreshold ? 'text-green-400' : 'text-red-400'}`}>
+                {score >= passThreshold ? `✓ Passed (Required: ${passThreshold}%)` : `✗ Need ${passThreshold}% to pass`}
               </div>
             )}
           </div>
 
-          {!isTheory && (
-            <div className="p-6 overflow-y-auto flex-grow bg-black/20" tabIndex={0} aria-label="Detailed Quiz Review">
-              <h3 className="text-white/80 font-bold mb-4 uppercase text-sm tracking-wider flex items-center gap-2">
-                <Info size={16} /> Detailed Review
-              </h3>
-              
-              <div className="space-y-4">
-                {results.map((res, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`p-4 rounded-xl border ${
-                      res.isCorrect 
-                        ? 'bg-green-500/10 border-green-500/30' 
-                        : 'bg-red-500/10 border-red-500/30'
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      <div className="mt-1" aria-hidden="true">
-                        {res.isCorrect ? <CheckCircle className="text-green-400" size={20} /> : <XCircle className="text-red-400" size={20} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-white font-medium mb-3 text-sm">
-                          <span className="sr-only">Question {idx + 1}:</span> {res.questionText}
-                        </p>
-                        
-                        <div className="text-xs space-y-2">
-                          <div className={`flex items-center gap-2 p-2 rounded ${
-                            res.isCorrect ? 'bg-green-500/20 text-green-200' : 'bg-red-500/20 text-red-200'
-                          }`}>
-                            <span className="font-bold">Your Answer:</span>
-                            <span>{res.userAnswer}</span>
-                          </div>
-
-                          {!res.isCorrect && (
-                            <div className="flex items-center gap-2 p-2 rounded bg-green-500/10 text-green-300 border border-green-500/20">
-                              <span className="font-bold">Correct Answer:</span>
-                              <span>{res.correctAnswer}</span>
-                            </div>
-                          )}
-
-                          {res.explanation && (
-                             <div className="mt-2 p-2 rounded bg-white/5 border border-white/10 text-white/70 italic">
-                               <span className="font-bold not-italic text-cyan-400 block mb-1">Explanation:</span>
-                               {res.explanation}
-                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+          {/* This area allows the student to scroll through all their answers */}
+          <div className="p-6 overflow-y-auto flex-grow bg-black/20">
+            <h3 className="text-white/50 font-bold mb-4 uppercase text-xs">Detailed Review</h3>
+            <div className="space-y-4">
+              {results.map((res, idx) => (
+                <div key={idx} className={`p-4 rounded-xl border ${res.isCorrect ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                  <p className="text-white text-sm mb-2">{idx + 1}. {res.questionText}</p>
+                  <div className="text-xs">
+                    <span className="text-white/40">Your Answer: </span>
+                    <span className={res.isCorrect ? 'text-green-400' : 'text-red-400'}>{res.userAnswer}</span>
                   </div>
-                ))}
-              </div>
+                  {!res.isCorrect && (
+                    <div className="text-xs mt-1">
+                      <span className="text-white/40">Correct Answer: </span>
+                      <span className="text-green-400">{res.correctAnswer}</span>
+                    </div>
+                  )}
+                  {res.explanation && (
+                    <div className="text-xs mt-2 pt-2 border-t border-white/10 text-white/60 italic">
+                      {res.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
-          <div className="p-6 border-t border-white/10 shrink-0 bg-slate-900 text-center">
-             <p className="text-white/60 mb-4 text-sm">
+          {/* THE FIX: The button that finally closes the quiz */}
+          <div className="p-6 border-t border-white/10 bg-slate-900 text-center">
+            <p className="text-white/60 mb-4 text-sm">
               {isTheory 
-                ? 'Check back later for your grade.'
+                ? 'Your answer has been submitted for teacher grading. Check back later for your grade.'
                 : score >= passThreshold
                   ? 'Great job! You can now continue.'
                   : 'Review the material and try again.'}
             </p>
             <button
               onClick={onClose}
-              className="bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-xl font-bold transition-colors w-full sm:w-auto focus:ring-2 focus:ring-cyan-500 focus:outline-none"
-              aria-label="Close results"
+              className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all"
             >
-              Close Results
+              Finished Reviewing
             </button>
           </div>
         </div>
