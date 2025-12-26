@@ -458,7 +458,7 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-// --- TEACHER DASHBOARD ---
+// --- TEACHER DASHBOARD - Fixed Blur Issue ---
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [dashboardVersion, setDashboardVersion] = useState(0); 
   const [stats, setStats] = useState<StudentStats[]>([]);
@@ -664,11 +664,11 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
       
-      {/* Main Actions */}
+      {/* Main Actions - REMOVED BACKDROP-BLUR */}
       <div className="grid md:grid-cols-2 gap-6">
         <Link 
           to="/courses" 
-          className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-6 flex items-center gap-6 hover:bg-white/10 transition-colors group"
+          className="bg-white/5 rounded-2xl border border-white/10 p-6 flex items-center gap-6 hover:bg-white/10 transition-colors group"
         >
           <div className="bg-purple-900/50 p-4 rounded-xl group-hover:scale-110 transition-transform">
             <BookOpenIcon size={32} className="text-purple-400" />
@@ -681,7 +681,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
 
         <Link 
           to="/assessments" 
-          className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 backdrop-blur-md rounded-2xl border border-cyan-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
+          className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 rounded-2xl border border-cyan-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
         >
           <div className="bg-cyan-900/50 p-4 rounded-xl shadow-cyan-500/20 shadow-lg">
             <PenTool size={32} className="text-cyan-400" />
@@ -693,11 +693,10 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             <p className="text-white/60 text-sm">Create MCQ/Written quizzes, use Newel Auto-Grading, and review student submissions.</p>
           </div>
         </Link>
-      </div>
         
         <Link 
           to="/courses" 
-          className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-md rounded-2xl border border-purple-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
+          className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 rounded-2xl border border-purple-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
         >
           <div className="bg-purple-900/50 p-4 rounded-xl shadow-purple-500/20 shadow-lg">
             <MessageSquare size={32} className="text-purple-400" />
@@ -716,6 +715,8 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             </p>
           </div>
         </Link>
+      </div>
+
       <div className="grid md:grid-cols-3 gap-6">
         {/* Left Column: Analytics & Instructions */}
         <div className="md:col-span-2 space-y-6">
@@ -987,7 +988,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
 };
 
 // StudentDashboard component - FIXED VERSION
-// COMPLETE StudentDashboard component - UPDATED WITH GRADE HISTORY
+// COMPLETE StudentDashboard component - UPDATED WITH NEUROSCIENCE FACTS & GRADE HISTORY
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
   const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
@@ -1001,8 +1002,46 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [assessmentFeedback, setAssessmentFeedback] = useState<any[]>([]);
   const [showGradeHistory, setShowGradeHistory] = useState(false);
   
+  // Neuroscience Facts State
+  const [neuroscienceFacts, setNeuroscienceFacts] = useState<string[]>([]);
+  const [currentFactIndex, setCurrentFactIndex] = useState(0);
+  const [factFade, setFactFade] = useState(true);
+  
   // Stats
   const { activeDays, streak } = calculateUserStats(user);
+
+  // Load Neuroscience Facts
+  useEffect(() => {
+    if (window.neuroscienceFacts && window.neuroscienceFacts.length > 0) {
+      setNeuroscienceFacts(window.neuroscienceFacts);
+    } else {
+      // Fallback facts if not loaded from index.html
+      const defaultFacts = [
+        "The human brain has about 86 billion neurons, each connected to thousands of others.",
+        "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
+        "Neuroplasticity allows your brain to reorganize itself throughout your life.",
+        "Sleep is crucial for memory consolidation and neural repair.",
+        "The brain is 73% water. Dehydration of just 2% can impair attention and memory.",
+        "Learning new skills increases myelin, making neural pathways faster."
+      ];
+      setNeuroscienceFacts(defaultFacts);
+    }
+  }, []);
+
+  // Rotate neuroscience facts
+  useEffect(() => {
+    if (neuroscienceFacts.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setFactFade(false);
+      setTimeout(() => {
+        setCurrentFactIndex((prev) => (prev + 1) % neuroscienceFacts.length);
+        setFactFade(true);
+      }, 300);
+    }, 11110); // Change fact every 11 seconds
+
+    return () => clearInterval(interval);
+  }, [neuroscienceFacts]);
 
   const refreshData = async () => {
     setLoading(true);
@@ -1113,11 +1152,11 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
       }
       
-      // NEW: Load grade history
+      // Load grade history
       const history = await getStudentCourseHistory(user.username);
       setCourseHistory(history);
       
-      // NEW: Load assessment feedback
+      // Load assessment feedback
       const feedback = await getStudentAssessmentFeedback(user.username);
       setAssessmentFeedback(feedback);
       
@@ -1183,8 +1222,16 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         doc.text('Complete assessments to see your scores.', 10, y);
       }
       
-      // Add course history if available
+      // Add neuroscience fact
       y += 10;
+      if (neuroscienceFacts.length > 0) {
+        doc.text('Brain Fact of the Day:', 10, y);
+        y += 10;
+        doc.text(neuroscienceFacts[currentFactIndex], 10, y, { maxWidth: 180 });
+        y += 15;
+      }
+      
+      // Add course history if available
       if (courseHistory.length > 0) {
         doc.text('Completed Courses:', 10, y);
         y += 10;
@@ -1261,29 +1308,72 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
+          {/* Header Section */}
           <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-white/10 p-8 rounded-2xl flex items-center justify-between">
             <div>
-              <h2 className="text-4xl font-bold text-white mb-2">Hello, {user.username}</h2>
+              <h2 className="text-4xl font-bold text-white mb-2">Welcome Back, {user.username}</h2>
               <p className="text-white/60">
                 {user.gradeLevel ? `Grade ${user.gradeLevel} Science Student` : 'Science Student'}
-                {subjectScores.length > 0 && ` ${subjectScores.length} Subjects Tracked`}
+                {subjectScores.length > 0 && ` • ${subjectScores.length} Subjects Tracked`}
               </p>
             </div>
             <div className="flex gap-2">
               <button 
                 onClick={refreshData} 
-                className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+                className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
               >
                 <RefreshCw size={16} /> Refresh
               </button>
               <button 
                 onClick={exportPDF} 
-                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
               >
                 <Download size={16} /> Export Report
               </button>
             </div>
           </div>
+
+          {/* Neuroscience Facts Section - ADDED HERE */}
+          {neuroscienceFacts.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-6 rounded-2xl">
+              <div className="flex items-start gap-4">
+                <div className="bg-white/10 p-3 rounded-xl">
+                  <Brain className="text-cyan-300" size={28}/>
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold text-cyan-300 text-lg">Neuroscience Insight</h4>
+                    <span className="text-xs text-white/40">
+                      Fact {currentFactIndex + 1} of {neuroscienceFacts.length}
+                    </span>
+                  </div>
+                  <p className={`text-white/90 italic transition-opacity duration-300 ${factFade ? 'opacity-100' : 'opacity-0'}`}>
+                    "{neuroscienceFacts[currentFactIndex]}"
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-cyan-500 transition-all duration-1000 ease-out"
+                        style={{ width: `${((currentFactIndex + 1) / neuroscienceFacts.length) * 100}%` }}
+                      />
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setFactFade(false);
+                        setTimeout(() => {
+                          setCurrentFactIndex((prev) => (prev + 1) % neuroscienceFacts.length);
+                          setFactFade(true);
+                        }, 300);
+                      }}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 bg-white/5 px-2 py-1 rounded"
+                    >
+                      Next Fact
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* AI Advisor */}
           <div className="bg-gradient-to-r from-purple-900/40 to-cyan-900/40 border border-white/10 p-6 rounded-2xl flex gap-4 items-start">
@@ -1331,14 +1421,14 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <p className="text-white/40 italic text-sm">No pending assessments. Great work!</p>
               }
               {pendingAssessments.map(a => (
-                <div key={a.id} className="bg-white/5 p-3 rounded-lg flex justify-between items-center">
+                <div key={a.id} className="bg-white/5 p-3 rounded-lg flex justify-between items-center hover:bg-white/10 transition-colors">
                   <div>
                     <p className="text-white font-bold text-sm">{a.title}</p>
-                    <p className="text-white/40 text-xs">{a.subject}  {a.questions?.length || 0} Questions</p>
+                    <p className="text-white/40 text-xs">{a.subject} • {a.questions?.length || 0} Questions</p>
                   </div>
                   <Link 
                     to="/assessments" 
-                    className="bg-cyan-600/50 hover:bg-cyan-600 text-white px-3 py-1 rounded text-sm"
+                    className="bg-cyan-600/50 hover:bg-cyan-600 text-white px-3 py-1 rounded text-sm transition-colors"
                   >
                     Start Now
                   </Link>
@@ -1347,12 +1437,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
+          {/* Feature Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {features.map((f, i) => (
               <Link 
                 to={f.link} 
                 key={i} 
-                className={`group bg-gradient-to-br ${f.color} backdrop-blur-md border border-white/10 p-6 rounded-2xl hover:scale-105 transition-all cursor-pointer shadow-xl`}
+                className={`group bg-gradient-to-br ${f.color} backdrop-blur-sm border border-white/10 p-6 rounded-2xl hover:scale-[1.02] transition-all duration-300 cursor-pointer shadow-xl`}
               >
                 <div className="mb-4 bg-white/10 w-12 h-12 rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform">
                   {f.icon}
@@ -1364,6 +1455,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </div>
 
+        {/* Right Column */}
         <div className="space-y-6">
           {/* Performance Chart */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-64 flex flex-col items-center justify-center">
@@ -1406,7 +1498,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
           
-          {/* Quick Stats - UPDATED WITH PERFORMANCE METRICS */}
+          {/* Quick Stats */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-white font-bold mb-4">Quick Stats</h3>
             <div className="space-y-4">
@@ -1447,7 +1539,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               )}
               
-              {/* NEW: Performance Metrics */}
+              {/* Performance Metrics */}
               {courseHistory.length > 0 && (
                 <>
                   <div className="pt-4 border-t border-white/10">
@@ -1481,16 +1573,15 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
       
-      {/* Grade History Section - ADDED BELOW MAIN GRID */}
+      {/* Grade History Section */}
       <div className="space-y-6">
-        {/* Grade History Toggle */}
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
             <ClipboardList className="text-green-400"/> Performance History
           </h3>
           <button 
             onClick={() => setShowGradeHistory(!showGradeHistory)}
-            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
           >
             {showGradeHistory ? 'Hide Details' : 'Show Details'}
             <ChevronDown className={`transform transition-transform ${showGradeHistory ? 'rotate-180' : ''}`} size={14} />
@@ -1506,7 +1597,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Completed Courses</h4>
                 <div className="space-y-2">
                   {courseHistory.slice(0, 5).map((course, index) => (
-                    <div key={index} className="bg-black/20 p-3 rounded-lg">
+                    <div key={index} className="bg-black/20 p-3 rounded-lg hover:bg-black/30 transition-colors">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-white font-medium">{course.topicTitle}</span>
                         <span className={`px-2 py-1 rounded text-xs ${
@@ -1537,7 +1628,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Recent Feedback</h4>
                 <div className="space-y-3">
                   {assessmentFeedback.slice(0, 3).map((feedback, index) => (
-                    <div key={index} className="bg-black/20 p-3 rounded-lg">
+                    <div key={index} className="bg-black/20 p-3 rounded-lg hover:bg-black/30 transition-colors">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-white font-medium text-sm">{feedback.assessmentTitle}</span>
                         <span className="text-cyan-400 font-bold">{feedback.score}%</span>
@@ -1558,4 +1649,3 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     </div>
   );
 };
-

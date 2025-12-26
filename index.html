@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Newel • Ace Scientific Concepts....</title>
+    <title>The Newel • Intelligent Science Learning</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,6 +35,7 @@
               'scan': 'scan 3s linear infinite',
               'digitalFloat': 'digitalFloat 3s linear infinite',
               'glitch': 'glitch 0.3s infinite',
+              'bounce-slow': 'bounce 3s infinite',
             },
             keyframes: {
               fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
@@ -116,6 +117,15 @@
         border-radius: 50%;
         box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
         animation: twinkle 3s ease-in-out infinite;
+      }
+      
+      /* Floating Space Icons */
+      .space-icon {
+        position: fixed;
+        font-size: 24px;
+        z-index: 1;
+        pointer-events: none;
+        animation: float 8s ease-in-out infinite;
       }
       
       /* Constellation */
@@ -260,80 +270,7 @@
         pointer-events: none;
       }
       
-      /* ===== NEUROSCIENCE FACT CONTAINER ===== */
-      #neuroscience-fact-container {
-        position: relative;
-        background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.12));
-        border: 1px solid rgba(59,130,246,0.4);
-        border-radius: 1.5rem;
-        padding: 2.5rem;
-        margin: 3rem auto;
-        max-width: 900px;
-        backdrop-filter: blur(12px);
-        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-        overflow: hidden;
-        z-index: 20;
-      }
-      #neuroscience-fact-container::before {
-        content: ''; 
-        position: absolute; 
-        top: 0; 
-        left: 0; 
-        right: 0; 
-        height: 5px;
-        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981);
-        border-radius: 1.5rem 1.5rem 0 0;
-      }
-      #neuroscience-fact-container .fact-content {
-        display: flex;
-        align-items: flex-start;
-        gap: 1.5rem;
-      }
-      #neuroscience-fact-container i {
-        font-size: 3rem;
-        color: #3b82f6;
-        flex-shrink: 0;
-      }
-      #neuroscience-fact-container h3 {
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin: 0 0 1rem 0;
-        color: #e0e7ff;
-      }
-      #neuroscience-fact {
-        font-size: 1.3rem;
-        line-height: 1.8;
-        color: #e0e7ff;
-        margin: 0;
-        transition: opacity 1s ease;
-      }
-
-      /* Cyber Theme Adjustments */
-      .cyber-bg #neuroscience-fact-container {
-        background: linear-gradient(135deg, rgba(0,255,65,0.08), rgba(0,200,83,0.08));
-        border: 1px solid rgba(0,255,65,0.5);
-        box-shadow: 0 12px 40px rgba(0,255,65,0.1);
-      }
-      .cyber-bg #neuroscience-fact-container::before {
-        background: linear-gradient(90deg, #00ff41, #00cc33, #009922);
-      }
-      .cyber-bg #neuroscience-fact-container i {
-        color: #00ff41;
-      }
-      .cyber-bg #neuroscience-fact-container h3 {
-        color: #00ff41;
-        text-shadow: 0 0 10px rgba(0,255,65,0.5);
-      }
-      .cyber-bg #neuroscience-fact {
-        color: #ccffcc;
-      }
-
-      /* ===== ANIMATIONS ===== */
-      @keyframes scanline {
-        0% { background-position: 0 0; }
-        100% { background-position: 0 100%; }
-      }
-      
+      /* ===== CYBER TEXT & BOX GLOW ===== */
       .cyber-text-glow {
         text-shadow: 
           0 0 10px rgba(0, 255, 65, 0.8),
@@ -348,24 +285,19 @@
         border: 1px solid rgba(0, 255, 65, 0.5);
       }
 
+      /* ===== ANIMATIONS ===== */
+      @keyframes scanline {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 100%; }
+      }
+      
+      @keyframes icon-float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(5deg); }
+      }
+
       /* ===== MOBILE OPTIMIZATION ===== */
       @media (max-width: 768px) {
-        #neuroscience-fact-container {
-          padding: 2rem;
-          margin: 2rem 1rem;
-        }
-        #neuroscience-fact-container .fact-content {
-          flex-direction: column;
-          text-align: center;
-        }
-        #neuroscience-fact-container i {
-          font-size: 2.5rem;
-          margin-bottom: 1rem;
-        }
-        #neuroscience-fact {
-          font-size: 1.15rem;
-        }
-        
         .constellation {
           width: 200px;
           height: 200px;
@@ -387,12 +319,27 @@
           height: 80px;
           left: 2%;
         }
+        
+        .space-icon {
+          font-size: 18px;
+        }
+        
+        .matrix-column {
+          font-size: 10px;
+          line-height: 14px;
+        }
+      }
+      
+      @media (max-width: 480px) {
+        .space-icon {
+          font-size: 14px;
+        }
       }
     </style>
     
     <!-- 33 Neuroscience Facts -->
     <script>
-      // 33 Neuroscience Facts - Will be exposed to React app
+      // 33 Neuroscience Facts - Exposed globally for React app
       const neuroscienceFacts = [
         "The human brain has about 86 billion neurons, each connected to thousands of others.",
         "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
@@ -434,20 +381,18 @@
       
       // Initialize function for React to call
       window.initNeuroscienceFacts = function() {
-        console.log('Neuroscience facts loaded:', neuroscienceFacts.length);
+        console.log('✅ Neuroscience facts loaded:', neuroscienceFacts.length);
         return neuroscienceFacts;
       };
-
-      // Also expose facts for React to use directly
-      window.neuroscienceFacts = neuroscienceFacts;
     </script>
 
-    <!-- Theme Manager -->
+    <!-- Enhanced Theme Manager -->
     <script>
       class ThemeManager {
         constructor() {
           this.currentTheme = null;
           this.initialized = false;
+          this.spaceIcons = [];
         }
         
         initialize() {
@@ -573,11 +518,13 @@
           
           this.hideAllThemeElements();
           document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+          this.cleanupSpaceIcons();
           
           if (theme === 'Cosmic') {
             body.classList.add('cosmic-bg', 'text-white');
             body.style.fontFamily = "'Inter', sans-serif";
             this.showCosmicElements();
+            this.createSpaceIcons();
           } else if (theme === 'Cyber-Dystopian') {
             body.classList.add('cyber-bg', 'text-green-500');
             body.style.fontFamily = "'Share Tech Mono', 'Inter', monospace";
@@ -622,6 +569,38 @@
           });
         }
         
+        createSpaceIcons() {
+          const icons = ['🚀', '🛰️', '⭐', '🌌', '🪐', '☄️', '💫', '🔭'];
+          const body = document.body;
+          
+          // Clear previous icons
+          this.cleanupSpaceIcons();
+          
+          // Create 15 floating space icons
+          for (let i = 0; i < 15; i++) {
+            const icon = document.createElement('div');
+            icon.className = 'space-icon';
+            icon.textContent = icons[Math.floor(Math.random() * icons.length)];
+            icon.style.left = `${Math.random() * 100}%`;
+            icon.style.top = `${Math.random() * 100}%`;
+            icon.style.animationDelay = `${Math.random() * 5}s`;
+            icon.style.animationDuration = `${8 + Math.random() * 8}s`;
+            icon.style.opacity = `${0.4 + Math.random() * 0.3}`;
+            icon.style.fontSize = `${18 + Math.random() * 12}px`;
+            body.appendChild(icon);
+            this.spaceIcons.push(icon);
+          }
+        }
+        
+        cleanupSpaceIcons() {
+          this.spaceIcons.forEach(icon => {
+            if (icon.parentNode) {
+              icon.parentNode.removeChild(icon);
+            }
+          });
+          this.spaceIcons = [];
+        }
+        
         showCyberElements() {
           document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
             el.style.display = 'block';
@@ -663,12 +642,21 @@
           if (themeManager.currentTheme === 'Cyber-Dystopian') {
             document.querySelectorAll('.matrix-column').forEach(el => el.remove());
             themeManager.initMatrixRain();
+          } else if (themeManager.currentTheme === 'Cosmic') {
+            themeManager.cleanupSpaceIcons();
+            themeManager.createSpaceIcons();
           }
         }, 250);
       });
 
       // Expose to window
       window.ThemeManager = themeManager;
+      
+      // Initialize on load
+      window.addEventListener('load', () => {
+        console.log('🚀 The Newel Platform Initialized');
+        console.log('📚 Neuroscience Facts Available:', window.neuroscienceFacts?.length || 0);
+      });
     </script>
   </head>
   
@@ -680,6 +668,11 @@
     <script type="module">
       // Expose ThemeManager globally for React to use
       window.ThemeManager = themeManager;
+      
+      // Initialize neuroscience facts
+      if (window.initNeuroscienceFacts) {
+        window.initNeuroscienceFacts();
+      }
     </script>
   </body>
 </html>

@@ -19,6 +19,13 @@ import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
 
+// Icons
+import { 
+  Rocket, Brain, Zap, Target, Clock, Users, BookOpen, 
+  MessageSquare, CheckCircle, Star, Award, Globe,
+  Mail, ExternalLink, Sparkles, Cpu, Shield, TrendingUp
+} from 'lucide-react';
+
 // Declare ThemeManager from index.html
 declare global {
   interface Window {
@@ -28,78 +35,6 @@ declare global {
     neuroscienceFacts?: string[];
   }
 }
-
-/* ------------------------------------
-   Neuroscience Insight Component
------------------------------------- */
-interface NeuroscienceInsightProps {
-  theme: Theme;
-}
-
-const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
-  const [currentFact, setCurrentFact] = useState<string>('');
-  const [fade, setFade] = useState(true);
-
-  useEffect(() => {
-    const updateFact = () => {
-      if (window.neuroscienceFacts && window.neuroscienceFacts.length > 0) {
-        const idx = Math.floor(Math.random() * window.neuroscienceFacts.length);
-        setFade(false);
-        setTimeout(() => {
-          setCurrentFact(window.neuroscienceFacts![idx]);
-          setFade(true);
-        }, 300);
-      }
-    };
-
-    updateFact();
-    const interval = setInterval(updateFact, 671000); // 11 minutes 11 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div 
-      id="neuroscience-fact-container"
-      className={`relative rounded-2xl p-8 mb-12 max-w-4xl mx-auto ${
-        theme === 'Cyber-Dystopian'
-          ? 'cyber-box-glow bg-black/70 border-green-500/30'
-          : 'bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
-      }`}
-    >
-      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
-      
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-        <div className="flex-shrink-0">
-          <div className={`text-4xl ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-blue-400'}`}>
-            <i className="fas fa-brain"></i>
-          </div>
-        </div>
-        
-        <div className="flex-1">
-          <h3 className={`text-2xl font-bold mb-3 font-['Poppins'] ${
-            theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'
-          }`}>
-            Neuroscience facts...
-          </h3>
-          
-          <p className={`text-lg leading-relaxed transition-opacity duration-300 ease-in-out ${
-            theme === 'Cyber-Dystopian' ? 'text-green-200/90' : 'text-white/90'
-          } ${fade ? 'opacity-100' : 'opacity-0'}`}>
-            {currentFact || window.neuroscienceFacts?.[0] || "Learning about the brain helps you learn better..."}
-          </p>
-          
-          <div className="mt-4 flex items-center gap-2 text-sm opacity-70">
-            <i className="fas fa-clock"></i>
-            <span className={theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}>
-              Updating....
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /* ------------------------------------
    Route Guard
@@ -141,106 +76,111 @@ interface HomepageProps {
 }
 
 const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
-  const [particles, setParticles] = useState<Array<{ x: number; y: number; size: number; speed: number }>>([]);
+  const [floatingIcons, setFloatingIcons] = useState<Array<{ id: number; x: number; y: number; icon: string; delay: number }>>([]);
 
   useEffect(() => {
-    const count = theme === 'Cosmic' ? 150 : 100;
-    const newParticles = Array.from({ length: count }, () => ({
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 3 + 1,
-      speed: Math.random() * 2 + 0.5
-    }));
-    setParticles(newParticles);
+    // Create floating icons for cosmic theme
+    if (theme === 'Cosmic') {
+      const icons = ['🚀', '🛰️', '⭐', '🌌', '🪐', '☄️', '💫', '🔭'];
+      const newIcons = Array.from({ length: 15 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        icon: icons[Math.floor(Math.random() * icons.length)],
+        delay: Math.random() * 5
+      }));
+      setFloatingIcons(newIcons);
+    }
   }, [theme]);
 
+  // App features with icons
+  const appFeatures = [
+    {
+      icon: <Brain className="w-10 h-10" />,
+      title: "Enhanced Learning",
+      description: "Adaptive lessons that adjust to your pace and understanding",
+      gradient: "from-purple-500/20 to-pink-500/20",
+      iconColor: "text-purple-400"
+    },
+    {
+      icon: <BookOpen className="w-10 h-10" />,
+      title: "Comprehensive Courses",
+      description: "Complete Biology, Chemistry & Physics syllabi coverage",
+      gradient: "from-cyan-500/20 to-blue-500/20",
+      iconColor: "text-cyan-400"
+    },
+    {
+      icon: <Target className="w-10 h-10" />,
+      title: "Progress Tracking",
+      description: "Detailed analytics and performance insights",
+      gradient: "from-green-500/20 to-emerald-500/20",
+      iconColor: "text-green-400"
+    },
+    {
+      icon: <Zap className="w-10 h-10" />,
+      title: "Quick Challenges",
+      description: "222-second sprints to test knowledge retention",
+      gradient: "from-yellow-500/20 to-orange-500/20",
+      iconColor: "text-yellow-400"
+    },
+    {
+      icon: <Users className="w-10 h-10" />,
+      title: "Expert Support",
+      description: "24/7 tutor access, your personal learning assistants",
+      gradient: "from-red-500/20 to-rose-500/20",
+      iconColor: "text-red-400"
+    },
+    {
+      icon: <TrendingUp className="w-10 h-10" />,
+      title: "Performance Analytics",
+      description: "Personalized insights to optimize your learning",
+      gradient: "from-indigo-500/20 to-violet-500/20",
+      iconColor: "text-indigo-400"
+    }
+  ];
+
   return (
-    <div className="min-h-[80vh] flex flex-col justify-center items-center text-center px-4 relative overflow-hidden">
-      {/* Background Effects */}
-      {theme === 'Cosmic' && (
-        <>
-          <div className="absolute inset-0 pointer-events-none">
-            {particles.map((p, i) => (
-              <div
-                key={i}
-                className="absolute rounded-full bg-white/30 animate-pulse"
-                style={{
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  width: `${p.size}px`,
-                  height: `${p.size}px`,
-                  animationDuration: `${p.speed}s`,
-                  animationDelay: `${Math.random() * 5}s`
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Planets */}
-          <div className="absolute top-1/4 left-1/4 w-48 h-48 animate-float" style={{ animationDuration: '15s' }}>
-            <div className="absolute w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-yellow-300 animate-pulse" style={{ animationDuration: '8s' }}>
-              <div className="absolute top-1/4 w-full h-1 bg-orange-600/50"></div>
-              <div className="absolute top-1/2 w-full h-2 bg-orange-700/50"></div>
-              <div className="absolute bottom-1/4 w-full h-1 bg-orange-600/50"></div>
+    <div className="min-h-[80vh] flex flex-col items-center text-center px-4 relative overflow-hidden">
+      {/* Floating Icons for Cosmic Theme */}
+      {theme === 'Cosmic' && floatingIcons.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none z-0">
+          {floatingIcons.map((icon) => (
+            <div
+              key={icon.id}
+              className="absolute animate-float text-2xl"
+              style={{
+                left: `${icon.x}%`,
+                top: `${icon.y}%`,
+                animationDuration: `${8 + Math.random() * 8}s`,
+                animationDelay: `${icon.delay}s`,
+                opacity: 0.4 + Math.random() * 0.3
+              }}
+            >
+              {icon.icon}
             </div>
-            <div className="absolute -top-2 -left-2 w-16 h-16 border-2 border-orange-400/30 rounded-full"></div>
-          </div>
-
-          <div className="absolute bottom-1/3 right-1/4 w-16 h-16 animate-float" style={{ animationDuration: '8s', animationDelay: '2s' }}>
-            <div className="absolute w-4 h-4 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 animate-pulse" style={{ animationDuration: '3s' }}>
-              <div className="absolute top-1 w-1 h-1 bg-gray-700 rounded-full"></div>
-              <div className="absolute bottom-2 right-2 w-0.5 h-0.5 bg-gray-800 rounded-full"></div>
-            </div>
-          </div>
-
-          <div className="absolute top-1/2 left-1/3 w-32 h-32">
-            <div className="absolute w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 animate-float" style={{ animationDuration: '12s' }}></div>
-          </div>
-          <div className="absolute bottom-1/4 left-2/3 w-24 h-24">
-            <div className="absolute w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 animate-float" style={{ animationDuration: '10s', animationDelay: '1s' }}></div>
-          </div>
-        </>
+          ))}
+        </div>
       )}
 
+      {/* Cyber Theme Grid */}
       {theme === 'Cyber-Dystopian' && (
-        <>
-          <div className="absolute inset-0 pointer-events-none opacity-10">
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `linear-gradient(to right, #00ff00 1px, transparent 1px),
-                                 linear-gradient(to bottom, #00ff00 1px, transparent 1px)`,
-                backgroundSize: '50px 50px'
-              }}
-            />
-          </div>
-
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-scan" />
-
-          <div className="absolute inset-0 pointer-events-none">
-            {particles.map((p, i) => (
-              <div
-                key={i}
-                className="absolute text-green-400 font-mono text-xs"
-                style={{
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  animation: `digitalFloat ${p.speed * 3}s linear infinite`,
-                  animationDelay: `${Math.random() * 10}s`
-                }}
-              >
-                {Math.random() > 0.5 ? '1' : '0'}
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="absolute inset-0 pointer-events-none opacity-10 z-0">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `linear-gradient(to right, #00ff00 1px, transparent 1px),
+                               linear-gradient(to bottom, #00ff00 1px, transparent 1px)`,
+              backgroundSize: '50px 50px'
+            }}
+          />
+        </div>
       )}
 
       {/* Main Content */}
-      <div className="relative z-10 max-w-6xl mx-auto w-full">
-        {/* Hero */}
-        <div className="mb-16 pt-12">
-          <div className="inline-block mb-6">
+      <div className="relative z-10 max-w-6xl mx-auto w-full pt-12 pb-20">
+        {/* Hero Section */}
+        <div className="mb-16">
+          <div className="inline-block mb-6 animate-fade-in">
             <div
               className={`px-6 py-2 rounded-full mb-4 ${
                 theme === 'Cyber-Dystopian'
@@ -248,123 +188,137 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                   : 'bg-gradient-to-r from-cyan-900/30 to-purple-900/30 text-cyan-300 border border-cyan-500/30'
               }`}
             >
-              <span className="text-sm font-bold uppercase tracking-widest">Science Learning Platform</span>
+              <span className="text-sm font-bold uppercase tracking-widest">Next-Gen Science Learning</span>
             </div>
           </div>
 
           <h1
-            className={`text-5xl md:text-6xl lg:text-7xl font-bold mb-6 font-['Poppins'] ${
+            className={`text-5xl md:text-6xl lg:text-7xl font-bold mb-6 font-['Poppins'] animate-fade-in-up ${
               theme === 'Cyber-Dystopian'
                 ? 'cyber-text-glow text-green-400'
                 : 'bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent'
             }`}
           >
-            Scientific Thinking....
+            Master Scientific Concepts
             <br />
             <span className="text-4xl md:text-5xl lg:text-6xl block mt-2 font-normal">
-              Reinvented for Students
+              With your personal learning assistants...
             </span>
           </h1>
 
-          <p className={`text-xl md:text-2xl mb-8 max-w-3xl mx-auto font-light leading-relaxed ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white/90'}`}>
-            Learn Science at Warp Speed....
+          <p className={`text-xl md:text-2xl mb-8 max-w-3xl mx-auto font-light leading-relaxed animate-fade-in-up ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white/90'}`}>
+            Enhanced learning platform with comprehensive courses, and real-time progress tracking...
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-fade-in-up">
             <button
               onClick={onOpenAuth}
-              className={`px-10 py-5 rounded-xl font-bold text-xl transition-all duration-300 transform hover:scale-105 font-['Poppins'] ${
+              className={`px-10 py-5 rounded-xl font-bold text-xl transition-all duration-300 transform hover:scale-105 font-['Poppins'] animate-pulse ${
                 theme === 'Cyber-Dystopian'
                   ? 'cyber-box-glow bg-black text-green-400 hover:bg-green-950 cyber-glitch'
                   : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:shadow-2xl hover:shadow-cyan-500/30 text-white'
               }`}
             >
               <span className="flex items-center justify-center gap-3">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Start Learning.....
+                <Rocket className="w-6 h-6" />
+                Start Learning...
               </span>
             </button>
+            
+            {/* Email Button */}
+            <a
+              href="mailto:bbrak1235@gmail.com"
+              className={`px-8 py-5 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 font-['Poppins'] flex items-center gap-3 ${
+                theme === 'Cyber-Dystopian'
+                  ? 'border-2 border-green-500/50 text-green-400 hover:bg-green-500/10'
+                  : 'border-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10'
+              }`}
+            >
+              <Mail className="w-5 h-5" />
+              bbrak1235@gmail.com
+              <ExternalLink className="w-4 h-4" />
+            </a>
           </div>
         </div>
 
-        {/* Value Proposition – 3 columns */}
-        <div
-          className={`grid grid-cols-1 md:grid-cols-3 gap-6 mb-20 p-6 rounded-2xl bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm ${
-            theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : ''
-          }`}
-        >
-          {[
-            {
-              image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400&h=300&fit=crop&auto=format',
-              title: 'Course Mastery',
-              description: 'Complete coverage of Biology, Chemistry, and Physics syllabi'
-            },
-            {
-              image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop&auto=format',
-              title: '24/7 Learning Assistant',
-              description: 'Instant help with homework and concept clarification anytime'
-            },
-            {
-              image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=400&h=300&fit=crop&auto=format',
-              title: 'Expert Tutor Available',
-              description: 'Schedule sessions with certified science tutor for personalized guidance'
-            }
-          ].map((feature, index) => (
-            <div key={index} className="text-center">
-              <div className="h-48 mb-4 overflow-hidden rounded-lg">
-                <ImageOptimizer src={feature.image} alt={feature.title} className="w-full h-full object-cover" scienceThemed={true} />
+        {/* App Features Grid */}
+        <div className="mb-20 animate-fade-in-up">
+          <h2 className={`text-3xl font-bold mb-12 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
+            Platform Features
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {appFeatures.map((feature, index) => (
+              <div
+                key={index}
+                className={`group bg-gradient-to-br ${feature.gradient} backdrop-blur-sm border border-white/10 p-6 rounded-2xl hover:scale-[1.02] transition-all duration-300 hover:shadow-xl ${
+                  theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'hover:shadow-purple-500/20'
+                }`}
+              >
+                <div className={`mb-4 bg-white/5 w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${feature.iconColor}`}>
+                  {feature.icon}
+                </div>
+                <h3 className={`text-xl font-bold mb-3 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
+                  {feature.title}
+                </h3>
+                <p className={`text-sm leading-relaxed ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
+                  {feature.description}
+                </p>
               </div>
-              <h3 className={`text-xl font-bold mb-3 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-                {feature.title}
-              </h3>
-              <p className={`font-['Inter'] ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-                {feature.description}
-              </p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Neuroscience Insight Component */}
-        <NeuroscienceInsight theme={theme} />
-
-        {/* AI Ethical Use in Learning */}
-        <div className={`p-10 rounded-2xl backdrop-blur-md border mb-20 ${
+        {/* AI Ethics Section - Simplified with 👆 */}
+        <div className={`p-10 rounded-2xl backdrop-blur-sm border mb-20 animate-fade-in ${
           theme === 'Cyber-Dystopian'
             ? 'cyber-box-glow bg-black/70 border-green-500/30'
-            : 'bg-white/10 border-white/20'
+            : 'bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-white/20'
         }`}>
           <h2 className={`text-3xl font-bold mb-8 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-            Ethical Use of AI in Learning
+            👆 Ethical AI Learning Guide
           </h2>
-          <ul className={`space-y-5 text-lg max-w-3xl mx-auto ${theme === 'Cyber-Dystopian' ? 'text-green-300/90' : 'text-white/90'}`}>
-            <li className="flex items-start gap-4">
-              <span className="text-2xl">🧠</span>
-              <span>Use AI as a study assistant to deepen understanding, not to replace your own thinking.</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-2xl">🔍</span>
-              <span>Always verify AI-generated information with credible sources and textbooks.</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-2xl">✍️</span>
-              <span>Develop your own answers and explanations — let AI be a guide, not the author.</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-2xl">✅</span>
-              <span>Maintain academic integrity: be transparent when AI helped you learn a concept.</span>
-            </li>
-            <li className="flex items-start gap-4">
-              <span className="text-2xl">🌱</span>
-              <span>AI accelerates learning when used ethically as it strengthens your mind.</span>
-            </li>
-          </ul>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <div className="text-left">
+              <div className={`text-lg mb-4 p-4 rounded-xl ${theme === 'Cyber-Dystopian' ? 'bg-black/50 border border-green-500/20' : 'bg-white/5 border border-white/10'}`}>
+                <p className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>
+                  <span className="text-2xl mr-2">👆</span>
+                  Use AI to <span className="font-bold">enhance</span> understanding, not replace thinking
+                </p>
+              </div>
+              <div className={`text-lg mb-4 p-4 rounded-xl ${theme === 'Cyber-Dystopian' ? 'bg-black/50 border border-green-500/20' : 'bg-white/5 border border-white/10'}`}>
+                <p className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>
+                  <span className="text-2xl mr-2">👆</span>
+                  Always <span className="font-bold">verify</span> with trusted sources
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-left">
+              <div className={`text-lg mb-4 p-4 rounded-xl ${theme === 'Cyber-Dystopian' ? 'bg-black/50 border border-green-500/20' : 'bg-white/5 border border-white/10'}`}>
+                <p className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>
+                  <span className="text-2xl mr-2">👆</span>
+                  Develop <span className="font-bold">your own</span> explanations
+                </p>
+              </div>
+              <div className={`text-lg mb-4 p-4 rounded-xl ${theme === 'Cyber-Dystopian' ? 'bg-black/50 border border-green-500/20' : 'bg-white/5 border border-white/10'}`}>
+                <p className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>
+                  <span className="text-2xl mr-2">👆</span>
+                  Maintain <span className="font-bold">academic integrity</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <p className={`mt-8 text-center text-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>
+            AI accelerates learning when used as a <span className="font-bold">thought partner</span>, not a crutch
+          </p>
         </div>
 
         {/* Final CTA */}
         <div
-          className={`rounded-3xl p-10 md:p-16 text-center my-20 ${
+          className={`rounded-3xl p-10 md:p-16 text-center my-20 animate-fade-in ${
             theme === 'Cyber-Dystopian'
               ? 'cyber-box-glow bg-black border-2 border-green-500/30'
               : 'bg-gradient-to-br from-cyan-900/20 via-purple-900/20 to-pink-900/20 border border-white/20 backdrop-blur-xl'
@@ -378,81 +332,64 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
                   : 'bg-gradient-to-r from-cyan-900/30 to-purple-900/30 text-cyan-300 border border-cyan-500/30'
               }`}
             >
-              <span className="text-sm font-bold uppercase tracking-widest">Ready to Excel?</span>
+              <span className="text-sm font-bold uppercase tracking-widest">Ready to Transform Your Learning?</span>
             </div>
           </div>
 
           <h2 className={`text-4xl font-bold mb-6 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-white'}`}>
-            Start Exploring.....
+            Join Students Who Are Mastering Science
           </h2>
 
           <p className={`text-xl mb-8 max-w-2xl mx-auto ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-            Join students who are mastering scientific concepts with a comprehensive learning platform
+            Get started in 30 seconds. No credit card required.
           </p>
 
-          <div
-            className={`mb-8 text-left max-w-md mx-auto p-6 rounded-xl ${
-              theme === 'Cyber-Dystopian' ? 'bg-black/50 border border-green-500/20' : 'bg-white/5 border border-white/10'
-            }`}
-          >
-            <h3 className={`text-xl font-bold mb-4 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-              What You'll Get:
-            </h3>
-            <ul className={`space-y-3 ${theme === 'Cyber-Dystopian' ? 'text-green-300/80' : 'text-white/80'}`}>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                Complete science course access
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                24/7 Learning assistant
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                Expert tutor support
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                Progress tracking and analytics
-              </li>
-            </ul>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
+            <button
+              onClick={onOpenAuth}
+              className={`px-12 py-6 rounded-xl font-bold text-xl transition-all duration-300 transform hover:scale-105 font-['Poppins'] ${
+                theme === 'Cyber-Dystopian'
+                  ? 'cyber-box-glow bg-green-600 text-black hover:bg-green-500'
+                  : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:shadow-2xl hover:shadow-purple-500/40 text-white'
+              }`}
+            >
+              <span className="flex items-center justify-center gap-3">
+                <Sparkles className="w-6 h-6" />
+                Start Free Trial
+              </span>
+            </button>
+            
+            <a
+              href="mailto:bbrak1235@gmail.com"
+              className={`px-8 py-6 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 font-['Poppins'] flex items-center gap-3 ${
+                theme === 'Cyber-Dystopian'
+                  ? 'border-2 border-green-500/50 text-green-400 hover:bg-green-500/10'
+                  : 'border-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10'
+              }`}
+            >
+              <Mail className="w-5 h-5" />
+              Contact Developer
+            </a>
           </div>
 
-          <button
-            onClick={onOpenAuth}
-            className={`px-12 py-6 rounded-xl font-bold text-xl transition-all duration-300 transform hover:scale-105 font-['Poppins'] ${
-              theme === 'Cyber-Dystopian'
-                ? 'cyber-box-glow bg-green-600 text-black hover:bg-green-500'
-                : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:shadow-2xl hover:shadow-purple-500/40 text-white'
-            }`}
-          >
-            <span className="flex items-center justify-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-              Get Started Now
-            </span>
-          </button>
-
-          <p className={`mt-6 text-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/40' : 'text-white/40'}`}>
-            Start learning in 30 seconds • No credit card required
-          </p>
+          <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mt-10 ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>
+            <div className="text-center">
+              <div className="text-2xl font-bold">24/7</div>
+              <div className="text-sm">AI Tutor Access</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">100%</div>
+              <div className="text-sm">Syllabus Coverage</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">0₵</div>
+              <div className="text-sm">To Start</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold">✓</div>
+              <div className="text-sm">Progress Tracking</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -623,15 +560,16 @@ const App: React.FC = () => {
               <div className={`text-2xl font-bold mb-2 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>
                 The Newel
               </div>
-              <p className="text-sm">Expert Science Tutoring</p>
+              <p className="text-sm">Enhanced Science Learning Platform</p>
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/" className="hover:underline">Home</Link>
               <Link to="/courses" className="hover:underline">Courses</Link>
+              <a href="mailto:bbrak1235@gmail.com" className="hover:underline">Contact</a>
               <button onClick={() => setShowAuthModal(true)} className="hover:underline">Register</button>
             </div>
           </div>
-          <p className="text-sm">© 2025 The Newel • Science Learning Platform</p>
+          <p className="text-sm">© 2025 The Newel • bbrak1235@gmail.com</p>
         </div>
       </footer>
 
