@@ -60,7 +60,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav
-      className={`w-full h-16 backdrop-blur-md border-b flex items-center justify-between px-6 sticky top-0 z-50 transition-all duration-300 ${
+      className={`w-full h-16 border-b flex items-center justify-between px-6 sticky top-0 z-50 transition-all duration-300 ${
         currentTheme === 'Cosmic'
           ? 'bg-black/20 border-white/10'
           : 'bg-black/30 border-green-500/20 cyber-box-glow'
