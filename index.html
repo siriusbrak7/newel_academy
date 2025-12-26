@@ -1,200 +1,711 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The Newel • Ace Scientific Concepts</title>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Google Fonts (Aligned with Blueprint) -->
-  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  
-  <!-- Custom Tailwind Config -->
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            'logo': ['Pacifico', 'cursive'],       // For Brand
-            'body': ['Inter', 'sans-serif'],       // For UI
-            'tech': ['JetBrains Mono', 'monospace'], // For Stats/Data
-          },
-          colors: {
-            cosmic: {
-              bg: '#1e1b4b',      // Midnight Indigo
-              void: '#000000',    // Pitch Black
-              primary: '#06b6d4', // Cyan-400
-              secondary: '#8b5cf6', // Purple-500
-              accent: '#ec4899',  // Pink-500
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Newel • Ace Scientific Concepts....</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Share+Tech+Mono&family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Custom Animations -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-in-out',
+              'fade-in-up': 'fadeInUp 0.5s ease-out',
+              'twinkle': 'twinkle 3s ease-in-out infinite',
+              'float': 'float 6s ease-in-out infinite',
+              'orbit': 'orbit 20s linear infinite',
+              'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'rocket-fly': 'rocketFly 8s ease-in-out infinite',
+              'asteroid-drift': 'asteroidDrift 15s linear infinite',
+              'matrix-fall': 'matrixFall 20s linear infinite',
+              'theme-pulse': 'themePulse 2s ease-in-out infinite',
+              'theme-switch': 'themeSwitch 0.5s ease-out',
+              'scan': 'scan 3s linear infinite',
+              'digitalFloat': 'digitalFloat 3s linear infinite',
+              'glitch': 'glitch 0.3s infinite',
             },
-            cyber: {
-              bg: '#000000',      // Solid Black
-              text: '#00FF00',    // Neon Green
-              dim: '#003300',     // Dark Green
+            keyframes: {
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              fadeInUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+              twinkle: { '0%, 100%': { opacity: '1', transform: 'scale(1)' }, '50%': { opacity: '0.3', transform: 'scale(0.8)' } },
+              float: { '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' }, '50%': { transform: 'translateY(-20px) rotate(2deg)' } },
+              orbit: { 'from': { transform: 'rotate(0deg) translateX(100px) rotate(0deg)' }, 'to': { transform: 'rotate(360deg) translateX(100px) rotate(-360deg)' } },
+              rocketFly: { '0%': { transform: 'translate(0, 0) rotate(-45deg)' }, '50%': { transform: 'translate(100px, -100px) rotate(-45deg)' }, '100%': { transform: 'translate(0, 0) rotate(-45deg)' } },
+              asteroidDrift: { '0%': { transform: 'translateX(-100px) rotate(0deg)' }, '100%': { transform: 'translateX(calc(100vw + 100px)) rotate(360deg)' } },
+              matrixFall: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100vh)' } },
+              themePulse: { '0%, 100%': { opacity: '1', transform: 'scale(1)' }, '50%': { opacity: '0.7', transform: 'scale(0.95)' } },
+              themeSwitch: { '0%': { opacity: '0', transform: 'translateY(-10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+              scan: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100vh)' } },
+              digitalFloat: { '0%': { transform: 'translateY(-100px); opacity: 0;' }, '10%': { opacity: 1; }, '90%': { opacity: 1; }, '100%': { transform: 'translateY(100vh); opacity: 0;' } },
+              glitch: { '0%, 100%': { transform: 'translate(0)' }, '20%': { transform: 'translate(-2px, 2px)' }, '40%': { transform: 'translate(-2px, -2px)' }, '60%': { transform: 'translate(2px, 2px)' }, '80%': { transform: 'translate(2px, -2px)' } }
             }
-          },
-          backgroundImage: {
-            // Blueprint: Radial Gradient Midnight Indigo -> Pitch Black
-            'deep-space': 'radial-gradient(circle at center, #1e1b4b 0%, #000000 100%)', 
-            'neon-gradient': 'linear-gradient(to right, #06b6d4, #8b5cf6)',
-          },
-          animation: {
-            'twinkle': 'twinkle 4s ease-in-out infinite',
-            'float': 'float 6s ease-in-out infinite', // Updated to 6s per blueprint
-            'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
-            'scanline': 'scanline 3s linear infinite',
-          },
-          keyframes: {
-            twinkle: { '0%, 100%': { opacity: '1', transform: 'scale(1)' }, '50%': { opacity: '0.3', transform: 'scale(0.8)' } },
-            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
-            pulseGlow: { '0%, 100%': { boxShadow: '0 0 15px rgba(6, 182, 212, 0.4)' }, '50%': { boxShadow: '0 0 25px rgba(6, 182, 212, 0.7)' } },
-            scanline: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100vh)' } },
           }
         }
       }
-    }
-  </script>
-  
-  <style>
-    /* ===== BLUEPRINT COMPONENT CLASSES ===== */
+    </script>
     
-    /* 1. Global Reset */
-    body {
-      margin: 0;
-      transition: background 0.5s ease, color 0.5s ease;
-      overflow-x: hidden;
-    }
-
-    #root { min-height: 100vh; position: relative; z-index: 10; }
-
-    /* 2. Theme: Cosmic (Default) */
-    .cosmic-theme {
-      background: radial-gradient(circle at center, #1e1b4b 0%, #000000 120%) !important;
-      color: #f8fafc; /* Slate-50 */
-      font-family: 'Inter', sans-serif;
-    }
-
-    /* GlassCard Function Implementation */
-    .glass-card {
-      background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 0 30px rgba(6, 182, 212, 0.1); /* Cyan glow 10% */
-      border-radius: 24px;
-    }
-
-    /* NeonButton Function Implementation */
-    .neon-button {
-      background: linear-gradient(to right, #06b6d4, #8b5cf6);
-      color: white;
-      font-weight: 700;
-      transition: all 0.3s ease;
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
-    }
-    .neon-button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 25px rgba(6, 182, 212, 0.6);
-    }
-
-    /* Typography Utilities */
-    .font-brand { font-family: 'Pacifico', cursive; }
-    .font-ui { font-family: 'Inter', sans-serif; }
-    .font-data { font-family: 'JetBrains Mono', monospace; }
-
-    /* 3. Theme: Cyber-Dystopian */
-    .cyber-theme {
-      background: #000000 !important;
-      color: #00FF00 !important; /* Neon Green */
-      font-family: 'JetBrains Mono', monospace !important;
-    }
-
-    /* Dystopian Overrides */
-    .cyber-theme .glass-card {
-      background: rgba(0, 20, 0, 0.8);
-      border: 1px solid #00FF00;
-      border-radius: 0; /* Square corners for cyber feel */
-      box-shadow: none;
-      backdrop-filter: none;
-    }
-
-    .cyber-theme .neon-button {
-      background: #000000;
-      border: 1px solid #00FF00;
-      color: #00FF00;
-      box-shadow: 0 0 5px #00FF00;
-      background-image: none; /* Remove gradient */
-    }
-
-    .cyber-theme .font-brand {
-      font-family: 'JetBrains Mono', monospace; /* No cursive in dystopia */
-      text-transform: uppercase;
-    }
-
-    /* Cyber Scanline Overlay */
-    .cyber-overlay {
-      pointer-events: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-      background-size: 100% 2px, 3px 100%;
-      z-index: 9999;
-      display: none;
-    }
-    .cyber-theme .cyber-overlay { display: block; }
-  </style>
-
-  <!-- Theme Manager (Fixed with all required methods) -->
-  <script>
-    window.neuroscienceFacts = [
-      "The human brain contains ~86 billion neurons.",
-      "Your brain generates about 20 watts of electricity.",
-      "Neuroplasticity means your brain rewires itself daily.",
-      "The visual cortex processes images 60,000× faster than text."
-    ];
-
-    window.ThemeManager = {
-      setTheme: (themeName) => {
-        const body = document.body;
-        if (themeName === 'Cyber-Dystopian') {
-          body.classList.remove('cosmic-theme');
-          body.classList.add('cyber-theme');
-        } else {
-          body.classList.remove('cyber-theme');
-          body.classList.add('cosmic-theme');
-        }
-        // Dispatch event for React
-        window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: themeName } }));
-      },
-      
-      getCurrentTheme: () => {
-        const body = document.body;
-        if (body.classList.contains('cyber-theme')) {
-          return 'Cyber-Dystopian';
-        }
-        return 'Cosmic'; // Default
-      },
-      
-      getCurrentCssClass: () => {
-        const body = document.body;
-        if (body.classList.contains('cyber-theme')) {
-          return 'cyber-theme';
-        }
-        return 'cosmic-theme';
+    <style>
+      /* ===== BASE STYLES ===== */
+      body { 
+        margin: 0; 
+        padding: 0; 
+        min-height: 100vh; 
+        font-family: 'Inter', sans-serif; 
+        transition: background 0.5s ease; 
+        overflow-x: hidden; 
       }
-    };
-  </script>
-</head>
-<body class="cosmic-theme">
-  <div class="cyber-overlay"></div> <!-- Scanlines -->
-  <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+      #root { 
+        position: relative; 
+        z-index: 10; 
+        min-height: 100vh;
+      }
+
+      /* ===== COSMIC THEME ===== */
+      .cosmic-bg { 
+        background: #000000 !important; 
+        position: relative;
+        overflow-x: hidden;
+        min-height: 100vh;
+        color: white !important;
+      }
+      
+      .cosmic-bg::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+          radial-gradient(circle at 20% 30%, rgba(138, 43, 226, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, rgba(30, 144, 255, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 50% 50%, rgba(75, 0, 130, 0.1) 0%, transparent 70%);
+        z-index: 0;
+        pointer-events: none;
+      }
+      
+      /* Star Field */
+      .star-field {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        pointer-events: none;
+        display: none;
+      }
+      
+      .star {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+        animation: twinkle 3s ease-in-out infinite;
+      }
+      
+      /* Constellation */
+      .constellation {
+        position: fixed !important;
+        top: 10%;
+        right: 15%;
+        width: 300px;
+        height: 300px;
+        z-index: 1;
+        opacity: 0.3;
+        pointer-events: none;
+        display: none;
+      }
+      
+      .constellation-line {
+        stroke: rgba(147, 197, 253, 0.4);
+        stroke-width: 1;
+        fill: none;
+      }
+      
+      .constellation-star {
+        fill: rgba(147, 197, 253, 0.8);
+        filter: drop-shadow(0 0 4px rgba(147, 197, 253, 0.6));
+      }
+      
+      /* Rocket */
+      .rocket {
+        position: fixed !important;
+        top: 15%;
+        right: 10%;
+        width: 80px;
+        height: 80px;
+        z-index: 2;
+        filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.5));
+        animation: rocketFly 8s ease-in-out infinite;
+        pointer-events: none;
+        display: none;
+      }
+      
+      /* Rocket Exhaust */
+      .rocket-exhaust {
+        position: fixed !important;
+        top: calc(15% + 60px);
+        right: calc(10% + 20px);
+        width: 30px;
+        height: 50px;
+        z-index: 1;
+        animation: rocketFly 8s ease-in-out infinite;
+        pointer-events: none;
+        display: none;
+      }
+      
+      /* Asteroids */
+      .asteroid {
+        position: fixed !important;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4a5568, #2d3748);
+        box-shadow: inset -5px -5px 10px rgba(0, 0, 0, 0.5);
+        animation: asteroidDrift 15s linear infinite;
+        pointer-events: none;
+        display: none;
+      }
+      
+      .asteroid-1 { width: 40px; height: 40px; top: 20%; left: -100px; animation-delay: 0s; }
+      .asteroid-2 { width: 25px; height: 25px; top: 60%; left: -100px; animation-delay: 5s; }
+      .asteroid-3 { width: 35px; height: 35px; top: 80%; left: -100px; animation-delay: 10s; }
+      
+      /* Saturn */
+      .saturn {
+        position: fixed !important;
+        bottom: 10%;
+        left: 5%;
+        width: 120px;
+        height: 120px;
+        z-index: 1;
+        opacity: 0.6;
+        pointer-events: none;
+        display: none;
+      }
+      
+      /* ===== CYBER-DYSTOPIAN THEME ===== */
+      .cyber-bg {
+        background: #000000 !important;
+        position: relative;
+        overflow-x: hidden;
+        min-height: 100vh;
+        font-family: 'Share Tech Mono', monospace !important;
+        color: #00ff41 !important;
+      }
+      
+      .cyber-bg * {
+        font-family: 'Share Tech Mono', monospace !important;
+      }
+      
+      /* Cyber Grid */
+      .cyber-grid {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: 
+          linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        z-index: 0;
+        pointer-events: none;
+        display: none;
+      }
+      
+      /* Cyber Scanline */
+      .cyber-scanline {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          transparent 50%,
+          rgba(0, 255, 65, 0.03) 50%
+        );
+        background-size: 100% 4px;
+        z-index: 1;
+        pointer-events: none;
+        animation: scan 8s linear infinite;
+        display: none;
+      }
+      
+      /* Matrix Columns */
+      .matrix-column {
+        position: fixed !important;
+        top: -100%;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 14px;
+        color: #00ff41;
+        text-shadow: 0 0 8px #00ff41;
+        white-space: pre;
+        line-height: 18px;
+        animation: matrixFall 20s linear infinite;
+        opacity: 0.6;
+        pointer-events: none;
+      }
+      
+      /* ===== NEUROSCIENCE FACT CONTAINER ===== */
+      #neuroscience-fact-container {
+        position: relative;
+        background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(139,92,246,0.12));
+        border: 1px solid rgba(59,130,246,0.4);
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        margin: 3rem auto;
+        max-width: 900px;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        overflow: hidden;
+        z-index: 20;
+      }
+      #neuroscience-fact-container::before {
+        content: ''; 
+        position: absolute; 
+        top: 0; 
+        left: 0; 
+        right: 0; 
+        height: 5px;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981);
+        border-radius: 1.5rem 1.5rem 0 0;
+      }
+      #neuroscience-fact-container .fact-content {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.5rem;
+      }
+      #neuroscience-fact-container i {
+        font-size: 3rem;
+        color: #3b82f6;
+        flex-shrink: 0;
+      }
+      #neuroscience-fact-container h3 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0 0 1rem 0;
+        color: #e0e7ff;
+      }
+      #neuroscience-fact {
+        font-size: 1.3rem;
+        line-height: 1.8;
+        color: #e0e7ff;
+        margin: 0;
+        transition: opacity 1s ease;
+      }
+
+      /* Cyber Theme Adjustments */
+      .cyber-bg #neuroscience-fact-container {
+        background: linear-gradient(135deg, rgba(0,255,65,0.08), rgba(0,200,83,0.08));
+        border: 1px solid rgba(0,255,65,0.5);
+        box-shadow: 0 12px 40px rgba(0,255,65,0.1);
+      }
+      .cyber-bg #neuroscience-fact-container::before {
+        background: linear-gradient(90deg, #00ff41, #00cc33, #009922);
+      }
+      .cyber-bg #neuroscience-fact-container i {
+        color: #00ff41;
+      }
+      .cyber-bg #neuroscience-fact-container h3 {
+        color: #00ff41;
+        text-shadow: 0 0 10px rgba(0,255,65,0.5);
+      }
+      .cyber-bg #neuroscience-fact {
+        color: #ccffcc;
+      }
+
+      /* ===== ANIMATIONS ===== */
+      @keyframes scanline {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 100%; }
+      }
+      
+      .cyber-text-glow {
+        text-shadow: 
+          0 0 10px rgba(0, 255, 65, 0.8),
+          0 0 20px rgba(0, 255, 65, 0.6),
+          0 0 30px rgba(0, 255, 65, 0.4);
+      }
+      
+      .cyber-box-glow {
+        box-shadow: 
+          0 0 20px rgba(0, 255, 65, 0.3),
+          inset 0 0 20px rgba(0, 255, 65, 0.1);
+        border: 1px solid rgba(0, 255, 65, 0.5);
+      }
+
+      /* ===== MOBILE OPTIMIZATION ===== */
+      @media (max-width: 768px) {
+        #neuroscience-fact-container {
+          padding: 2rem;
+          margin: 2rem 1rem;
+        }
+        #neuroscience-fact-container .fact-content {
+          flex-direction: column;
+          text-align: center;
+        }
+        #neuroscience-fact-container i {
+          font-size: 2.5rem;
+          margin-bottom: 1rem;
+        }
+        #neuroscience-fact {
+          font-size: 1.15rem;
+        }
+        
+        .constellation {
+          width: 200px;
+          height: 200px;
+          right: 5%;
+        }
+        
+        .rocket {
+          width: 60px;
+          height: 60px;
+          right: 5%;
+        }
+        
+        .rocket-exhaust {
+          right: calc(5% + 15px);
+        }
+        
+        .saturn {
+          width: 80px;
+          height: 80px;
+          left: 2%;
+        }
+      }
+    </style>
+    
+    <!-- 33 Neuroscience Facts -->
+    <script>
+      const neuroscienceFacts = [
+        "The human brain has about 86 billion neurons, each connected to thousands of others.",
+        "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
+        "Neuroplasticity allows your brain to reorganize itself throughout your life.",
+        "Sleep is crucial for memory consolidation and neural repair.",
+        "The brain is 73% water. Dehydration of just 2% can impair attention and memory.",
+        "Learning new skills increases myelin, making neural pathways faster.",
+        "The prefrontal cortex (decision-making) isn't fully developed until age 25.",
+        "Stress physically changes brain structure, shrinking the hippocampus.",
+        "Exercise increases BDNF (brain-derived neurotrophic factor), boosting learning.",
+        "Multitasking reduces learning efficiency by up to 40%.",
+        "The brain processes images 60,000 times faster than text.",
+        "Blue light from screens suppresses melatonin, disrupting sleep cycles.",
+        "Meditation increases gray matter density in learning and memory areas.",
+        "The spacing effect: Distributed practice beats cramming for long-term retention.",
+        "Dopamine release during learning creates 'reward pathways' for knowledge.",
+        "The brain's default mode network activates during daydreaming and creativity.",
+        "Chronic stress kills brain cells in the hippocampus (memory center).",
+        "Bilingual brains have more gray matter and delay dementia onset by 5 years.",
+        "The brain uses 20% of the body's oxygen despite being 2% of body weight.",
+        "Music training enhances auditory processing and executive function.",
+        "Smell is the only sense directly wired to the limbic system (emotions/memory).",
+        "Lack of sleep impairs glucose metabolism in the prefrontal cortex by 12%.",
+        "The cerebellum ('little brain') contains 50% of the brain's neurons.",
+        "Chronic inflammation reduces neurogenesis (new neuron creation).",
+        "Omega-3 fatty acids are essential for maintaining neuronal membrane fluidity.",
+        "The gut-brain axis: Your microbiome produces neurotransmitters that affect mood.",
+        "Blueberries contain flavonoids that cross the blood-brain barrier, enhancing memory.",
+        "Learning in 90-minute intervals with breaks aligns with ultradian rhythms.",
+        "The 'testing effect': Retrieval practice boosts memory more than re-studying.",
+        "Emotional arousal enhances memory consolidation via amygdala activation.",
+        "The brain's visual cortex dedicates 30% of its neurons to facial recognition.",
+        "Chronic pain physically rewires neural pathways, creating pain memory.",
+        "Laughter increases endorphins and dopamine, enhancing learning capacity."
+      ];
+
+      // This will be called by React app when it's ready
+      window.initNeuroscienceFacts = function(container) {
+        if (!document.getElementById('neuroscience-fact-container') && container) {
+          const neuroscienceContainer = document.createElement('div');
+          neuroscienceContainer.id = 'neuroscience-fact-container';
+          neuroscienceContainer.innerHTML = `
+            <div class="fact-content">
+              <i class="fas fa-brain"></i>
+              <div>
+                <h3>Neuroscience Insight</h3>
+                <p id="neuroscience-fact"></p>
+              </div>
+            </div>
+          `;
+          
+          // Append to the container (after main content)
+          container.appendChild(neuroscienceContainer);
+
+          const factElement = document.getElementById('neuroscience-fact');
+          const displayFact = () => {
+            const idx = Math.floor(Math.random() * neuroscienceFacts.length);
+            factElement.textContent = neuroscienceFacts[idx];
+            factElement.style.opacity = '0';
+            setTimeout(() => {
+              factElement.style.opacity = '1';
+            }, 100);
+          };
+
+          displayFact();
+          setInterval(displayFact, 671000); // 11 minutes 11 seconds
+          
+          return neuroscienceContainer;
+        }
+        return null;
+      };
+
+      // Also expose facts for React to use directly
+      window.neuroscienceFacts = neuroscienceFacts;
+    </script>
+
+    <!-- Theme Manager -->
+    <script>
+      class ThemeManager {
+        constructor() {
+          this.currentTheme = null;
+          this.initialized = false;
+        }
+        
+        initialize() {
+          if (this.initialized) return;
+          this.createThemeElements();
+          this.initialized = true;
+        }
+        
+        createThemeElements() {
+          const body = document.body;
+          
+          if (!document.querySelector('.star-field')) {
+            const starField = document.createElement('div');
+            starField.className = 'star-field';
+            body.appendChild(starField);
+            
+            const constellation = document.createElement('div');
+            constellation.className = 'constellation';
+            constellation.innerHTML = `
+              <svg viewBox="0 0 300 300">
+                <line class="constellation-line" x1="50" y1="50" x2="100" y2="100"/>
+                <line class="constellation-line" x1="100" y1="100" x2="150" y2="80"/>
+                <line class="constellation-line" x1="150" y1="80" x2="200" y2="120"/>
+                <line class="constellation-line" x1="200" y1="120" x2="250" y2="100"/>
+                <line class="constellation-line" x1="100" y1="100" x2="120" y2="150"/>
+                <line class="constellation-line" x1="120" y1="150" x2="180" y2="180"/>
+                <circle class="constellation-star" cx="50" cy="50" r="3"/>
+                <circle class="constellation-star" cx="100" cy="100" r="4"/>
+                <circle class="constellation-star" cx="150" cy="80" r="3"/>
+                <circle class="constellation-star" cx="200" cy="120" r="3"/>
+                <circle class="constellation-star" cx="250" cy="100" r="2"/>
+                <circle class="constellation-star" cx="120" cy="150" r="3"/>
+                <circle class="constellation-star" cx="180" cy="180" r="3"/>
+              </svg>
+            `;
+            body.appendChild(constellation);
+            
+            const rocket = document.createElement('div');
+            rocket.className = 'rocket';
+            rocket.innerHTML = `
+              <svg viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="rocketGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                  </linearGradient>
+                </defs>
+                <ellipse cx="50" cy="50" rx="15" ry="30" fill="url(#rocketGradient)"/>
+                <path d="M 50 20 L 35 35 L 65 35 Z" fill="#93c5fd"/>
+                <path d="M 35 65 L 30 80 L 35 75 Z" fill="#1e40af"/>
+                <path d="M 65 65 L 70 80 L 65 75 Z" fill="#1e40af"/>
+                <circle cx="50" cy="45" r="6" fill="#1e3a8a" opacity="0.7"/>
+                <circle cx="50" cy="45" r="4" fill="#60a5fa" opacity="0.5"/>
+              </svg>
+            `;
+            body.appendChild(rocket);
+            
+            const exhaust = document.createElement('div');
+            exhaust.className = 'rocket-exhaust';
+            exhaust.innerHTML = `
+              <svg viewBox="0 0 30 50">
+                <defs>
+                  <linearGradient id="exhaustGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#facc15;stop-opacity:0.8" />
+                    <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:0" />
+                  </linearGradient>
+                </defs>
+                <ellipse cx="15" cy="10" rx="12" ry="20" fill="url(#exhaustGradient)">
+                  <animate attributeName="ry" values="20;25;20" dur="0.3s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="1;0.7;1" dur="0.3s" repeatCount="indefinite"/>
+                </ellipse>
+              </svg>
+            `;
+            body.appendChild(exhaust);
+            
+            for (let i = 1; i <= 3; i++) {
+              const asteroid = document.createElement('div');
+              asteroid.className = `asteroid asteroid-${i}`;
+              body.appendChild(asteroid);
+            }
+            
+            const saturn = document.createElement('div');
+            saturn.className = 'saturn';
+            saturn.innerHTML = `
+              <svg viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="saturnGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+                  </linearGradient>
+                  <linearGradient id="ringsGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:0.8" />
+                    <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:0.6" />
+                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.4" />
+                  </linearGradient>
+                </defs>
+                <circle cx="60" cy="60" r="35" fill="url(#saturnGradient)"/>
+                <ellipse cx="60" cy="60" rx="55" ry="15" stroke="url(#ringsGradient)" stroke-width="8" fill="none" opacity="0.7">
+                  <animateTransform attributeName="transform" type="rotate" from="0 60 60" to="360 60 60" dur="40s" repeatCount="indefinite"/>
+                </ellipse>
+              </svg>
+            `;
+            body.appendChild(saturn);
+          }
+          
+          if (!document.querySelector('.cyber-grid')) {
+            const cyberGrid = document.createElement('div');
+            cyberGrid.className = 'cyber-grid';
+            body.appendChild(cyberGrid);
+            
+            const scanline = document.createElement('div');
+            scanline.className = 'cyber-scanline';
+            body.appendChild(scanline);
+          }
+        }
+        
+        setTheme(theme) {
+          const body = document.body;
+          
+          body.classList.remove('cosmic-bg', 'cyber-bg', 'text-white', 'text-green-500');
+          
+          this.hideAllThemeElements();
+          document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+          
+          if (theme === 'Cosmic') {
+            body.classList.add('cosmic-bg', 'text-white');
+            body.style.fontFamily = "'Inter', sans-serif";
+            this.showCosmicElements();
+          } else if (theme === 'Cyber-Dystopian') {
+            body.classList.add('cyber-bg', 'text-green-500');
+            body.style.fontFamily = "'Share Tech Mono', 'Inter', monospace";
+            this.showCyberElements();
+            this.initMatrixRain();
+          }
+          
+          this.currentTheme = theme;
+        }
+        
+        hideAllThemeElements() {
+          document.querySelectorAll('.star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn').forEach(el => {
+            el.style.display = 'none';
+          });
+          document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+            el.style.display = 'none';
+          });
+        }
+        
+        showCosmicElements() {
+          const starField = document.querySelector('.star-field');
+          if (starField) {
+            starField.innerHTML = '';
+            for (let i = 0; i < 200; i++) {
+              const star = document.createElement('div');
+              star.className = 'star';
+              star.style.left = `${Math.random() * 100}%`;
+              star.style.top = `${Math.random() * 100}%`;
+              star.style.animationDelay = `${Math.random() * 3}s`;
+              star.style.animationDuration = `${2 + Math.random() * 2}s`;
+              starField.appendChild(star);
+            }
+            starField.style.display = 'block';
+          }
+          
+          document.querySelectorAll('.constellation, .rocket, .rocket-exhaust, .saturn').forEach(el => {
+            el.style.display = 'block';
+          });
+          
+          document.querySelectorAll('.asteroid').forEach(el => {
+            el.style.display = 'block';
+          });
+        }
+        
+        showCyberElements() {
+          document.querySelectorAll('.cyber-grid, .cyber-scanline').forEach(el => {
+            el.style.display = 'block';
+          });
+        }
+        
+        initMatrixRain() {
+          const chars = 'ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ01';
+          const columns = Math.floor(window.innerWidth / 20);
+          
+          for (let i = 0; i < columns; i++) {
+            const column = document.createElement('div');
+            column.className = 'matrix-column';
+            column.style.left = `${i * 20}px`;
+            column.style.animationDelay = `${Math.random() * 20}s`;
+            column.style.animationDuration = `${15 + Math.random() * 10}s`;
+            
+            let text = '';
+            const length = Math.floor(10 + Math.random() * 20);
+            for (let j = 0; j < length; j++) {
+              text += chars[Math.floor(Math.random() * chars.length)] + '\n';
+            }
+            column.textContent = text;
+            document.body.appendChild(column);
+          }
+        }
+      }
+      
+      const themeManager = new ThemeManager();
+      
+      document.addEventListener('DOMContentLoaded', () => {
+        themeManager.initialize();
+      });
+      
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          if (themeManager.currentTheme === 'Cyber-Dystopian') {
+            document.querySelectorAll('.matrix-column').forEach(el => el.remove());
+            themeManager.initMatrixRain();
+          }
+        }, 250);
+      });
+
+      // Expose to window
+      window.ThemeManager = themeManager;
+    </script>
+  </head>
+  
+  <body>
+    <div id="root" class="main-content"></div>
+    
+    <script type="module" src="/index.tsx"></script>
+    
+    <script type="module">
+      // Expose ThemeManager globally for React to use
+      window.ThemeManager = themeManager;
+    </script>
+  </body>
 </html>

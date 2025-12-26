@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Theme } from '../types';
 import {
@@ -12,10 +12,9 @@ import {
   VolumeX,
   LogIn,
   Star,
-  Cpu,
-  Menu
+  Cpu
 } from 'lucide-react';
-import { DEFAULT_THEME, THEME_CONFIGS } from '../constants';
+import { DEFAULT_THEME } from '../constants';
 
 interface NavbarProps {
   user: User | null;
@@ -35,81 +34,99 @@ const Navbar: React.FC<NavbarProps> = ({
   currentTheme = DEFAULT_THEME
 }) => {
   const [soundOn, setSoundOn] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const themeConfig = {
+    Cosmic: {
+      icon: Star,
+      color: 'text-cyan-400',
+      bgColor: 'bg-cyan-500/10',
+      borderColor: 'border-cyan-500/30',
+      label: 'Cosmic',
+      iconColor: 'text-cyan-300',
+      font: ''
+    },
+    'Cyber-Dystopian': {
+      icon: Cpu,
+      color: 'text-green-400',
+      bgColor: 'bg-green-500/10',
+      borderColor: 'border-green-500/30',
+      label: 'Cyber',
+      iconColor: 'text-green-300',
+      font: 'font-mono'
+    }
+  };
 
-  // Safe theme check
-  const isCosmic = currentTheme === 'Cosmic';
-  const isCyber = currentTheme === 'Cyber-Dystopian' as string;
-  const themeConfig = THEME_CONFIGS[currentTheme] || THEME_CONFIGS[DEFAULT_THEME];
-
-  // Get icon component based on theme
-  const ThemeIcon = isCyber ? Cpu : Star;
+  const currentConfig = themeConfig[currentTheme];
 
   return (
     <nav
-      className={`w-full h-16 border-b flex items-center justify-between px-4 md:px-6 sticky top-0 z-50 transition-all duration-300 backdrop-blur-xl ${
-        isCosmic
-          ? 'cosmic-theme bg-[#1e1b4b]/80 border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
-          : 'cyber-theme bg-black/90 border-green-500/30 shadow-none'
+      className={`w-full h-16 backdrop-blur-md border-b flex items-center justify-between px-6 sticky top-0 z-50 transition-all duration-300 ${
+        currentTheme === 'Cosmic'
+          ? 'bg-black/20 border-white/10'
+          : 'bg-black/30 border-green-500/20 cyber-box-glow'
       }`}
     >
       {/* Left: Logo + Mobile Menu */}
-      <div className="flex items-center gap-3 md:gap-4">
-        {user && (
-          <button
-            onClick={toggleSidebar}
-            className={`md:hidden p-2 rounded-lg transition-colors ${
-              isCosmic
-                ? 'text-white hover:bg-white/10'
-                : 'text-green-500 hover:bg-green-900/30 hover:text-green-400'
-            }`}
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5 md:w-6 md:h-6" />
-          </button>
-        )}
-
+      <div className="flex items-center gap-4">
         <Link
           to="/"
-          className="text-xl md:text-2xl lg:text-3xl font-bold cursor-pointer hover:opacity-90 transition-opacity"
+          className="text-3xl font-bold cursor-pointer hover:opacity-80 transition-opacity"
         >
           <span
+            style={{ fontFamily: "'Pacifico', cursive" }}
             className={`bg-clip-text text-transparent ${
-              isCosmic
-                ? 'font-brand bg-gradient-to-r from-cyan-400 to-purple-400 drop-shadow-sm'
-                : 'font-data bg-green-500 uppercase tracking-widest'
+              currentTheme === 'Cosmic'
+                ? 'bg-gradient-to-r from-cyan-400 to-purple-400'
+                : 'bg-gradient-to-r from-green-400 to-emerald-400 cyber-text-glow'
             }`}
           >
             The Newel
           </span>
         </Link>
+
+        {/* Mobile menu button */}
+        {user && (
+          <button
+            onClick={toggleSidebar}
+            className={`md:hidden p-2 rounded-lg transition-colors ${
+              currentTheme === 'Cosmic'
+                ? 'text-white hover:bg-white/10'
+                : 'text-green-400 hover:bg-green-500/20 cyber-box-glow'
+            }`}
+            aria-label="Open menu"
+          >
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Right side */}
-      <div className="flex items-center space-x-2 md:space-x-3 lg:space-x-4">
-        {/* Theme indicator (Desktop) */}
-        {user && isMounted && (
+      <div className="flex items-center space-x-4">
+        {/* Theme indicator */}
+        {user && (
           <div
-            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border backdrop-blur-sm transition-all ${
-              isCosmic
-                ? 'bg-cyan-900/20 border-cyan-500/30'
-                : 'bg-black border-green-500 text-green-500'
-            }`}
+            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg ${currentConfig.bgColor} border ${currentConfig.borderColor} backdrop-blur-sm`}
           >
-            <ThemeIcon
-              className={isCosmic ? 'text-cyan-400' : 'text-green-500'}
+            <currentConfig.icon
+              className={currentConfig.iconColor}
               size={16}
             />
             <span
-              className={`text-sm font-medium ${
-                isCosmic ? 'font-body text-cyan-100' : 'font-data text-green-500'
-              }`}
+              className={`text-sm font-medium ${currentConfig.color} ${currentConfig.font}`}
             >
-              {isCosmic ? 'Cosmic Mode' : 'CYBER_CORE'}
+              {currentConfig.label}
             </span>
           </div>
         )}
@@ -117,13 +134,13 @@ const Navbar: React.FC<NavbarProps> = ({
         {user ? (
           <>
             {/* MAIN NAV LINKS — hidden on mobile */}
-            <div className="hidden md:flex space-x-3 lg:space-x-6 text-sm font-medium">
+            <div className="hidden md:flex space-x-4 md:space-x-6 text-sm font-medium">
               <Link
                 to="/"
                 className={`flex items-center gap-2 transition-colors ${
-                  isCosmic
-                    ? 'text-slate-200 hover:text-cyan-400'
-                    : 'font-data text-green-700 hover:text-green-400'
+                  currentTheme === 'Cosmic'
+                    ? 'text-white/80 hover:text-cyan-400'
+                    : 'text-green-300/80 hover:text-green-400 cyber-text-glow'
                 }`}
               >
                 <LayoutDashboard size={16} />
@@ -135,9 +152,9 @@ const Navbar: React.FC<NavbarProps> = ({
                   <Link
                     to="/courses"
                     className={`flex items-center gap-2 transition-colors ${
-                      isCosmic
-                        ? 'text-slate-200 hover:text-cyan-400'
-                        : 'font-data text-green-700 hover:text-green-400'
+                      currentTheme === 'Cosmic'
+                        ? 'text-white/80 hover:text-cyan-400'
+                        : 'text-green-300/80 hover:text-green-400 cyber-text-glow'
                     }`}
                   >
                     <BookOpen size={16} />
@@ -147,9 +164,9 @@ const Navbar: React.FC<NavbarProps> = ({
                   <Link
                     to="/leaderboard"
                     className={`flex items-center gap-2 transition-colors ${
-                      isCosmic
-                        ? 'text-slate-200 hover:text-cyan-400'
-                        : 'font-data text-green-700 hover:text-green-400'
+                      currentTheme === 'Cosmic'
+                        ? 'text-white/80 hover:text-cyan-400'
+                        : 'text-green-300/80 hover:text-green-400 cyber-text-glow'
                     }`}
                   >
                     <Trophy size={16} />
@@ -160,36 +177,28 @@ const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => setSoundOn(!soundOn)}
-                className={`hidden sm:block transition-colors ${
-                  isCosmic
-                    ? 'text-slate-400 hover:text-white'
-                    : 'text-green-800 hover:text-green-500'
+                className={`transition-colors ${
+                  currentTheme === 'Cosmic'
+                    ? 'text-white/60 hover:text-white'
+                    : 'text-green-400/60 hover:text-green-300'
                 }`}
-                aria-label={soundOn ? 'Mute sound' : 'Unmute sound'}
               >
                 {soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
               </button>
 
-              <div className="relative">
-                <button
-                  className={`transition-colors ${
-                    isCosmic
-                      ? 'text-slate-400 hover:text-cyan-400'
-                      : 'text-green-800 hover:text-green-500'
-                  }`}
-                  aria-label="Notifications"
-                >
-                  <Bell size={18} />
-                </button>
+              <div
+                className={`relative cursor-pointer transition-colors ${
+                  currentTheme === 'Cosmic'
+                    ? 'text-white/60 hover:text-cyan-400'
+                    : 'text-green-400/60 hover:text-green-300 cyber-text-glow'
+                }`}
+              >
+                <Bell size={18} />
                 {notifications > 0 && (
-                  <span 
-                    className={`absolute -top-1 -right-1 w-2 h-2 rounded-full animate-pulse ${
-                      isCosmic ? 'bg-pink-500 shadow-[0_0_5px_#ec4899]' : 'bg-green-500 shadow-[0_0_5px_#00ff00]'
-                    }`}
-                  />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 )}
               </div>
 
@@ -197,38 +206,38 @@ const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={toggleSidebar}
                 className={`hidden md:flex p-2 rounded-full transition-colors ${
-                  isCosmic
+                  currentTheme === 'Cosmic'
                     ? 'text-white hover:bg-white/10'
-                    : 'text-green-500 hover:bg-green-900/30'
+                    : 'text-green-400 hover:bg-green-500/20 cyber-box-glow'
                 }`}
-                aria-label="Settings"
               >
                 <Settings size={20} />
               </button>
 
               <button
                 onClick={onLogout}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
-                  isCosmic
-                    ? 'bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/20'
-                    : 'bg-black hover:bg-red-900/20 text-red-500 border-red-900 font-data'
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
+                  currentTheme === 'Cosmic'
+                    ? 'bg-red-500/20 hover:bg-red-500/40 text-red-300 border-red-500/30'
+                    : 'bg-red-900/30 hover:bg-red-900/50 text-red-400 border-red-700/50'
                 }`}
               >
                 <LogOut size={16} />
-                <span className="hidden sm:inline">Logout</span>
+                Logout
               </button>
             </div>
           </>
         ) : (
           <button
             onClick={onOpenAuth}
-            className={`neon-button px-4 md:px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2`}
+            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              currentTheme === 'Cosmic'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white'
+                : 'bg-gradient-to-r from-green-600 to-emerald-600 text-black cyber-box-glow'
+            }`}
           >
             <LogIn size={16} />
-            <span className="hidden sm:inline">
-              {isCyber ? 'ACCESS_TERMINAL' : 'Login'}
-            </span>
-            <span className="sm:hidden">Login</span>
+            Login
           </button>
         )}
       </div>

@@ -1,193 +1,176 @@
-/* mobile.css - Aligned with Newel Academy Blueprint */
+/* mobile.css - Mobile-first responsive fixes */
 
-/* ===== GLOBAL RESPONSIVE ADJUSTMENTS ===== */
+/* Base mobile adjustments */
 @media (max-width: 768px) {
-  /* Font Scaling */
+  /* Font size reductions */
   html {
     font-size: 14px;
   }
   
-  /* Theme-aware body adjustments */
-  .cosmic-theme {
-    /* Matches index.html Deep Space Gradient */
-    background: radial-gradient(circle at center, #1e1b4b 0%, #000000 120%) !important;
-    background-attachment: fixed !important; /* Prevents background scroll jitter */
-  }
-  
-  .cyber-theme {
-    /* Matches index.html Solid Black */
-    background: #000000 !important;
-  }
-  
-  /* Typography Scaling */
   h1 {
     font-size: 2rem !important;
     line-height: 2.5rem !important;
   }
-
-  /* Pacifico Font Adjustments for Mobile */
-  .font-brand {
-    font-size: 1.8rem !important;
-    letter-spacing: 0.05em;
+  
+  h2 {
+    font-size: 1.5rem !important;
   }
   
-  h2 { font-size: 1.5rem !important; }
-  h3 { font-size: 1.25rem !important; }
+  h3 {
+    font-size: 1.25rem !important;
+  }
   
-  /* Navbar Mobile Optimizations */
+  /* Navbar mobile fixes */
   nav {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
-    height: 4rem !important;
+    height: 3.5rem !important;
   }
   
-  /* Theme-specific navbar backgrounds */
-  .cosmic-theme nav {
-    background: rgba(30, 27, 75, 0.95) !important; /* Indigo-950 */
-    backdrop-filter: blur(15px) !important;
-    border-bottom: 1px solid rgba(6, 182, 212, 0.2) !important; /* Cyan border */
+  .text-3xl {
+    font-size: 1.75rem !important;
   }
   
-  .cyber-theme nav {
-    background: rgba(0, 0, 0, 0.95) !important;
-    border-bottom: 1px solid #00FF00 !important; /* Neon Green */
+  /* Hide text on small icons */
+  .hidden\\/sm\\:inline {
+    display: none !important;
   }
   
-  /* Prevent horizontal scroll */
-  body {
-    overflow-x: hidden;
-    width: 100%;
+  /* Button touch targets */
+  button, a[role="button"] {
+    min-height: 44px !important;
+    min-width: 44px !important;
   }
-
-  /* ===== GRID SYSTEM OVERRIDES ===== */
-  .grid-cols-1, .grid-cols-2, .grid-cols-3,
-  .md\:grid-cols-2, .md\:grid-cols-3, .md\:grid-cols-4 {
+  
+  /* Grid adjustments */
+  .grid-cols-1 {
     grid-template-columns: 1fr !important;
   }
   
-  /* Exception for Quick Stats (2x2 grid on mobile) */
-  .grid-cols-2.gap-4 {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.75rem !important;
+  .grid-cols-2 {
+    grid-template-columns: 1fr !important;
   }
-
-  /* ===== COMPONENT SPECIFICS ===== */
   
-  /* Glass Card Mobile Overrides */
-  .glass-card {
-    border-radius: 16px !important;
+  .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .md\\:grid-cols-2, .md\\:grid-cols-3, .md\\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Padding reductions */
+  .p-8 {
     padding: 1.5rem !important;
-    /* Reduce blur slightly for mobile performance */
-    backdrop-filter: blur(8px) !important; 
-    -webkit-backdrop-filter: blur(8px) !important;
   }
-
-  .cosmic-theme .glass-card {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  
+  .p-6 {
+    padding: 1rem !important;
   }
-
-  .cyber-theme .glass-card {
-    background: #000000 !important;
-    border: 1px solid #00FF00 !important;
-    border-radius: 0 !important; /* Square edges for cyber */
+  
+  /* Margin adjustments */
+  .space-y-8 > * + * {
+    margin-top: 1.5rem !important;
   }
-
-  /* Neon Button Mobile Targets */
-  .neon-button {
-    width: 100%; /* Full width buttons on mobile */
-    justify-content: center;
-    padding-top: 1rem !important;
-    padding-bottom: 1rem !important;
+  
+  /* Modal positioning fix */
+  .fixed.inset-0 {
+    padding: 1rem !important;
   }
-
-  /* Sidebar Mobile Full Width */
+  
+  /* Sidebar full width on mobile */
   .fixed.right-0.w-80 {
-    width: 85% !important;
-    max-width: 320px !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   
-  /* Sidebar Styling */
-  .cosmic-theme .fixed.right-0.w-80 > div {
-    background: #1e1b4b !important;
-    border-left: 1px solid rgba(6, 182, 212, 0.3);
+  /* Table responsive */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
   }
   
-  .cyber-theme .fixed.right-0.w-80 > div {
-    background: #000000 !important;
-    border-left: 1px solid #00FF00;
+  /* Card adjustments */
+  .rounded-2xl {
+    border-radius: 1rem !important;
   }
   
-  /* Form Inputs Touch Targets */
+  .rounded-3xl {
+    border-radius: 1.25rem !important;
+  }
+  
+  /* Chart container fixes */
+  .h-64 {
+    height: 200px !important;
+  }
+  
+  /* Input/select touch targets */
   input, select, textarea {
-    font-size: 16px !important; /* Prevents iOS auto-zoom */
-    padding: 0.75rem !important;
+    font-size: 16px !important; /* Prevents iOS zoom */
+    min-height: 44px !important;
   }
   
-  .cosmic-theme input {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border-color: rgba(6, 182, 212, 0.3) !important;
-    color: white !important;
+  /* Hide non-essential elements on mobile */
+  .mobile\\:hidden {
+    display: none !important;
   }
   
-  .cyber-theme input {
-    background: black !important;
-    border: 1px solid #003300 !important;
-    color: #00FF00 !important;
-    font-family: 'JetBrains Mono', monospace !important;
-  }
-  .cyber-theme input:focus {
-    border-color: #00FF00 !important;
-    box-shadow: 0 0 5px #00FF00 !important;
-  }
-
-  /* Hide decorative float animations on mobile to save battery */
-  .animate-float, 
-  .animate-pulse-glow {
-    animation: none !important;
+  /* Show mobile-specific elements */
+  .mobile\\:block {
+    display: block !important;
   }
   
-  /* Ensure Icons are visible even without animation */
-  .fa-atom, .fa-flask, .fa-dna {
-    opacity: 1 !important;
-    transform: none !important;
+  /* Flex column on mobile */
+  .mobile\\:flex-col {
+    flex-direction: column !important;
+  }
+  
+  /* Mobile menu button */
+  .mobile-menu-button {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
   }
 }
 
-/* ===== SMALL PHONES (iPhone SE, etc) ===== */
+/* Very small phones */
 @media (max-width: 375px) {
-  html { font-size: 13px; }
+  html {
+    font-size: 13px;
+  }
   
-  .text-6xl { font-size: 2.5rem !important; } /* Fix Hero Title */
+  .px-6 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
   
-  /* Force single column for stats on tiny screens */
-  .grid-cols-2.gap-4 {
-    grid-template-columns: 1fr !important;
+  .gap-6 {
+    gap: 1rem !important;
   }
 }
 
-/* ===== LANDSCAPE ===== */
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .md\\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  .md\\:grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Landscape orientation fixes */
 @media (max-height: 600px) and (orientation: landscape) {
-  .min-h-screen { height: auto !important; }
-  .py-20 { padding-top: 2rem !important; padding-bottom: 2rem !important; }
-  
-  /* Fix sticky nav taking up too much space */
-  nav { position: relative !important; }
-}
-
-/* ===== PERFORMANCE (Low Power Mode) ===== */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation: none !important;
-    transition: none !important;
+  .h-screen {
+    height: auto !important;
+    min-height: 100vh !important;
   }
   
-  .glass-card {
-    backdrop-filter: none !important;
-    background: #1e1b4b !important; /* Solid fallback */
-  }
-  
-  .cyber-overlay {
-    display: none !important; /* Hide scanlines */
+  nav {
+    height: 3rem !important;
   }
 }

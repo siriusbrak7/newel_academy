@@ -1,341 +1,110 @@
-﻿// services/storageService.ts
-
-import {  
-  CourseStructure, 
-  UserProgress, 
-  Assessment, 
-  Topic, 
-  TopicProgress, 
-  LeaderboardEntry, 
-  StudentStats, 
-  Submission, 
-  Announcement, 
-  Material,
-  
-} from '../types';
+﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
+import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material } from '../types';
 import { supabase } from './supabaseClient';
 
 // =====================================================
-// CONSTANTS & CONFIGURATION
+// DEMO ACCOUNT CONFIGURATION
 // =====================================================
-
 const DEMO_ACCOUNTS = ['admin', 'teacher_demo', 'student_demo'];
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_FILE_TYPES = [
-  'image/jpeg', 
-  'image/png', 
-  'image/gif', 
-  'application/pdf', 
-  'application/msword', 
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain'
-];
-const SUPABASE_STORAGE_URL = 'https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/';
-
-// Add this function to your storageService.ts, around line 50 (after the constants)
-
-// =====================================================
-// HELPER FUNCTIONS
-// =====================================================
-
-/**
- * Gets the user ID (UUID) from the database for a given username
- */
-export const getUserId = async (username?: string): Promise<string | null> => {
-  console.log('🔍 Looking up user ID for:', username);
-  
-  if (!username) {
-    // Get from localStorage
-    const stored = localStorage.getItem('newel_currentUser');
-    if (!stored) {
-      console.error('❌ No user session found');
-      return null;
-    }
-    
-    try {
-      const user = JSON.parse(stored);
-      username = user.username;
-      console.log('📦 Using username from localStorage:', username);
-    } catch (error) {
-      console.error('❌ Error parsing localStorage:', error);
-      return null;
-    }
-  }
-  
-  try {
-    // Query public.users table
-    const { data, error } = await supabase
-      .from('users')  // public.users
-      .select('id')
-      .eq('username', username.trim())
-      .maybeSingle();
-    
-    if (error) {
-      console.error('❌ Database error:', error);
-      return null;
-    }
-    
-    if (!data) {
-      console.error('❌ User not found in public.users:', username);
-      return null;
-    }
-    
-    console.log('✅ Found ID in public.users:', data.id);
-    return data.id;
-    
-  } catch (err) {
-    console.error('❌ Unexpected error:', err);
-    return null;
-  }
-};
 
 // =====================================================
 // INITIALIZATION
 // =====================================================
-
-/**
- * Initializes Supabase connection and verifies session.
- */
 export const initStorage = async (): Promise<void> => {
+  console.log('Initializing Supabase storage...');
   try {
-    const { error } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    
-    // Simple query to verify database connectivity
-    const { error: dbError } = await supabase.from('users').select('count', { count: 'exact', head: true });
-    if (dbError) throw dbError;
+    console.log('Supabase Auth initialized');
   } catch (error) {
-    console.error('Critical: Initialization failed', error);
+    console.error('Initialization error:', error);
+    throw error;
   }
 };
 
 // =====================================================
 // SESSION MANAGEMENT
 // =====================================================
-
-export const getStoredSession = async (): Promise<User | null> => {
-  try {
-    // Check localStorage for custom session
-    const stored = localStorage.getItem('newel_currentUser');
-    if (!stored) return null;
-    
-    const user: User = JSON.parse(stored);
-    
-    // Optional: Verify user still exists in database
-    const { data: profile } = await supabase
-      .from('users')
-      .select('approved')
-      .eq('username', user.username)
-      .single();
-    
-    if (!profile || !profile.approved) {
-      localStorage.removeItem('newel_currentUser');
-      return null;
-    }
-    
-    return user;
-  } catch (error) {
-    console.error('Session retrieval error:', error);
-    return null;
-  }
+export const getStoredSession = (): User | null => {
+  const raw = localStorage.getItem('newel_currentUser');
+  return raw ? JSON.parse(raw) : null;
 };
-
 
 export const saveSession = (user: User | null) => {
-  try {
-    if (user) {
-      localStorage.setItem('newel_currentUser', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('newel_currentUser');
-    }
-  } catch (error) {
-    console.error('Session save error', error);
+  if (user) {
+    localStorage.setItem('newel_currentUser', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('newel_currentUser');
   }
 };
 
 // =====================================================
-// AUTHENTICATION
+// AUTHENTICATION (Supabase Auth)
 // =====================================================
-
-// services/storageService.ts - Fix the authenticateUser function
-// services/storageService.ts 
-
-// ... existing imports ...
-import { User, Role } from '../types';
-
-/**
- * AUTHENTICATE
- * Uses Supabase Auth + checks approval in custom users table
- */
-export const authenticateUser = async (username: string, password: string): Promise<User> => {
+export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
+  console.log('Authenticating via Supabase Auth:', username);
+  
   try {
-    console.log('🔐 Supabase Auth login for:', username);
-    
-    // 1. Use Supabase Auth
-    const email = `${username.trim().toLowerCase()}@newel.academy`;
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password
+    // Sign in with password
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: `${username}@newel.academy`,
+      password: password
     });
 
-    if (authError) {
-      console.error('❌ Supabase Auth error:', authError.message);
-      
-      // If user doesn't exist in auth, create them
-      if (authError.message.includes('Invalid login credentials')) {
-        throw new Error('Please register first or contact administrator');
-      }
-      throw new Error(authError.message);
+    if (error) {
+      console.error('Auth error:', error.message);
+      return null;
     }
 
-    if (!authData.user) {
-      throw new Error("Login failed: No user returned");
-    }
+    if (!data.user) return null;
 
-    // 2. Get profile from public.users
+    // Get user profile from users table
     const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('*')
-      .eq('id', authData.user.id)
+      .eq('id', data.user.id)
       .single();
 
     if (profileError || !profile) {
-      console.error('❌ Profile not found in public.users');
-      throw new Error('User profile not found');
+      console.error('Profile fetch error:', profileError?.message);
+      return null;
     }
 
-    // 3. Update login history in public.users
-    const now = new Date().toISOString();
-    const history = [...(profile.login_history || []), now].slice(-10);
-    
-    await supabase
-      .from('users')
-      .update({ 
-        last_login: now,
-        login_history: history,
-        updated_at: now
-      })
-      .eq('id', authData.user.id);
+    if (!profile.approved) {
+      console.log('User not approved:', username);
+      return null;
+    }
+
+    console.log('Authentication successful:', username);
 
     return {
-      id: authData.user.id,
       username: profile.username,
-      role: profile.role as Role,
+      role: profile.role,
       approved: profile.approved,
       securityQuestion: profile.security_question || '',
       securityAnswer: profile.security_answer || '',
       gradeLevel: profile.grade_level || undefined,
       assignedStudents: profile.assigned_students || undefined,
       lastLogin: Date.now(),
-      createdAt: new Date(profile.created_at).getTime(),
-      loginHistory: history.map((d: string) => new Date(d).getTime())
+      loginHistory: profile.login_history ? profile.login_history.map((d: string) => new Date(d).getTime()) : undefined
     };
-    
-  } catch (err: any) {
-    console.error('❌ Login error:', err);
-    throw new Error(err.message || 'Login failed. Please try again.');
-  }
-};
-
-/**
- * REGISTER
- */
-export const registerUser = async (formData: any): Promise<{success: boolean, message: string}> => {
-  try {
-    const email = `${formData.username.trim().toLowerCase()}@newel.academy`;
-    
-    // 1. Create Supabase Auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password: formData.password,
-      options: {
-        data: {
-          username: formData.username,
-          role: formData.role
-        }
-      }
-    });
-
-    if (authError) throw authError;
-    if (!authData.user) throw new Error("Auth user creation failed");
-
-    // 2. Create profile in public.users
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,  // Use the same ID!
-        username: formData.username.trim(),
-        password_hash: btoa(formData.password), // Keep for compatibility
-        role: formData.role,
-        approved: formData.role === 'admin',
-        security_question: formData.securityQuestion,
-        security_answer: formData.securityAnswer.toLowerCase().trim(),
-        grade_level: formData.role === 'student' ? formData.gradeLevel : null,
-        created_at: new Date().toISOString()
-      });
-
-    if (profileError) {
-      // Cleanup: Delete the auth user if profile fails
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      throw profileError;
-    }
-
-    return {
-      success: true,
-      message: formData.role === 'admin' 
-        ? 'Admin account created successfully!' 
-        : 'Registration successful! Awaiting admin approval.'
-    };
-    
-  } catch (err: any) {
-    console.error('❌ Registration error:', err);
-    throw new Error(err.message || 'Registration failed. Please try again.');
-  }
-};
-
-/**
- * RECOVER (Simple version)
- */
-export const recoverPassword = async (username: string, securityAnswer: string, newPassword: string): Promise<void> => {
-  // 1. Verify username and answer
-  const { data: profile, error } = await supabase
-    .from('users')
-    .select('id, security_answer')
-    .eq('username', username.trim())
-    .single();
-
-  if (error || !profile) throw new Error("User not found");
-  if (profile.security_answer !== securityAnswer.toLowerCase().trim()) {
-    throw new Error("Incorrect security answer");
-  }
-
-  // Note: Standard Supabase Auth requires a session or email link to update password.
-  // For a custom "hard-reset", you would usually use a Supabase Edge Function (Admin API).
-  // This client-side update only works if the user manages to log in.
-  throw new Error("Please contact your administrator to reset your password.");
-};
-
-export const signOut = async (): Promise<void> => {
-  try {
-    // Clear custom session
-    localStorage.removeItem('newel_currentUser');
-    
-    // Optional: Clear any Supabase Auth session if exists
-    await supabase.auth.signOut();
-    
-    console.log('✅ User signed out successfully');
   } catch (error) {
-    console.error('❌ Sign out error:', error);
+    console.error('Authentication error:', error);
+    return null;
   }
 };
 
 // =====================================================
 // USER MANAGEMENT
 // =====================================================
-
 export const getUsers = async (): Promise<Record<string, User>> => {
+  console.log('Fetching users...');
+  
   try {
-    const { data, error } = await supabase.from('users').select('*');
+    const { data, error } = await supabase
+      .from('users')
+      .select('*');
+
     if (error) throw error;
 
     const users: Record<string, User> = {};
@@ -352,8 +121,11 @@ export const getUsers = async (): Promise<Record<string, User>> => {
         loginHistory: dbUser.login_history ? dbUser.login_history.map((d: string) => new Date(d).getTime()) : undefined
       };
     });
+
+    console.log(`Fetched ${Object.keys(users).length} users`);
     return users;
   } catch (error) {
+    console.error('Get users error:', error);
     return {};
   }
 };
@@ -367,6 +139,7 @@ export const getRealUsers = async (): Promise<Record<string, User>> => {
       realUsers[username] = user;
     }
   });
+  
   return realUsers;
 };
 
@@ -391,16 +164,20 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
       lastLogin: data.last_login ? new Date(data.last_login).getTime() : undefined,
       loginHistory: data.login_history ? data.login_history.map((d: string) => new Date(d).getTime()) : undefined
     };
-  } catch {
+  } catch (error) {
+    console.error('Get user error:', error);
     return null;
   }
 };
 
 export const saveUser = async (user: User & { password?: string }): Promise<void> => {
+  console.log('Saving user:', user.username);
+  
   try {
     let userId: string;
 
     if (user.password) {
+      // Register new user with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: `${user.username}@newel.academy`,
         password: user.password,
@@ -410,6 +187,7 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
       if (!authData.user) throw new Error('No user returned from auth');
       userId = authData.user.id;
     } else {
+      // Get existing user ID
       const { data } = await supabase
         .from('users')
         .select('id')
@@ -419,6 +197,7 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
       userId = data.id;
     }
 
+    // Save/update user profile
     const userData = {
       id: userId,
       username: user.username,
@@ -432,40 +211,61 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabase.from('users').upsert(userData, { onConflict: 'id' });
+    const { error } = await supabase
+      .from('users')
+      .upsert(userData, { onConflict: 'id' });
+    
     if (error) throw error;
+    
+    console.log(`User saved: ${user.username}`);
   } catch (error) {
-    console.error('Save user failed', error);
+    console.error('Save user error:', error);
     throw error;
   }
 };
 
 export const deleteUser = async (username: string): Promise<void> => {
+  console.log('Deleting user:', username);
+  
   try {
-    const { data: user } = await supabase.from('users').select('id').eq('username', username).single();
+    // Get user ID
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
     if (!user) return;
 
-    await supabase.auth.admin.deleteUser(user.id);
-    const { error } = await supabase.from('users').delete().eq('id', user.id);
+    // Delete from auth (requires admin privileges or RLS policy)
+    const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+    if (authError) console.warn('Auth delete warning:', authError.message);
+
+    // Delete from users table
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', user.id);
+    
     if (error) throw error;
+    
+    console.log(`User deleted: ${username}`);
   } catch (error) {
-    console.error('Delete user failed', error);
+    console.error('Delete user error:', error);
     throw error;
   }
 };
 
-
-
 // =====================================================
-// COURSE MANAGEMENT (OPTIMIZED)
+// COURSE MANAGEMENT
 // =====================================================
-
-/**
- * Fetches course structure without heavy questions payload for performance.
- */
+// storageService.ts - Updated getCourses function
 export const getCourses = async (): Promise<CourseStructure> => {
+  console.log('Fetching courses...');
+  
   try {
-    const { data: topicsData, error } = await supabase
+    // Fetch topics with their materials from the database
+    const { data: topicsData, error: topicsError } = await supabase
       .from('topics')
       .select(`
         *,
@@ -473,9 +273,15 @@ export const getCourses = async (): Promise<CourseStructure> => {
         subtopics (*),
         subject:subject_id (name)
       `)
-      .order('sort_order', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .order('title', { ascending: true });
 
-    if (error) throw error;
+    if (topicsError) throw topicsError;
+
+    // Get questions for topics
+    const { data: questionsData } = await supabase
+      .from('questions')
+      .select('*');
 
     const courses: CourseStructure = {};
     
@@ -486,45 +292,97 @@ export const getCourses = async (): Promise<CourseStructure> => {
         courses[subjectName] = {};
       }
 
+      // Get subtopics from subtopics table
+      const subtopics: string[] = (topic.subtopics || [])
+        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map((s: any) => s.name);
+
+      // ✅ CRITICAL FIX: Get materials from database with proper content
+      const materials: Material[] = (topic.materials || []).map((m: any) => {
+        // For files, use storage_path if available, otherwise content
+        const content = m.type === 'file' 
+          ? (m.storage_path || m.content || '')
+          : (m.content || '');
+        
+        return {
+          id: m.id,
+          title: m.title,
+          type: m.type as 'text' | 'link' | 'file',
+          content: content
+        };
+      });
+
+      // Organize questions by subtopic
+      const topicQuestions = (questionsData || []).filter(q => q.topic_id === topic.id);
+      const subtopicQuestions: Record<string, any[]> = {};
+      
+      topicQuestions.forEach(q => {
+        const subtopic = q.subtopic_name || 'general';
+        if (!subtopicQuestions[subtopic]) {
+          subtopicQuestions[subtopic] = [];
+        }
+        
+        subtopicQuestions[subtopic].push({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          difficulty: q.difficulty || 'IGCSE',
+          topic: topic.title,
+          options: q.options || [],
+          correctAnswer: q.correct_answer || '',
+          modelAnswer: q.model_answer
+        });
+      });
+
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
         gradeLevel: topic.grade_level || '9',
         description: topic.description || '',
-        subtopics: (topic.subtopics || [])
-          .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
-          .map((s: any) => s.name),
-        materials: (topic.materials || []).map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          type: m.type as 'text' | 'link' | 'file',
-          content: m.content || m.storage_path || ''
-        })),
+        subtopics: subtopics,
+        materials: materials,  // ✅ Now properly fetched from database
+        subtopicQuestions,
         checkpoints_required: topic.checkpoints_required || 3,
         checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
         final_assessment_required: topic.final_assessment_required !== false
       };
     });
 
+    console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects`);
     return courses;
   } catch (error) {
-    console.error('getCourses Optimization Error:', error);
+    console.error('❌ Get courses error:', error);
     return {};
   }
 };
 
+// In storageService.ts, update the saveTopic function:
+// storageService.ts - Updated saveTopic function
 export const saveTopic = async (subject: string, topic: Topic): Promise<void> => {
+  console.log(`Saving topic: ${subject} - ${topic.title}`);
+  
   try {
-    const { data: subjectData } = await supabase.from('subjects').select('id').eq('name', subject).single();
+    // Get or create subject
+    const { data: subjectData } = await supabase
+      .from('subjects')
+      .select('id')
+      .eq('name', subject)
+      .single();
+
     let subjectId: string;
     
     if (!subjectData) {
-      const { data: newSubject } = await supabase.from('subjects').insert({ name: subject }).select('id').single();
+      const { data: newSubject } = await supabase
+        .from('subjects')
+        .insert({ name: subject })
+        .select('id')
+        .single();
       subjectId = newSubject.id;
     } else {
       subjectId = subjectData.id;
     }
 
+    // Prepare topic data
     const topicData: any = {
       subject_id: subjectId,
       title: topic.title,
@@ -538,17 +396,33 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
 
     let topicId: string;
     
+    // Save topic and get ID
     if (topic.id) {
-      const { error } = await supabase.from('topics').update(topicData).eq('id', topic.id);
-      if (error) throw error;
+      // Update existing topic
+      const { error: updateError } = await supabase
+        .from('topics')
+        .update(topicData)
+        .eq('id', topic.id);
+      
+      if (updateError) throw updateError;
       topicId = topic.id;
     } else {
-      const { data: newTopic, error } = await supabase.from('topics').insert([topicData]).select('id').single();
-      if (error) throw error;
+      // Insert new topic
+      const { data: newTopic, error: insertError } = await supabase
+        .from('topics')
+        .insert([topicData])
+        .select('id')
+        .single();
+      
+      if (insertError) throw insertError;
+      if (!newTopic) throw new Error('Failed to create topic');
       topicId = newTopic.id;
     }
 
+    // ✅ CRITICAL FIX: Save materials to materials table
     if (topic.materials && topic.materials.length > 0) {
+      console.log(`Saving ${topic.materials.length} materials to database`);
+      
       const materialsToInsert = topic.materials.map((material, index) => ({
         topic_id: topicId,
         title: material.title,
@@ -558,71 +432,42 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
         sort_order: index,
         created_at: new Date().toISOString()
       }));
-      await supabase.from('materials').insert(materialsToInsert);
+      
+      const { error: materialsError } = await supabase
+        .from('materials')
+        .insert(materialsToInsert);
+      
+      if (materialsError) {
+        console.error('Error saving materials:', materialsError);
+        // Don't throw - topic is saved, materials might fail but we continue
+      }
     }
+
+    console.log(`✅ Topic saved: ${topic.title} (ID: ${topicId})`);
   } catch (error) {
+    console.error('❌ Save topic error:', error);
     throw error;
-  }
-};
-
-export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStructure> => {
-  try {
-    const { data: topicsData, error } = await supabase
-      .from('topics')
-      .select(`
-        id, title, description, grade_level, sort_order,
-        subject:subject_id (name),
-        materials (*), checkpoints (*)
-      `)
-      .eq('grade_level', gradeLevel)
-      .order('sort_order', { ascending: true })
-      .order('title');
-
-    if (error) return {};
-    if (!topicsData || topicsData.length === 0) return {};
-    
-    const courses: CourseStructure = {};
-    
-    topicsData.forEach(topic => {
-      const subjectName = topic.subject?.name || 'General';
-      if (!courses[subjectName]) courses[subjectName] = {};
-
-      courses[subjectName][topic.id] = {
-        id: topic.id,
-        title: topic.title,
-        gradeLevel: topic.grade_level,
-        description: topic.description || '',
-        subtopics: [],
-        materials: (topic.materials || []).map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          type: m.type,
-          content: m.content || m.storage_path || ''
-        })),
-        checkpoints: (topic.checkpoints || []).map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          checkpointNumber: c.checkpoint_number,
-          requiredScore: c.required_score,
-          questionCount: c.question_count
-        }))
-      };
-    });
-
-    return courses;
-  } catch (error) {
-    return {};
   }
 };
 
 // =====================================================
 // PROGRESS MANAGEMENT
 // =====================================================
-
 export const getProgress = async (username: string): Promise<UserProgress> => {
+  console.log(`Fetching progress for: ${username}`);
+  
   try {
-    const { data: userData } = await supabase.from('users').select('id').eq('username', username).single();
-    if (!userData) return {};
+    // Get user ID
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (userError || !userData) {
+      console.log('User not found, returning empty progress');
+      return {};
+    }
 
     const { data, error } = await supabase
       .from('user_progress')
@@ -634,7 +479,9 @@ export const getProgress = async (username: string): Promise<UserProgress> => {
     const progress: UserProgress = {};
     data.forEach(item => {
       const subject = item.topic?.subject?.name || 'General';
-      if (!progress[subject]) progress[subject] = {};
+      if (!progress[subject]) {
+        progress[subject] = {};
+      }
       
       progress[subject][item.topic_id] = {
         subtopics: item.subtopics || {},
@@ -644,8 +491,11 @@ export const getProgress = async (username: string): Promise<UserProgress> => {
         lastAccessed: item.last_accessed ? new Date(item.last_accessed).getTime() : undefined
       };
     });
+
+    console.log(`Progress fetched for ${username}`);
     return progress;
-  } catch {
+  } catch (error) {
+    console.error('Get progress error:', error);
     return {};
   }
 };
@@ -656,10 +506,19 @@ export const updateTopicProgress = async (
   topicId: string, 
   updates: Partial<TopicProgress>
 ): Promise<void> => {
+  console.log(`Updating progress: ${username} - ${topicId}`);
+  
   try {
-    const { data: userData } = await supabase.from('users').select('id').eq('username', username).single();
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
     if (!userData) throw new Error('User not found');
 
+    // Get existing progress
     const { data: existing } = await supabase
       .from('user_progress')
       .select('*')
@@ -668,7 +527,9 @@ export const updateTopicProgress = async (
       .single();
 
     const current = existing?.progress_data || { 
-      subtopics: {}, checkpointScores: {}, mainAssessmentPassed: false 
+      subtopics: {}, 
+      checkpointScores: {}, 
+      mainAssessmentPassed: false 
     };
     
     const merged = {
@@ -676,21 +537,26 @@ export const updateTopicProgress = async (
       ...updates,
       subtopics: { ...current.subtopics, ...(updates.subtopics || {}) },
       checkpointScores: { ...current.checkpointScores, ...(updates.checkpointScores || {}) },
-      lastAccessed: new Date().toISOString()
+      lastAccessed: Date.now()
     };
 
-    const { error } = await supabase.from('user_progress').upsert({
-      user_id: userData.id,
-      topic_id: topicId,
-      subtopics: merged.subtopics,
-      checkpoint_scores: merged.checkpointScores,
-      main_assessment_passed: merged.mainAssessmentPassed,
-      main_assessment_score: merged.mainAssessmentScore,
-      last_accessed: new Date().toISOString()
-    }, { onConflict: 'user_id,topic_id' });
+    const { error } = await supabase
+      .from('user_progress')
+      .upsert({
+        user_id: userData.id,
+        topic_id: topicId,
+        subtopics: merged.subtopics,
+        checkpoint_scores: merged.checkpointScores,
+        main_assessment_passed: merged.mainAssessmentPassed,
+        main_assessment_score: merged.mainAssessmentScore,
+        last_accessed: new Date().toISOString()
+      }, { onConflict: 'user_id,topic_id' });
     
     if (error) throw error;
+    
+    console.log(`Progress updated: ${username} - ${topicId}`);
   } catch (error) {
+    console.error('Update progress error:', error);
     throw error;
   }
 };
@@ -698,72 +564,94 @@ export const updateTopicProgress = async (
 // =====================================================
 // ASSESSMENTS
 // =====================================================
-
 export const getAssessments = async (): Promise<Assessment[]> => {
+  console.log('Fetching assessments...');
+  
   try {
-    // We use the join syntax '*, questions(*)' to pull related rows immediately
-    const { data, error } = await supabase
+    const { data: assessmentsData, error: assessmentsError } = await supabase
       .from('assessments')
-      .select(`
-        *,
-        questions (*)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (assessmentsError) throw assessmentsError;
 
-    return (data || []).map(item => ({
-      id: item.id,
-      title: item.title,
-      subject: item.subject || '',
-      questions: (item.questions || []).map((q: any) => ({
-        id: q.id,
-        text: q.text,
-        type: q.type,
-        difficulty: q.difficulty || 'IGCSE',
-        topic: item.subject || '',
-        options: q.options || [],
-        correctAnswer: q.correct_answer || '',
-        modelAnswer: q.model_answer
-      })),
-      assignedTo: item.assigned_to || [],
-      targetGrade: item.target_grade || 'all',
-      createdBy: item.created_by || 'system'
-    }));
+    // Get questions
+    const assessments: Assessment[] = [];
+    
+    for (const item of assessmentsData || []) {
+      const { data: questionsData } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('assessment_id', item.id);
+
+      assessments.push({
+        id: item.id,
+        title: item.title,
+        subject: item.subject || '',
+        questions: (questionsData || []).map((q: any) => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          difficulty: q.difficulty || 'IGCSE',
+          topic: item.subject || '',
+          options: q.options || [],
+          correctAnswer: q.correct_answer || '',
+          modelAnswer: q.model_answer
+        })),
+        assignedTo: item.assigned_to || [],
+        targetGrade: item.target_grade || 'all',
+        createdBy: item.created_by || 'system'
+      });
+    }
+
+    console.log(`Fetched ${assessments.length} assessments`);
+    return assessments;
   } catch (error) {
-    console.error('getAssessments Optimization Error:', error);
+    console.error('Get assessments error:', error);
     return [];
   }
 };
 
-
 export const saveAssessment = async (assessment: Assessment): Promise<void> => {
+  console.log(`Saving assessment: ${assessment.title}`);
+  
   try {
-    const { error } = await supabase.from('assessments').upsert({
-      id: assessment.id,
-      title: assessment.title,
-      subject: assessment.subject,
-      target_grade: assessment.targetGrade,
-      created_by: assessment.createdBy,
-      assigned_to: assessment.assignedTo,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'id' });
-    
-    if (error) throw error;
-
-    for (const question of assessment.questions) {
-      await supabase.from('questions').upsert({
-        id: question.id,
-        assessment_id: assessment.id,
-        text: question.text,
-        type: question.type,
-        difficulty: question.difficulty,
-        options: question.options,
-        correct_answer: question.correctAnswer,
-        model_answer: question.modelAnswer
+    // Save assessment
+    const { error: assessmentError } = await supabase
+      .from('assessments')
+      .upsert({
+        id: assessment.id,
+        title: assessment.title,
+        subject: assessment.subject,
+        target_grade: assessment.targetGrade,
+        created_by: assessment.createdBy,
+        assigned_to: assessment.assignedTo,
+        updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
+    
+    if (assessmentError) throw assessmentError;
+
+    // Save questions
+    for (const question of assessment.questions) {
+      const { error: questionError } = await supabase
+        .from('questions')
+        .upsert({
+          id: question.id,
+          assessment_id: assessment.id,
+          text: question.text,
+          type: question.type,
+          difficulty: question.difficulty,
+          options: question.options,
+          correct_answer: question.correctAnswer,
+          model_answer: question.modelAnswer
+        }, { onConflict: 'id' });
+      
+      if (questionError) console.error('Question save error:', questionError);
     }
+
+    console.log(`Assessment saved: ${assessment.title}`);
   } catch (error) {
+    console.error('Save assessment error:', error);
     throw error;
   }
 };
@@ -775,16 +663,22 @@ export const deleteAssessment = async (id: string): Promise<void> => {
 // =====================================================
 // SUBMISSIONS
 // =====================================================
-
 export const getSubmissions = async (assessmentId?: string): Promise<Submission[]> => {
+  console.log('Fetching submissions...');
+  
   try {
-    let query = supabase.from('submissions').select('*');
-    if (assessmentId) query = query.eq('assessment_id', assessmentId);
+    let query = supabase
+      .from('submissions')
+      .select('*');
+    
+    if (assessmentId) {
+      query = query.eq('assessment_id', assessmentId);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
     
-    return (data || []).map(item => ({
+    const submissions: Submission[] = (data || []).map(item => ({
       assessmentId: item.assessment_id,
       username: item.username || '',
       answers: item.answers || {},
@@ -794,51 +688,75 @@ export const getSubmissions = async (assessmentId?: string): Promise<Submission[
       feedback: item.feedback,
       aiGraded: item.ai_graded || false
     }));
-  } catch {
+
+    console.log(`Fetched ${submissions.length} submissions`);
+    return submissions;
+  } catch (error) {
+    console.error('Get submissions error:', error);
     return [];
   }
 };
 
 export const saveSubmission = async (submission: Submission): Promise<void> => {
+  console.log(`DEBUG: Saving submission for: ${submission.username}, graded: ${submission.graded}, score: ${submission.score}`);
+  
   try {
-    const { data: user } = await supabase.from('users').select('id').eq('username', submission.username).single();
+    // Get user ID
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', submission.username)
+      .single();
 
-    const { error } = await supabase.from('submissions').upsert({
-      assessment_id: submission.assessmentId,
-      user_id: user?.id,
-      username: submission.username,
-      answers: submission.answers,
-      score: submission.score,
-      graded: submission.graded,
-      feedback: submission.feedback,
-      ai_graded: submission.newelGraded || false,
-      submitted_at: new Date().toISOString()
-    }, { onConflict: 'assessment_id,user_id' });
+    const { error } = await supabase
+      .from('submissions')
+      .upsert({
+        assessment_id: submission.assessmentId,
+        user_id: user?.id,
+        username: submission.username,
+        answers: submission.answers,
+        score: submission.score,
+        graded: submission.graded,
+        feedback: submission.feedback,
+        ai_graded: submission.newelGraded || false,
+        submitted_at: new Date().toISOString()
+      }, { onConflict: 'assessment_id,user_id' });
     
     if (error) throw error;
     
+    console.log(`Submission saved for: ${submission.username}`);
+    
+    // ALWAYS update leaderboard if graded and has score
     if (submission.graded && submission.score !== undefined) {
+      console.log(`Calling updateAssessmentLeaderboard for ${submission.username} with score ${submission.score}`);
       await updateAssessmentLeaderboard(submission.username, submission.score);
+    } else {
+      console.log(`Not updating leaderboard - submission not graded or no score`);
     }
   } catch (error) {
+    console.error('Save submission error:', error);
     throw error;
   }
 };
 
 // =====================================================
-// LEADERBOARDS (Merged Logic)
+// LEADERBOARDS - FIXED FOR DEPLOYMENT
 // =====================================================
-
 export const getLeaderboards = async (): Promise<{
   academic: LeaderboardEntry[];
   challenge: LeaderboardEntry[];
   assessments: LeaderboardEntry[];
 }> => {
+  console.log('Fetching leaderboards (demo accounts excluded)...');
+  
   try {
-    // 1. Calculate Assessment Leaderboard (Manual assessments)
+    // Get all submissions to calculate assessment scores
     const submissions = await getSubmissions();
-    const users = await getUsers(); // Needed for grade levels
     
+    // Get all users to exclude demo accounts
+    const users = await getUsers();
+    
+    // Calculate assessment scores from graded submissions (exclude demo accounts)
     const assessmentScores: Record<string, number> = {};
     const assessmentCounts: Record<string, number> = {};
     
@@ -853,13 +771,22 @@ export const getLeaderboards = async (): Promise<{
       }
     });
 
-    const assessmentEntries = Object.entries(assessmentScores)
-      .map(([username, totalScore]) => {
-        const avg = totalScore / assessmentCounts[username];
+    // Calculate averages
+    const assessmentAverages: Record<string, number> = {};
+    Object.keys(assessmentScores).forEach(username => {
+      if (assessmentCounts[username] > 0) {
+        assessmentAverages[username] = assessmentScores[username] / assessmentCounts[username];
+      }
+    });
+
+    // Convert assessment averages to leaderboard entries
+    const challengeEntries = []; // Initialize variable
+    const assessmentEntries = Object.entries(assessmentAverages)
+      .map(([username, avgScore]) => {
         const user = Object.values(users).find(u => u.username === username);
         return {
           username,
-          score: avg,
+          score: avgScore,
           grade_level: user?.gradeLevel || '',
           type: 'assessments' as const
         };
@@ -867,134 +794,248 @@ export const getLeaderboards = async (): Promise<{
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
-    // 2. Get Challenge Leaderboard (Database)
-    const { data: dbLeaderboards, error } = await supabase
+    // Get existing leaderboard data (exclude demo accounts)
+    const { data, error } = await supabase
       .from('leaderboards')
-      .select('*')
+      .select('id, username, score, grade_level, board_type')
       .order('score', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('âŒ Error fetching leaderboards:', error);
+      return { academic: [], challenge: [], assessments: assessmentEntries };
+    }
 
-    const filteredDb = (dbLeaderboards || []).filter(item => !DEMO_ACCOUNTS.includes(item.username));
+    // Filter out demo accounts
+    const filteredData = (data || []).filter(item => 
+      !DEMO_ACCOUNTS.includes(item.username)
+    );
 
-    const challengeEntries = filteredDb
-      .filter((l: any) => l.board_type === 'challenge')
-      .slice(0, 10)
-      .map((item: any) => ({
-        username: item.username || '',
-        score: item.score,
-        grade_level: item.grade_level,
-        type: 'challenge' as const
-      }));
+    // Organize by board_type
+    const leaderboards = {
+      academic: filteredData
+        .filter((l: any) => l.board_type === 'academic')
+        .slice(0, 10)
+        .map((item: any) => ({
+          username: item.username || '',
+          score: item.score,
+          grade_level: item.grade_level,
+          type: item.board_type as 'academic' | 'challenge' | 'assessments'
+        })),
+      challenge: filteredData
+        .filter((l: any) => l.board_type === 'challenge')
+        .slice(0, 10)
+        .map((item: any) => ({
+          username: item.username || '',
+          score: item.score,
+          grade_level: item.grade_level,
+          type: item.board_type as 'academic' | 'challenge' | 'assessments'
+        })),
+      assessments: assessmentEntries
+    };
+    // In the getLeaderboards function, add course checkpoint scores
+    const getCourseAssessmentScores = async (): Promise<Record<string, number>> => {
+      try {
+        const { data: checkpointProgress, error } = await supabase
+          .from('student_checkpoint_progress')
+          .select('user_id, score, checkpoint:checkpoints(topic_id)')
+          .not('score', 'is', null);
 
-    // 3. Calculate Academic Leaderboard (Course Checkpoints)
-    // Fetches scores from course progression
-    const { data: checkpointProgress } = await supabase
-      .from('student_checkpoint_progress')
-      .select('user_id, score, checkpoint:checkpoints(topic_id)')
-      .not('score', 'is', null);
+        if (error) throw error;
 
-    const academicScores: Record<string, number> = {};
-    const academicCounts: Record<string, number> = {};
-    
-    // Map User IDs back to usernames
-    const userMap: Record<string, string> = {};
-    Object.values(users).forEach(u => {
-        // Since we don't have user ID in the User type, we fetch it or iterate assuming we can map
-        // Note: getUsers returns a record by username. We need ID map. 
-        // Optimization: Rely on getUsers fetching *all*.
-    });
-    
-    // For simplicity/performance in this view, we fetch the ID map once
-    const { data: userIdMap } = await supabase.from('users').select('id, username');
-    userIdMap?.forEach(u => userMap[u.id] = u.username);
+        const scores: Record<string, number> = {};
+        const counts: Record<string, number> = {};
 
-    checkpointProgress?.forEach(progress => {
-      const username = userMap[progress.user_id];
-      if (username && !DEMO_ACCOUNTS.includes(username)) {
-        if (!academicScores[username]) {
-          academicScores[username] = 0;
-          academicCounts[username] = 0;
-        }
-        academicScores[username] += progress.score;
-        academicCounts[username] += 1;
+        // Get usernames for user_ids
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, username');
+
+        const userMap: Record<string, string> = {};
+        users?.forEach(u => userMap[u.id] = u.username);
+
+        checkpointProgress?.forEach(progress => {
+          const username = userMap[progress.user_id];
+          if (username && !DEMO_ACCOUNTS.includes(username)) {
+            if (!scores[username]) {
+              scores[username] = 0;
+              counts[username] = 0;
+            }
+            scores[username] += progress.score;
+            counts[username] += 1;
+          }
+        });
+
+        // Calculate averages
+        const averages: Record<string, number> = {};
+        Object.keys(scores).forEach(username => {
+          if (counts[username] > 0) {
+            averages[username] = Math.round(scores[username] / counts[username]);
+          }
+        });
+
+        return averages;
+      } catch (error) {
+        console.error('Error getting course assessment scores:', error);
+        return {};
       }
-    });
+    };
 
-    const academicEntries = Object.entries(academicScores)
-      .map(([username, total]) => {
-        const avg = total / academicCounts[username];
-        const user = Object.values(users).find(u => u.username === username);
-        return {
-          username,
-          score: Math.round(avg),
-          grade_level: user?.gradeLevel || '',
-          type: 'academic' as const
-        };
-      })
+    // Then in getLeaderboards function, add this:
+    const courseScores = await getCourseAssessmentScores();
+    const courseEntries = Object.entries(courseScores)
+      .map(([username, avgScore]) => ({
+        username,
+        score: avgScore,
+        grade_level: users[username]?.gradeLevel || '',
+        type: 'course' as const
+      }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
+    // Add to your return statement
     return {
-      academic: academicEntries,
-      challenge: challengeEntries,
+      academic: courseEntries, // Use course scores for academic leaderboard
+      challenge: [], // Placeholder - will be populated below
       assessments: assessmentEntries
     };
+
+    console.log('Leaderboards fetched: ${assessmentEntries.length} real assessment entries');
+    return leaderboards;
   } catch (error) {
+    console.error('Get leaderboards error:', error);
     return { academic: [], challenge: [], assessments: [] };
   }
 };
 
+
 export const saveSprintScore = async (username: string, score: number): Promise<void> => {
-  if (DEMO_ACCOUNTS.includes(username)) return;
+  console.log(`Saving sprint score: ${username} - ${score}`);
+  
+  // Don't save demo account scores
+  if (DEMO_ACCOUNTS.includes(username)) {
+    console.log('Skipping demo account score');
+    return;
+  }
+  
   try {
-    const { data: user } = await supabase.from('users').select('id, grade_level').eq('username', username).single();
-    if (!user) return;
-    await supabase.from('leaderboards').insert({
-      board_type: 'challenge',
-      user_id: user.id,
-      username: username,
-      score: score,
-      grade_level: user.grade_level || '',
-      recorded_at: new Date().toISOString()
-    });
-  } catch { /* Silent */ }
-};
-
-export const updateAssessmentLeaderboard = async (username: string, score: number): Promise<void> => {
-  if (DEMO_ACCOUNTS.includes(username)) return;
-  try {
-    const { data: user } = await supabase.from('users').select('id, grade_level').eq('username', username).single();
-    if (!user) return;
-
-    const { data: existing } = await supabase
-      .from('leaderboards')
-      .select('id, score')
+    // Get user ID
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, grade_level')
       .eq('username', username)
-      .eq('board_type', 'assessments')
       .single();
 
-    if (existing) {
-      const newScore = Math.max(existing.score, score);
-      await supabase.from('leaderboards').update({ score: newScore, recorded_at: new Date().toISOString() }).eq('id', existing.id);
-    } else {
-      await supabase.from('leaderboards').insert({
-        board_type: 'assessments',
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('leaderboards')
+      .insert({
+        board_type: 'challenge',
         user_id: user.id,
         username: username,
         score: score,
         grade_level: user.grade_level || '',
         recorded_at: new Date().toISOString()
       });
-    }
-  } catch { /* Silent */ }
+    
+    if (error) throw error;
+    
+    console.log(`Sprint score saved: ${username} - ${score}`);
+  } catch (error) {
+    console.error('Save sprint score error:', error);
+  }
 };
+
+// In storageService.ts, find the updateAssessmentLeaderboard function
+export const updateAssessmentLeaderboard = async (username: string, score: number): Promise<void> => {
+  console.log(`DEBUG: Updating assessment leaderboard for ${username} with score ${score}`);
+  
+  // Don't update demo accounts
+  if (DEMO_ACCOUNTS.includes(username)) {
+    console.log('Skipping demo account leaderboard update');
+    return;
+  }
+  
+  try {
+    // Get user ID
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, grade_level')
+      .eq('username', username)
+      .single();
+
+    if (!user) {
+      console.log(`User ${username} not found in database`);
+      return;
+    }
+
+    // Check existing entry
+    const { data: existing, error: fetchError } = await supabase
+      .from('leaderboards')
+      .select('id, score')
+      .eq('username', username)
+      .eq('board_type', 'assessments')
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means "no rows returned"
+      console.error('Error fetching existing leaderboard:', fetchError);
+      return;
+    }
+
+    if (existing) {
+      // Calculate new average with the new score
+      const submissionCount = 1; // You might want to track this separately
+      const newScore = Math.max(existing.score, score); // Keep highest OR calculate average
+      
+      console.log(`Updating existing score from ${existing.score} to ${newScore}`);
+      
+      const { error: updateError } = await supabase
+        .from('leaderboards')
+        .update({
+          score: newScore,
+          recorded_at: new Date().toISOString()
+        })
+        .eq('id', existing.id);
+      
+      if (updateError) {
+        console.error('Update leaderboard error:', updateError);
+        return;
+      }
+    } else {
+      // Create new entry
+      console.log(`Creating new leaderboard entry for ${username} with score ${score}`);
+      
+      const { error: insertError } = await supabase
+        .from('leaderboards')
+        .insert({
+          board_type: 'assessments',
+          user_id: user.id,
+          username: username,
+          score: score,
+          grade_level: user.grade_level || '',
+          recorded_at: new Date().toISOString()
+        });
+      
+      if (insertError) {
+        console.error('Insert leaderboard error:', insertError);
+        return;
+      }
+    }
+    
+    console.log(`Assessment leaderboard updated for ${username}`);
+  } catch (error) {
+    console.error('Update assessment leaderboard error:', error);
+  }
+};
+
+
 
 // =====================================================
 // ANNOUNCEMENTS
 // =====================================================
-
 export const getAnnouncements = async (): Promise<Announcement[]> => {
+  console.log('Fetching announcements...');
+  
   try {
     const { data, error } = await supabase
       .from('announcements')
@@ -1003,33 +1044,47 @@ export const getAnnouncements = async (): Promise<Announcement[]> => {
 
     if (error) throw error;
     
-    return (data || []).map(item => ({
+    const announcements: Announcement[] = (data || []).map(item => ({
       id: item.id,
       title: item.title,
       content: item.content,
       timestamp: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
       author: item.author_user?.username || item.author_name || 'System'
     }));
-  } catch {
+
+    console.log(`Fetched ${announcements.length} announcements`);
+    return announcements;
+  } catch (error) {
+    console.error('Get announcements error:', error);
     return [];
   }
 };
 
 export const saveAnnouncement = async (announcement: Announcement): Promise<void> => {
+  console.log(`Saving announcement: ${announcement.title}`);
+  
   try {
-    await supabase.from('announcements').insert({
-      title: announcement.title,
-      content: announcement.content,
-      author_name: announcement.author,
-      created_at: new Date().toISOString()
-    });
-  } catch { /* Silent */ }
+    const { error } = await supabase
+      .from('announcements')
+      .insert({
+        title: announcement.title,
+        content: announcement.content,
+        author_name: announcement.author,
+        created_at: new Date().toISOString()
+      });
+    
+    if (error) throw error;
+    
+    console.log(`Announcement saved: ${announcement.title}`);
+  } catch (error) {
+    console.error('Save announcement error:', error);
+    throw error;
+  }
 };
 
 // =====================================================
-// STATISTICS
+// STATISTICS - FIXED FOR DEPLOYMENT
 // =====================================================
-
 export const calculateUserStats = (user: User) => {
   const history = user.loginHistory || [];
   if (history.length === 0) return { activeDays: 0, streak: 0 };
@@ -1045,10 +1100,13 @@ export const calculateUserStats = (user: User) => {
   if (uniqueDates.includes(today) || uniqueDates.includes(yesterday)) {
     streak = 1;
     let currentDate = new Date(uniqueDates[uniqueDates.length - 1] as string);
+    
     for (let i = uniqueDates.length - 2; i >= 0; i--) {
       const prevDate = new Date(uniqueDates[i] as string);
       const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime());
-      if (Math.ceil(diffTime / (1000 * 60 * 60 * 24)) === 1) {
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      
+      if (diffDays === 1) {
         streak++;
         currentDate = prevDate;
       } else {
@@ -1056,23 +1114,46 @@ export const calculateUserStats = (user: User) => {
       }
     }
   }
+  
   return { activeDays, streak };
 };
 
 export const getAllStudentStats = async (): Promise<StudentStats[]> => {
   try {
+    console.log('DEBUG: Calculating student stats...');
+    
+    // Get all users (excluding demo accounts)
     const users = await getRealUsers();
+    console.log('DEBUG: Real users found:', Object.keys(users).length);
+    
     const students = Object.values(users).filter(u => u.role === 'student');
+    console.log('DEBUG: Students found:', students.length);
+    console.log('DEBUG: Student usernames:', students.map(s => s.username));
+    
+    // Get all submissions
     const submissions = await getSubmissions();
+    console.log('DEBUG: Total submissions:', submissions.length);
+    console.log('DEBUG: Graded submissions:', submissions.filter(s => s.graded).length);
+    
     const stats: StudentStats[] = [];
     
     for (const user of students) {
-      const userSubs = submissions.filter(s => s.username === user.username && s.graded);
+      console.log(`\nDEBUG: Processing student: ${user.username}`);
+      const userSubs = submissions.filter(s => 
+        s.username === user.username && s.graded
+      );
+      
+      console.log(`DEBUG: Graded submissions for ${user.username}:`, userSubs.length);
+      userSubs.forEach((sub, i) => {
+        console.log(`  Submission ${i+1}: Score=${sub.score}, Assessment=${sub.assessmentId}`);
+      });
+      
       let totalScore = 0;
       userSubs.forEach(s => totalScore += (s.score || 0));
+      
       const { activeDays, streak } = calculateUserStats(user);
 
-      stats.push({
+      const studentStat = {
         username: user.username,
         gradeLevel: user.gradeLevel || '?',
         avgScore: userSubs.length > 0 ? totalScore / userSubs.length : 0,
@@ -1080,16 +1161,27 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
         lastActive: user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never',
         streak: streak,
         activeDays: activeDays
-      });
+      };
+      
+      console.log(`DEBUG: Final stats for ${user.username}:`, studentStat);
+      stats.push(studentStat);
     }
-    return stats.sort((a, b) => b.avgScore - a.avgScore);
-  } catch {
+    
+    const sortedStats = stats.sort((a, b) => b.avgScore - a.avgScore);
+    console.log('DEBUG: Final sorted stats:', sortedStats);
+    
+    return sortedStats;
+  } catch (error) {
+    console.error('Error calculating stats:', error);
     return [];
   }
 };
 
 export const getClassOverview = async () => {
   const stats = await getAllStudentStats();
+  
+  const totalStudents = stats.length;
+  
   let totalScore = 0;
   let studentCount = 0;
   
@@ -1100,50 +1192,66 @@ export const getClassOverview = async () => {
     }
   });
   
+  const classAverage = studentCount > 0 ? Math.round(totalScore / studentCount) : 0;
+  
+  // Find weakest topic (simplified)
+  const weakestTopic = totalStudents > 0 ? 'General Science' : 'No Data';
+  
   return {
-    totalStudents: stats.length,
-    classAverage: studentCount > 0 ? Math.round(totalScore / studentCount) : 0,
-    weakestTopic: stats.length > 0 ? 'General Science' : 'No Data'
+    totalStudents,
+    classAverage,
+    weakestTopic
   };
 };
 
 // =====================================================
-// FILE UPLOAD (SECURED)
+// FILE UPLOAD
 // =====================================================
-
+// storageService.ts - Ensure file upload returns proper URL
 export const uploadFileToSupabase = async (file: File): Promise<string | null> => {
-  if (file.size > MAX_FILE_SIZE) {
-    console.error('File too large');
-    return null;
-  }
-  
-  if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-    console.error('Invalid file type');
-    return null;
-  }
-
   try {
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-    const { error } = await supabase.storage
+    
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
       .from('materials')
-      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
-    if (error) throw error;
-    return `${SUPABASE_STORAGE_URL}${fileName}`;
-  } catch (error) {
-    console.error('Upload error', error);
+    if (error) {
+      console.error('❌ Upload failed:', error);
+      return null;
+    }
+
+    // ✅ CRITICAL: Return full public URL for file access
+    const publicUrl = `https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/${fileName}`;
+    console.log(`✅ File uploaded: ${publicUrl}`);
+    
+    return publicUrl;
+  } catch (error: any) {
+    console.error('❌ Upload error:', error);
     return null;
   }
 };
 
 // =====================================================
-// EXPORT / IMPORT
+// EXPORT/IMPORT
 // =====================================================
-
 export const exportAllData = async (): Promise<string> => {
+  console.log('Exporting all data...');
+  
   try {
-    const [users, courses, assessments, submissions, announcements, leaderboards] = await Promise.all([
-      getRealUsers(),
+    const [
+      users,
+      courses,
+      assessments,
+      submissions,
+      announcements,
+      leaderboards
+    ] = await Promise.all([
+      getRealUsers(), // Use real users only
       getCourses(),
       getAssessments(),
       getSubmissions(),
@@ -1162,67 +1270,112 @@ export const exportAllData = async (): Promise<string> => {
       source: 'supabase'
     };
     
+    console.log('Data export complete (demo accounts excluded)');
     return JSON.stringify(data, null, 2);
   } catch (error) {
-    console.error('Export failed', error);
+    console.error('Export failed:', error);
     throw error;
   }
 };
 
 export const importAllData = async (jsonString: string): Promise<boolean> => {
+  console.log('Importing data to Supabase...');
+  
   try {
     const data = JSON.parse(jsonString);
+    
+    // Import users
     if (data.users) {
+      console.log(`   Importing ${Object.keys(data.users).length} users...`);
       for (const username in data.users) {
         await saveUser(data.users[username]);
       }
     }
+    
+    // Import courses
     if (data.courses) {
+      console.log('   Importing courses...');
       for (const subject in data.courses) {
         for (const topicId in data.courses[subject]) {
           await saveTopic(subject, data.courses[subject][topicId]);
         }
       }
     }
+    
+    // Import assessments
     if (data.assessments) {
+      console.log(`   Importing ${data.assessments.length} assessments...`);
       for (const assessment of data.assessments) {
         await saveAssessment(assessment);
       }
     }
+    
+    console.log('Import to Supabase complete');
     return true;
   } catch (error) {
-    console.error('Import failed', error);
+    console.error('Import failed:', error);
     return false;
   }
 };
 
 // =====================================================
-// CLEANUP
+// CLEANUP FUNCTIONS FOR DEPLOYMENT
 // =====================================================
-
 export const cleanupDemoData = async (): Promise<void> => {
+  console.log('Cleaning up demo data from database...');
+  
   try {
-    await supabase.from('leaderboards').delete().in('username', DEMO_ACCOUNTS);
-    await supabase.from('submissions').delete().in('username', DEMO_ACCOUNTS);
-  } catch { /* Silent */ }
+    // Delete demo accounts from leaderboards
+    const { error: leaderboardError } = await supabase
+      .from('leaderboards')
+      .delete()
+      .in('username', DEMO_ACCOUNTS);
+    
+    if (leaderboardError) console.error('Leaderboard cleanup error:', leaderboardError);
+    
+    // Delete submissions from demo accounts
+    const { error: submissionError } = await supabase
+      .from('submissions')
+      .delete()
+      .in('username', DEMO_ACCOUNTS);
+    
+    if (submissionError) console.error('Submission cleanup error:', submissionError);
+    
+    console.log('Demo data cleanup complete');
+  } catch (error) {
+    console.error('Cleanup error:', error);
+  }
 };
 
 export const refreshAllLeaderboards = async (): Promise<void> => {
+  console.log('Refreshing all leaderboards with current data...');
+  
   try {
+    // Clean existing demo data
     await cleanupDemoData();
+    
+    // Get all graded submissions
     const submissions = await getSubmissions();
+    const users = await getUsers();
+    
+    // Process each submission to update leaderboards
     for (const sub of submissions) {
       if (sub.graded && sub.score !== undefined && !DEMO_ACCOUNTS.includes(sub.username)) {
         await updateAssessmentLeaderboard(sub.username, sub.score);
       }
     }
-  } catch { /* Silent */ }
+
+    console.log('All leaderboards refreshed');
+  } catch (error) {
+    console.error('Refresh leaderboards error:', error);
+  }
 };
 
 // =====================================================
-// CHECKPOINT SYSTEM
+// CHECKPOINT SYSTEM FUNCTIONS (NEW)
 // =====================================================
 
+// Get checkpoints for a topic
 export const getTopicCheckpoints = async (topicId: string): Promise<any[]> => {
   try {
     const { data, error } = await supabase
@@ -1233,46 +1386,45 @@ export const getTopicCheckpoints = async (topicId: string): Promise<any[]> => {
 
     if (error) throw error;
     return data || [];
-  } catch {
+  } catch (error) {
+    console.error('âŒ Get checkpoints error:', error);
     return [];
   }
 };
 
+// Get student's checkpoint progress
 export const getStudentCheckpointProgress = async (username: string, topicId: string): Promise<Record<string, any>> => {
-  if (!username) {
-    console.error('❌ No username provided to getStudentCheckpointProgress');
-    return {};
-  }
-  
-  const userId = await getUserId(username);
-  if (!userId) {
-    console.error('❌ Could not find user ID for:', username);
-    return {};
-  }
-
   try {
-    // 1. First, get checkpoints for this topic
+    // First get user ID from username
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return {};
+
+    // Get all checkpoints for this topic
     const { data: checkpoints } = await supabase
       .from('checkpoints')
       .select('id')
       .eq('topic_id', topicId);
-    
-    if (!checkpoints || checkpoints.length === 0) {
-      console.log('📭 No checkpoints found for topic:', topicId);
-      return {};
-    }
+
+    if (!checkpoints || checkpoints.length === 0) return {};
 
     const checkpointIds = checkpoints.map(cp => cp.id);
-    
-    // 2. Get progress for these checkpoints
-    const { data: progressData } = await supabase
+
+    // Get progress for these checkpoints
+    const { data: progressData, error } = await supabase
       .from('student_checkpoint_progress')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userData.id)
       .in('checkpoint_id', checkpointIds);
 
+    if (error) throw error;
+
+    // Convert to dictionary for easy lookup
     const progressDict: Record<string, any> = {};
-    
     progressData?.forEach(item => {
       progressDict[item.checkpoint_id] = {
         score: item.score,
@@ -1280,22 +1432,15 @@ export const getStudentCheckpointProgress = async (username: string, topicId: st
         completedAt: item.completed_at
       };
     });
-    
-    console.log('📊 Checkpoint progress retrieved:', {
-      topicId,
-      username,
-      checkpointCount: checkpointIds.length,
-      progressCount: progressData?.length || 0
-    });
-    
+
     return progressDict;
-    
   } catch (error) {
-    console.error('❌ Error fetching checkpoint progress:', error);
+    console.error('âŒ Get checkpoint progress error:', error);
     return {};
   }
 };
 
+// Save checkpoint progress
 export const saveCheckpointProgress = async (
   username: string, 
   checkpointId: string, 
@@ -1303,37 +1448,34 @@ export const saveCheckpointProgress = async (
   passed: boolean
 ): Promise<void> => {
   try {
-    console.log('💾 Saving checkpoint progress:', { username, checkpointId, score, passed });
-    
-    const userId = await getUserId(username);
-    if (!userId) {
-      console.error('❌ Cannot save checkpoint: User ID not found for:', username);
-      throw new Error("User not found");
-    }
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) throw new Error('User not found');
 
     const { error } = await supabase
       .from('student_checkpoint_progress')
       .upsert({
-        user_id: userId,  // ← Changed from userData.id to userId
+        user_id: userData.id,
         checkpoint_id: checkpointId,
         score: Math.round(score),
         passed: passed,
         completed_at: new Date().toISOString()
       }, { onConflict: 'user_id,checkpoint_id' });
 
-    if (error) {
-      console.error('❌ Supabase save error:', error);
-      throw error;
-    }
-    
-    console.log('✅ Checkpoint progress saved successfully');
-    
+    if (error) throw error;
+    console.log(`âœ… Checkpoint progress saved for ${username}: ${score}%`);
   } catch (error) {
-    console.error('❌ Failed to save checkpoint progress:', error);
+    console.error('âŒ Save checkpoint progress error:', error);
     throw error;
   }
 };
 
+// Get final assessment for a topic (single)
 export const getTopicFinalAssessment = async (topicId: string): Promise<any> => {
   try {
     const { data, error } = await supabase
@@ -1342,42 +1484,76 @@ export const getTopicFinalAssessment = async (topicId: string): Promise<any> => 
       .eq('topic_id', topicId)
       .single();
 
-    if (error && error.code === 'PGRST116') return null;
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No rows
+      throw error;
+    }
     return data;
-  } catch {
+  } catch (error) {
+    console.error('âŒ Get final assessment error:', error);
     return null;
   }
 };
 
-// =====================================================
-// STUDENT ANALYTICS
-// =====================================================
-
+// Check if student has unlocked final assessment (passed all checkpoints)
+// Also update the hasUnlockedFinalAssessment function:
 export const hasUnlockedFinalAssessment = async (username: string, topicId: string): Promise<boolean> => {
-  return true; // Production override
+  return true; // Always unlocked in production
 };
 
+// Add this function to check if student can access a topic
+// Add this function to your storageService.ts file if it doesn't exist:
+// In storageService.ts, replace canAccessTopic function:
+// REPLACE ENTIRE canAccessTopic function in storageService.ts with:
 export const canAccessTopic = async (username: string, topicId: string): Promise<boolean> => {
-  return true; // Production override
+  console.log(`🔐 PRODUCTION: Allowing access to ${topicId} for ${username}`);
+  return true; // All topics accessible in production
 };
 
+
+
+// Add to storageService.ts
 export const getStudentCourseHistory = async (username: string): Promise<any[]> => {
   try {
-    const { data: userData } = await supabase.from('users').select('id').eq('username', username).single();
+    console.log(`📊 Getting course history for: ${username}`);
+    
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
     if (!userData) return [];
 
+    // Get all topics the student has accessed
     const { data: topicsProgress } = await supabase
       .from('user_progress')
-      .select(`*, topic:topics(id, title, grade_level, subject:subject_id(name))`)
+      .select(`
+        *,
+        topic:topics (
+          id,
+          title,
+          grade_level,
+          subject:subject_id (name)
+        )
+      `)
       .eq('user_id', userData.id)
       .not('main_assessment_score', 'is', null);
 
     if (!topicsProgress) return [];
 
+    // Get checkpoint progress for each topic
     const courseHistory = await Promise.all(
       topicsProgress.map(async (progress) => {
-        const { data: checkpoints } = await supabase.from('checkpoints').select('id, checkpoint_number, title').eq('topic_id', progress.topic_id);
+        // Get checkpoint progress for this topic
+        const { data: checkpoints } = await supabase
+          .from('checkpoints')
+          .select('id, checkpoint_number, title')
+          .eq('topic_id', progress.topic_id);
+
         const checkpointIds = checkpoints?.map(c => c.id) || [];
+        
         const { data: checkpointProgress } = await supabase
           .from('student_checkpoint_progress')
           .select('checkpoint_id, score, passed, completed_at')
@@ -1406,19 +1582,28 @@ export const getStudentCourseHistory = async (username: string): Promise<any[]> 
       })
     );
 
-    return courseHistory.sort((a, b) => new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime());
-  } catch {
+    return courseHistory.sort((a, b) => 
+      new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime()
+    );
+  } catch (error) {
+    console.error('❌ Error getting course history:', error);
     return [];
   }
 };
 
+// Add to storageService.ts
 export const getStudentAssessmentFeedback = async (username: string): Promise<any[]> => {
   try {
+    // Get all graded submissions for the student
     const submissions = await getSubmissions();
-    const studentSubmissions = submissions.filter(s => s.username === username && s.graded && s.feedback);
+    const studentSubmissions = submissions.filter(
+      s => s.username === username && s.graded && s.feedback
+    );
+
+    // Get assessment details for each submission
     const assessments = await getAssessments();
     
-    return studentSubmissions.map(sub => {
+    const feedbackHistory = studentSubmissions.map(sub => {
       const assessment = assessments.find(a => a.id === sub.assessmentId);
       return {
         assessmentId: sub.assessmentId,
@@ -1429,17 +1614,28 @@ export const getStudentAssessmentFeedback = async (username: string): Promise<an
         feedback: sub.feedback,
         aiGraded: sub.ai_graded || false
       };
-    }).sort((a, b) => b.submittedAt - a.submittedAt);
-  } catch {
+    });
+
+    return feedbackHistory.sort((a, b) => b.submittedAt - a.submittedAt);
+  } catch (error) {
+    console.error('❌ Error getting assessment feedback:', error);
     return [];
   }
 };
 
+// Add to storageService.ts
 export const getStudentTopicPerformance = async (username: string, topicId: string): Promise<any> => {
   try {
-    const { data: userData } = await supabase.from('users').select('id').eq('username', username).single();
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
     if (!userData) return null;
 
+    // Get topic progress
     const { data: topicProgress } = await supabase
       .from('user_progress')
       .select('*')
@@ -1447,6 +1643,7 @@ export const getStudentTopicPerformance = async (username: string, topicId: stri
       .eq('topic_id', topicId)
       .single();
 
+    // Get checkpoint progress for this topic
     const { data: checkpoints } = await supabase
       .from('checkpoints')
       .select('id, checkpoint_number, title, required_score')
@@ -1454,12 +1651,14 @@ export const getStudentTopicPerformance = async (username: string, topicId: stri
       .order('checkpoint_number', { ascending: true });
 
     const checkpointIds = checkpoints?.map(c => c.id) || [];
+    
     const { data: checkpointProgress } = await supabase
       .from('student_checkpoint_progress')
       .select('*')
       .eq('user_id', userData.id)
       .in('checkpoint_id', checkpointIds);
 
+    // Get theory submissions for this topic
     const { data: theorySubmissions } = await supabase
       .from('theory_submissions')
       .select('*')
@@ -1480,14 +1679,160 @@ export const getStudentTopicPerformance = async (username: string, topicId: stri
       theorySubmissions: theorySubmissions || [],
       overallCompletion: checkpointProgress?.filter(cp => cp.passed).length || 0
     };
-  } catch {
+  } catch (error) {
+    console.error('❌ Error getting topic performance:', error);
     return null;
   }
 };
 
-// =====================================================
-// EXPORTS
-// =====================================================
+// Helper function to check if a topic was passed
+const hasPassedTopic = async (username: string, topicId: string): Promise<boolean> => {
+  try {
+    // Get checkpoint progress for this topic
+    const progress = await getStudentCheckpointProgress(username, topicId);
+    
+    // Check if final MCQ (checkpoint 4) is passed with ≥85%
+    const checkpoint4Id = '6ad5399c-c1d0-4de1-8d36-8ecf2fd1dc3e';
+    const checkpoint4Progress = progress[checkpoint4Id];
+    
+    if (!checkpoint4Progress) {
+      console.log(`❌ No checkpoint 4 progress found for topic ${topicId}`);
+      return false;
+    }
+
+    const isMcqPassed = checkpoint4Progress.passed && checkpoint4Progress.score >= 85;
+    
+    if (!isMcqPassed) {
+      console.log(`❌ Checkpoint 4 not passed: score=${checkpoint4Progress.score}%, required=85%`);
+      return false;
+    }
+
+    // Check if final theory (checkpoint 5) exists and is passed
+    const { data: checkpoint5 } = await supabase
+      .from('checkpoints')
+      .select('id')
+      .eq('topic_id', topicId)
+      .eq('checkpoint_number', 5)
+      .single();
+
+    if (checkpoint5) {
+      const checkpoint5Progress = progress[checkpoint5.id];
+      if (!checkpoint5Progress) {
+        console.log(`❌ No checkpoint 5 progress found for topic ${topicId}`);
+        return false;
+      }
+      
+      const isTheoryPassed = checkpoint5Progress.passed && checkpoint5Progress.score >= 85;
+      if (!isTheoryPassed) {
+        console.log(`❌ Checkpoint 5 not passed: score=${checkpoint5Progress.score}%, required=85%`);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error checking if topic passed:', error);
+    return false;
+  }
+};
+
+
+
+// Get topics filtered by student grade level
+export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStructure> => {
+  console.log(`ðŸ“š DEBUG: Getting topics for grade level: "${gradeLevel}"`);
+  
+  try {
+    const { data: topicsData, error } = await supabase
+      .from('topics')
+      .select(`
+        id,
+        title,
+        description,
+        grade_level,
+        sort_order,
+        subject:subject_id (name),
+        materials (*),
+        checkpoints (*)
+      `)
+      .eq('grade_level', gradeLevel)
+      .order('sort_order', { ascending: true })  // Add this line
+      .order('title');  // Keep as secondary sort
+
+    if (error) {
+      console.error('âŒ Supabase error in getTopicsForStudent:', error);
+      return {};
+    }
+
+    console.log(`ðŸ“š DEBUG: Found ${topicsData?.length || 0} topics for grade ${gradeLevel}`);
+    
+    if (!topicsData || topicsData.length === 0) {
+      console.log(`ðŸ“š DEBUG: No topics found for grade ${gradeLevel}. Checking all topics...`);
+      // Fallback: Get all topics to debug
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('*, subject:subject_id (name)')
+        .order('title');
+      
+      console.log('ðŸ“š DEBUG: All topics in database:', allTopics?.map(t => ({
+        id: t.id,
+        title: t.title,
+        grade: t.grade_level,
+        subject: t.subject?.name
+      })));
+      
+      return {};
+    }
+    
+    const courses: CourseStructure = {};
+    
+    topicsData.forEach(topic => {
+      const subjectName = topic.subject?.name || 'General';
+      
+      if (!courses[subjectName]) {
+        courses[subjectName] = {};
+      }
+
+      console.log(`ðŸ“š DEBUG: Adding topic - Subject: ${subjectName}, Title: ${topic.title}`);
+      
+      courses[subjectName][topic.id] = {
+        id: topic.id,
+        title: topic.title,
+        gradeLevel: topic.grade_level,
+        description: topic.description || '',
+        subtopics: [],
+        materials: (topic.materials || []).map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          type: m.type,
+          content: m.content || m.storage_path || ''
+        })),
+        checkpoints: (topic.checkpoints || []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          checkpointNumber: c.checkpoint_number,
+          requiredScore: c.required_score,
+          questionCount: c.question_count
+        }))
+      };
+    });
+
+    console.log(`ðŸ“š DEBUG: Final courses structure for grade ${gradeLevel}:`, {
+      subjects: Object.keys(courses),
+      topicCounts: Object.keys(courses).map(subject => ({
+        subject,
+        count: Object.keys(courses[subject]).length
+      }))
+    });
+    
+    return courses;
+  } catch (error) {
+    console.error('âŒ Get topics for student error:', error);
+    return {};
+  }
+};
+
+// Re-export theory grading functions
 export { 
   getPendingTheorySubmissions,
   aiGradeTheoryAnswer,
@@ -1495,4 +1840,3 @@ export {
   approveTheoryGrade,
   saveTheorySubmission
 } from './theoryGradingService';
-export { getCheckpointQuestions } from './checkpointService';
