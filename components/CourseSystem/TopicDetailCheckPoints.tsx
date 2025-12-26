@@ -481,7 +481,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           checkpointId={activeCheckpoint.id}
           checkpointTitle={activeCheckpoint.title}
           questions={activeCheckpoint.questions}
-          passThreshold={activeCheckpoint.required_score || 85}
+          passThreshold={activeCheckpoint.required_score || 80}
           onComplete={(score, passed, results) => 
             handleCheckpointComplete(activeCheckpoint.id, score, passed, results)
           }
@@ -497,7 +497,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         <QuizInterface
           title={`${topic.title} - Final Assessment`}
           questions={finalAssessmentQuestions}
-          passThreshold={finalAssessment.pass_percentage || 85}
+          passThreshold={finalAssessment.pass_percentage || 80}
           onComplete={handleFinalAssessmentComplete}
           onClose={() => setActiveFinalQuiz(false)}
           isCourseFinal={true}
@@ -512,7 +512,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
     checkpointId={showReviewForCheckpoint}
     checkpointTitle={`Review: ${checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.title || 'Checkpoint'}`}
     questions={checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.questions || []}
-    passThreshold={checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.required_score || 85}
+    passThreshold={checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.required_score || 80}
     onComplete={() => {}} // No-op for review mode
     onClose={() => setShowReviewForCheckpoint(null)}
     username={user.username}
@@ -535,7 +535,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             <button onClick={() => setShowAiAsk(false)} className="text-white/50 hover:text-white"><ChevronRight /></button>
           </div>
           <div className="flex-grow overflow-y-auto mb-4 text-sm text-white/80 whitespace-pre-wrap">
-            {aiAnswer || <span className="opacity-50">Ask about {topic.title}...</span>}
+            {aiAnswer || <span className="opacity-50">Ask Newel about {topic.title}...</span>}
           </div>
           <div className="flex gap-2">
             <input 
@@ -634,7 +634,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                       <p className="text-sm text-white/60 mb-4">{checkpoint.title}</p>
                       {checkpoint.checkpoint_number === 4 && (
                         <div className="text-xs bg-cyan-900/20 text-cyan-300 p-2 rounded mb-3">
-                          Pass this (85%) to unlock Final Assessment
+                          Pass this (80%) to unlock Final Assessment
                         </div>
                       )}
                       

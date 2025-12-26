@@ -1,4 +1,4 @@
-import { supabase } from '../../services/supabaseClient';  // Add this line
+import { supabase } from '../../services/supabaseClient';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CourseStructure, Topic, Question, Material } from '../../types';
@@ -32,7 +32,7 @@ export const CourseManager: React.FC = () => {
     materialType: 'text', 
     materialContent: '',
     checkpointsRequired: 3,
-    checkpointPassPercentage: 85,
+    checkpointPassPercentage: 80,
     finalAssessmentRequired: true
   });
   const [createFile, setCreateFile] = useState<File | null>(null);
@@ -95,7 +95,7 @@ export const CourseManager: React.FC = () => {
       materialType: 'text', 
       materialContent: '',
       checkpointsRequired: 3,
-      checkpointPassPercentage: 85,
+      checkpointPassPercentage: 80,
       finalAssessmentRequired: true
     });
   };
@@ -142,178 +142,171 @@ export const CourseManager: React.FC = () => {
     }));
   };
 
-    const handleCreateTopic = async () => {
-      if (!createForm.title) {
-        alert('Topic Title required');
-        return;
-      }
-      
-      let materialContent = createForm.materialContent;
+  const handleCreateTopic = async () => {
+    if (!createForm.title) {
+      alert('Topic Title required');
+      return;
+    }
+    
+    let materialContent = createForm.materialContent;
 
-      if (createForm.materialType === 'file' && createFile) {
-        setIsUploading(true);
-        try {
-          const publicUrl = await uploadFileToSupabase(createFile);
-          if (!publicUrl) {
-            alert("Failed to upload file. Please try again.");
-            setIsUploading(false);
-            return;
-          }
-          materialContent = publicUrl;
-        } catch (error) {
-          console.error('Upload error:', error);
-          alert("Upload failed. Please try again.");
+    if (createForm.materialType === 'file' && createFile) {
+      setIsUploading(true);
+      try {
+        const publicUrl = await uploadFileToSupabase(createFile);
+        if (!publicUrl) {
+          alert("Failed to upload file. Please try again.");
           setIsUploading(false);
           return;
         }
+        materialContent = publicUrl;
+      } catch (error) {
+        console.error('Upload error:', error);
+        alert("Upload failed. Please try again.");
         setIsUploading(false);
+        return;
       }
-      
-      const newTopic: any = {
-        title: createForm.title,
-        gradeLevel: createForm.gradeLevel,
-        description: createForm.description,
-        subtopics: parsedSubtopics,
-        materials: createForm.materialTitle ? [{
-          title: createForm.materialTitle,
-          type: createForm.materialType as 'text'|'link'|'file',
-          content: materialContent
-        }] : [],
-        subtopicQuestions: questionsMap,
-        checkpoints_required: createForm.checkpointsRequired,
-        checkpoint_pass_percentage: createForm.checkpointPassPercentage,
-        final_assessment_required: createForm.finalAssessmentRequired
-      };
-
-      await saveTopic(activeSubject, newTopic);
-      
-      const updatedCourses = await getCourses();
-      setCourses(updatedCourses);
-      
-      alert('Topic saved!');
-      setCreateForm({ 
-        title: '', 
-        gradeLevel: 'all', 
-        description: '', 
-        subtopics: '', 
-        materialTitle: '', 
-        materialType: 'text', 
-        materialContent: '',
-        checkpointsRequired: 3,
-        checkpointPassPercentage: 85,
-        finalAssessmentRequired: true
-      });
-      setCreateFile(null);
-      setQuestionsMap({});
-      setAiSummary('');
+      setIsUploading(false);
+    }
+    
+    const newTopic: any = {
+      title: createForm.title,
+      gradeLevel: createForm.gradeLevel,
+      description: createForm.description,
+      subtopics: parsedSubtopics,
+      materials: createForm.materialTitle ? [{
+        title: createForm.materialTitle,
+        type: createForm.materialType as 'text'|'link'|'file',
+        content: materialContent
+      }] : [],
+      subtopicQuestions: questionsMap,
+      checkpoints_required: createForm.checkpointsRequired,
+      checkpoint_pass_percentage: createForm.checkpointPassPercentage,
+      final_assessment_required: createForm.finalAssessmentRequired
     };
 
-// CourseManager.tsx - Updated handleAddMaterialToTopic function
-const handleAddMaterialToTopic = async () => {
-  if (!editingTopic) return;
-  if (!addMatForm.title) {
-    alert("Title required");
-    return;
-  }
+    await saveTopic(activeSubject, newTopic);
+    
+    const updatedCourses = await getCourses();
+    setCourses(updatedCourses);
+    
+    alert('Topic saved!');
+    setCreateForm({ 
+      title: '', 
+      gradeLevel: 'all', 
+      description: '', 
+      subtopics: '', 
+      materialTitle: '', 
+      materialType: 'text', 
+      materialContent: '',
+      checkpointsRequired: 3,
+      checkpointPassPercentage: 80,
+      finalAssessmentRequired: true
+    });
+    setCreateFile(null);
+    setQuestionsMap({});
+    setAiSummary('');
+  };
 
-  let content = addMatForm.content;
-  if (addMatForm.type === 'file') {
-    if (!addMatFile) {
-      alert("Please select a file");
+  const handleAddMaterialToTopic = async () => {
+    if (!editingTopic) return;
+    if (!addMatForm.title) {
+      alert("Title required");
       return;
     }
-    setIsUploading(true);
-    try {
-      const url = await uploadFileToSupabase(addMatFile);
-      if (!url) {
+
+    let content = addMatForm.content;
+    if (addMatForm.type === 'file') {
+      if (!addMatFile) {
+        alert("Please select a file");
+        return;
+      }
+      setIsUploading(true);
+      try {
+        const url = await uploadFileToSupabase(addMatFile);
+        if (!url) {
+          alert("Upload failed");
+          setIsUploading(false);
+          return;
+        }
+        content = url;
+        console.log(`✅ Additional file uploaded: ${url}`);
+      } catch (error) {
+        console.error('Upload error:', error);
         alert("Upload failed");
         setIsUploading(false);
         return;
       }
-      content = url;
-      console.log(`✅ Additional file uploaded: ${url}`);
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert("Upload failed");
       setIsUploading(false);
+    } else if (!content) {
+      alert("Content required");
       return;
     }
-    setIsUploading(false);
-  } else if (!content) {
-    alert("Content required");
-    return;
-  }
 
-  // ✅ CRITICAL FIX: Create new material with proper structure
-  const newMat: Material = {
-    id: `temp_${Date.now()}`, // Temporary ID
-    title: addMatForm.title,
-    type: addMatForm.type as 'text' | 'link' | 'file',
-    content: content
-  };
+    const newMat: Material = {
+      id: `temp_${Date.now()}`,
+      title: addMatForm.title,
+      type: addMatForm.type as 'text' | 'link' | 'file',
+      content: content
+    };
 
-  const updatedTopic = { 
-    ...editingTopic, 
-    materials: [...editingTopic.materials, newMat] 
-  };
-  
-  await saveTopic(activeSubject, updatedTopic);
-  
-  const updatedCourses = await getCourses();
-  setCourses(updatedCourses);
-  
-  alert('✅ Material added successfully! Students can now access it.');
-  
-  setAddMatForm({ title: '', type: 'text', content: '' });
-  setAddMatFile(null);
-};
-
-  // CourseManager.tsx - Updated handleDeleteMaterial function
-const handleDeleteMaterial = async (materialId: string) => {
-  if (!editingTopic) return;
-  
-  if (!confirm("Are you sure you want to delete this material?")) return;
-
-  // ✅ CRITICAL: For database materials, we need to delete from materials table
-  const materialToDelete = editingTopic.materials.find(m => m.id === materialId);
-  if (materialToDelete?.id?.startsWith('temp_')) {
-    // Temporary material (not yet in DB or in-memory only)
-    const updatedTopic = {
-      ...editingTopic,
-      materials: editingTopic.materials.filter(m => m.id !== materialId)
+    const updatedTopic = { 
+      ...editingTopic, 
+      materials: [...editingTopic.materials, newMat] 
     };
     
     await saveTopic(activeSubject, updatedTopic);
-  } else {
-    // Material from database - we should delete from materials table
-    try {
-      const { error } = await supabase
-        .from('materials')
-        .delete()
-        .eq('id', materialId);
+    
+    const updatedCourses = await getCourses();
+    setCourses(updatedCourses);
+    
+    alert('✅ Material added successfully!');
+    
+    setAddMatForm({ title: '', type: 'text', content: '' });
+    setAddMatFile(null);
+  };
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    if (!editingTopic) return;
+    
+    if (!confirm("Are you sure you want to delete this material?")) return;
+
+    const materialToDelete = editingTopic.materials.find(m => m.id === materialId);
+    if (materialToDelete?.id?.startsWith('temp_')) {
+      const updatedTopic = {
+        ...editingTopic,
+        materials: editingTopic.materials.filter(m => m.id !== materialId)
+      };
       
-      if (error) {
-        console.error('Error deleting material from database:', error);
-        alert('Failed to delete material from database');
-        return;
+      await saveTopic(activeSubject, updatedTopic);
+    } else {
+      try {
+        const { error } = await supabase
+          .from('materials')
+          .delete()
+          .eq('id', materialId);
+        
+        if (error) {
+          console.error('Error deleting material from database:', error);
+          alert('Failed to delete material from database');
+          return;
+        }
+        
+        const updatedCourses = await getCourses();
+        setCourses(updatedCourses);
+        alert('✅ Material deleted from database');
+      } catch (error) {
+        console.error('Delete error:', error);
+        alert('Error deleting material');
       }
-      
-      // Refresh courses to update UI
-      const updatedCourses = await getCourses();
-      setCourses(updatedCourses);
-      alert('✅ Material deleted from database');
-    } catch (error) {
-      console.error('Delete error:', error);
-      alert('Error deleting material');
     }
-  }
-};
+  };
 
   // Get filtered topics for dropdown/search
   const allTopics = Object.values(courses[activeSubject] || {}) as Topic[];
   const filteredTopics = allTopics.filter(topic => 
     topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    topic.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (topic.description && topic.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -322,7 +315,7 @@ const handleDeleteMaterial = async (materialId: string) => {
         <h2 className="text-3xl font-bold text-white">Course Management</h2>
         <button 
           onClick={() => navigate('/teacher-dashboard')} 
-          className="text-white/50 hover:text-white flex items-center gap-2"
+          className="text-white/50 hover:text-white flex items-center gap-2 transition-colors"
         >
           <ArrowLeft size={18} /> Back to Dashboard
         </button>
@@ -361,7 +354,7 @@ const handleDeleteMaterial = async (materialId: string) => {
       </div>
 
       {activeTab === 'topics' ? (
-        <>
+        <div>
           {/* Subject Tabs */}
           <div className="flex gap-4 mb-8 border-b border-white/10 pb-1">
             {['Biology', 'Physics', 'Chemistry'].map(sub => (
@@ -384,7 +377,7 @@ const handleDeleteMaterial = async (materialId: string) => {
             ))}
           </div>
 
-          <div className="grid md:grid-cols-12 gap-6 h-[600px]">
+          <div className="grid md:grid-cols-12 gap-6 h-[600px] relative">
             {/* LEFT SIDE: Topic Selection */}
             <div className="md:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col">
               <button 
@@ -447,7 +440,7 @@ const handleDeleteMaterial = async (materialId: string) => {
               </div>
             </div>
 
-            {/* RIGHT SIDE: Content Area */}
+            {/* RIGHT SIDE: Content Area - FIXED BLUR ISSUE */}
             <div className="md:col-span-8 bg-white/5 border border-white/10 rounded-2xl p-6 overflow-y-auto">
               {viewMode === 'create' ? (
                 <div className="animate-fade-in">
@@ -566,22 +559,26 @@ const handleDeleteMaterial = async (materialId: string) => {
                     
                     <div className="flex gap-2 items-start">
                       {createForm.materialType === 'file' ? (
-                        <div className="w-full bg-white/5 border border-white/10 border-dashed rounded-lg p-6 text-center hover:bg-white/10 transition-colors cursor-pointer relative">
-                          <input 
-                            type="file" 
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            onChange={(e) => setCreateFile(e.target.files?.[0] || null)}
-                          />
-                          {createFile ? (
-                            <div className="text-green-400 flex items-center justify-center gap-2">
-                              <CheckCircle size={18}/> {createFile.name} selected
+                        <div className="relative w-full">
+                          <div className="w-full bg-white/5 border border-white/10 border-dashed rounded-lg p-6 text-center hover:bg-white/10 transition-colors">
+                            <div className="relative z-10">
+                              {createFile ? (
+                                <div className="text-green-400 flex items-center justify-center gap-2">
+                                  <CheckCircle size={18}/> {createFile.name} selected
+                                </div>
+                              ) : (
+                                <div className="text-white/50 flex flex-col items-center">
+                                  <Upload size={24} className="mb-2"/>
+                                  <span>Click to select file to upload</span>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-white/50 flex flex-col items-center">
-                              <Upload size={24} className="mb-2"/>
-                              <span>Click to select file to upload</span>
-                            </div>
-                          )}
+                            <input 
+                              type="file" 
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => setCreateFile(e.target.files?.[0] || null)}
+                            />
+                          </div>
                         </div>
                       ) : createForm.materialType === 'link' ? (
                         <input 
@@ -740,7 +737,7 @@ const handleDeleteMaterial = async (materialId: string) => {
                       <p className="text-white/50">{editingTopic.title} (Grade {editingTopic.gradeLevel})</p>
                       <div className="flex gap-4 mt-2 text-sm text-white/60">
                         <span>Checkpoints Required: {editingTopic.checkpoints_required || 3}</span>
-                        <span>Pass Percentage: {editingTopic.checkpoint_pass_percentage || 85}%</span>
+                        <span>Pass Percentage: {editingTopic.checkpoint_pass_percentage || 80}%</span>
                         <span>Final Assessment: {editingTopic.final_assessment_required ? 'Yes' : 'No'}</span>
                       </div>
                     </div>
@@ -830,21 +827,25 @@ const handleDeleteMaterial = async (materialId: string) => {
                     
                     <div className="mb-4">
                       {addMatForm.type === 'file' ? (
-                        <div className="w-full bg-black/40 border border-white/10 border-dashed rounded-lg p-4 text-center hover:bg-white/5 transition-colors cursor-pointer relative">
-                          <input 
-                            type="file" 
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            onChange={(e) => setAddMatFile(e.target.files?.[0] || null)}
-                          />
-                          {addMatFile ? (
-                            <div className="text-green-400 flex items-center justify-center gap-2 text-sm">
-                              <CheckCircle size={16}/> {addMatFile.name}
+                        <div className="relative w-full">
+                          <div className="w-full bg-black/40 border border-white/10 border-dashed rounded-lg p-4 text-center hover:bg-white/5 transition-colors">
+                            <div className="relative z-10">
+                              {addMatFile ? (
+                                <div className="text-green-400 flex items-center justify-center gap-2 text-sm">
+                                  <CheckCircle size={16}/> {addMatFile.name}
+                                </div>
+                              ) : (
+                                <div className="text-white/40 text-sm flex items-center justify-center gap-2">
+                                  <Upload size={16}/> Choose file...
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-white/40 text-sm flex items-center justify-center gap-2">
-                              <Upload size={16}/> Choose file...
-                            </div>
-                          )}
+                            <input 
+                              type="file" 
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => setAddMatFile(e.target.files?.[0] || null)}
+                            />
+                          </div>
                         </div>
                       ) : addMatForm.type === 'link' ? (
                         <input 
@@ -881,7 +882,7 @@ const handleDeleteMaterial = async (materialId: string) => {
               )}
             </div>
           </div>
-        </>
+        </div>
       ) : (
         /* THEORY SUBMISSIONS TAB */
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
