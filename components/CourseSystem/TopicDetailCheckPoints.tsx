@@ -261,11 +261,21 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
   // --- UPDATED HANDLERS (With Correct Bracing) ---
 
+  
   const handleCheckpointComplete = async (checkpointId: string, score: number, passed: boolean) => {
-    if (!user) return;
+    // Add this check
+    if (!user || !user.username) {
+      console.error('❌ Cannot save checkpoint: No user or username found');
+      alert('User session error. Please log in again.');
+      return;
+    }
 
     try {
+      console.log('💾 Saving checkpoint for user:', user.username);
+      
       await saveCheckpointProgress(user.username, checkpointId, score, passed);
+      
+      // Rest of your code...
       
       const progressData = await getStudentCheckpointProgress(user.username, topicId!);
       setCheckpointProgress(progressData);
