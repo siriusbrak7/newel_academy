@@ -57,12 +57,7 @@ export const QuizInterface: React.FC<QuizProps> = ({
       // Ensure minimum 1 minute timer
       if (seconds < 60) seconds = 60;
       
-      console.log('Timer calculation:', {
-        totalSeconds: seconds,
-        minutes: Math.floor(seconds / 60),
-        questionsCount: questions.length,
-        finalTime: `${Math.floor(seconds / 60)}:${seconds % 60}`
-      });
+      
       
       setTimeLeft(seconds);
       setTotalDuration(seconds);
@@ -73,7 +68,7 @@ export const QuizInterface: React.FC<QuizProps> = ({
     if (timeLeft === null || submitted || grading) return;
     
     if (timeLeft <= 0) {
-      console.log('Time is up! Auto-submitting...');
+      
       handleSubmit(true);
       return;
     }
@@ -96,7 +91,7 @@ export const QuizInterface: React.FC<QuizProps> = ({
   };
 
   const handleTeacherAssignedSubmit = () => {
-    console.log('handleTeacherAssignedSubmit called', { assessmentId, username });
+    
     
     if (assessmentId && username) {
       const answersMap: Record<string, string> = {};
@@ -112,7 +107,7 @@ export const QuizInterface: React.FC<QuizProps> = ({
         graded: false
       };
       
-      console.log('Saving teacher submission:', submission);
+      
       saveSubmission(submission);
       setSubmitted(true);
     } else {
@@ -121,214 +116,208 @@ export const QuizInterface: React.FC<QuizProps> = ({
     }
   };
 
-    const handleCourseAssessmentSubmit = async () => {
-    console.log('=== FINAL ASSESSMENT SUBMISSION START ===');
-    console.log('handleCourseAssessmentSubmit called', {
-      questionCount: questions.length,
-      isCourseFinal,
-      assessmentId,
-      username
-    });
-    
-    setGrading(true);
-    let mcqScore = 0;
-    let mcqCount = 0;
-    let theoryScore = 0;
-    let theoryFeedback = '';
+   const handleCourseAssessmentSubmit = async () => {
+  console.log('=== FINAL ASSESSMENT SUBMISSION START ===');
+  console.log('handleCourseAssessmentSubmit called', {
+    questionCount: questions.length,
+    isCourseFinal,
+    assessmentId,
+    username
+  });
+  
+  setGrading(true);
+  let mcqScore = 0;
+  let mcqCount = 0;
+  let theoryScore = 0;
+  let theoryFeedback = '';
 
-    try {
-      // Grade MCQ questions
-      questions.forEach((q, idx) => {
-        if (q.type === 'MCQ') {
-          mcqCount++;
-          if (answers[idx] === q.correctAnswer) {
-            mcqScore++;
-            console.log(`MCQ ${idx + 1}: Correct! Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
-          } else {
-            console.log(`MCQ ${idx + 1}: Incorrect. Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
-          }
-        }
-      });
-
-      console.log('MCQ Results:', { mcqScore, mcqCount });
-
-      // Grade theory question
-      const theoryQIndex = questions.findIndex(q => q.type === 'THEORY');
-      console.log('Theory question search:', { theoryQIndex, questions: questions.map(q => q.type) });
-      
-      if (theoryQIndex >= 0) {
-        const q = questions[theoryQIndex];
-        const studentAns = answers[theoryQIndex] || "No answer provided.";
-        console.log('Theory question found:', {
-          questionText: q.text?.substring(0, 100) + '...',
-          answerLength: studentAns.length,
-          hasAnswer: !!answers[theoryQIndex]
-        });
-        
-        try {
-          console.log('Calling Gemini AI for grading...');
-          const aiResponse = await getAITutorResponse(
-            `Grade this essay. Question: "${q.text}" Answer: "${studentAns}" Return ONLY JSON: {"score": 85, "feedback": "Good..."}`
-          );
-          console.log('Gemini raw response:', aiResponse);
-          
-          // Clean JSON response
-          const cleanJson = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-          console.log('Cleaned JSON:', cleanJson);
-          
-          const result = JSON.parse(cleanJson);
-          theoryScore = result.score || 0;
-          theoryFeedback = result.feedback || "Newel Graded.";
-          
-          console.log('AI Grading result:', { theoryScore, feedbackLength: theoryFeedback.length });
-        } catch (e) {
-          console.error('Gemini API error:', e);
-          // Fallback scoring based on answer length
-          theoryScore = studentAns.length > 50 ? 70 : 40;
-          theoryFeedback = "Newel grading unavailable. Score based on answer length.";
-          console.log('Using fallback scoring:', { theoryScore, answerLength: studentAns.length });
-        }
-      } else {
-        console.log('No theory question found in this assessment');
-      }
-
-      // Calculate final score
-      let finalPercent = 0;
-      console.log('Score calculation inputs:', { theoryQIndex, mcqCount, theoryScore, mcqScore });
-      
-      // IMPORTANT: For YOUR system, final assessments should be 100% theory or 100% MCQ
-      // Check if this is a THEORY-only final assessment
-      const hasTheory = theoryQIndex >= 0;
-      const hasMCQ = mcqCount > 0;
-      
-      if (hasTheory && hasMCQ) {
-        // Mixed assessment - use 70% MCQ, 30% Theory weighting
-        const mcqPercent = (mcqScore / mcqCount) * 100;
-        finalPercent = (mcqPercent * 0.7) + (theoryScore * 0.3);
-        console.log('Mixed assessment (70% MCQ, 30% Theory):', { 
-          mcqPercent, theoryScore, finalPercent 
-        });
-      } else if (hasMCQ) {
-        // MCQ-only assessment
-        finalPercent = (mcqScore / mcqCount) * 100;
-        console.log('MCQ-only assessment:', { finalPercent });
-      } else if (hasTheory) {
-        // Theory-only assessment (YOUR FINAL ASSESSMENTS)
-        finalPercent = theoryScore;
-        console.log('Theory-only assessment (Final Assessment):', { finalPercent });
-      } else {
-        // No questions - this shouldn't happen
-        finalPercent = 0;
-        console.error('No questions found in assessment!');
-      }
-
-      console.log('Final score calculated:', { finalPercent, rounded: Math.round(finalPercent) });
-      
-      // Update UI state
-      setScore(finalPercent);
-      setFeedback(theoryFeedback);
-      setSubmitted(true);
-      
-      if (finalPercent >= passThreshold) {
-        console.log('Passed! Showing confetti');
-        setShowConfetti(true);
-      } else {
-        console.log('Not passed:', { finalPercent, passThreshold });
-      }
-      
-      // Save submission to database
-      if (username && assessmentId) {
-        const answersMap: Record<string, string> = {};
-        questions.forEach((q, idx) => {
-          if (q.id) {
-            answersMap[q.id] = answers[idx] || '';
-          } else {
-            console.error('Question missing ID:', q);
-            answersMap[`q${idx}`] = answers[idx] || '';
-          }
-        });
-        
-        // Build submission object - match what your database expects
-        const submission: Submission = {
-          assessmentId: assessmentId,
-          username: username,
-          answers: answersMap,
-          submittedAt: Date.now(), // timestamp in milliseconds
-          graded: true,
-          score: Math.round(finalPercent),
-          feedback: theoryFeedback || `Auto-graded with score: ${Math.round(finalPercent)}%`,
-          ai_graded: true
-        };
-        
-        console.log('Saving final assessment submission:', submission);
-        
-        try {
-          await saveSubmission(submission);
-          console.log('Submission saved successfully');
-        } catch (saveError) {
-          console.error('Failed to save submission:', saveError);
-          // Continue anyway - the UI should still update
-        }
-      } else {
-        console.error('Missing username or assessmentId:', { username, assessmentId });
-      }
-      
-      console.log('=== FINAL ASSESSMENT SUBMISSION END ===');
-      
-      // Call the completion callback
-      onComplete(finalPercent, finalPercent >= passThreshold);
-      
-    } catch (error) {
-      console.error('Critical error in handleCourseAssessmentSubmit:', error);
-      alert('An error occurred while submitting your assessment. Please try again.');
-    } finally {
-      setGrading(false);
-    }
-  };
-
-  const handleCheckpointSubmit = () => {
-    console.log('handleCheckpointSubmit called - regular checkpoint quiz');
-    
-    let rawScore = 0;
+  try {
+    // Grade MCQ questions
     questions.forEach((q, idx) => {
-      if (q.type === 'MCQ' && answers[idx] === q.correctAnswer) {
-        rawScore++;
-        console.log(`Question ${idx + 1}: Correct`);
-      } else if (q.type === 'MCQ') {
-        console.log(`Question ${idx + 1}: Incorrect. Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
+      if (q.type === 'MCQ') {
+        mcqCount++;
+        if (answers[idx] === q.correctAnswer) {
+          mcqScore++;
+          console.log(`MCQ ${idx + 1}: Correct! Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
+        } else {
+          console.log(`MCQ ${idx + 1}: Incorrect. Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
+        }
       }
     });
+
+    console.log('MCQ Results:', { mcqScore, mcqCount });
+
+    // Grade theory question
+    const theoryQIndex = questions.findIndex(q => q.type === 'THEORY');
+    console.log('Theory question search:', { theoryQIndex, questions: questions.map(q => q.type) });
     
-    const finalScore = questions.length > 0 ? (rawScore / questions.length) * 100 : 0;
-    console.log('Checkpoint score:', { rawScore, totalQuestions: questions.length, finalScore });
+    if (theoryQIndex >= 0) {
+      const q = questions[theoryQIndex];
+      const studentAns = answers[theoryQIndex] || "No answer provided.";
+      console.log('Theory question found:', {
+        questionText: q.text?.substring(0, 100) + '...',
+        answerLength: studentAns.length,
+        hasAnswer: !!answers[theoryQIndex]
+      });
+      
+      try {
+        console.log('Calling Gemini AI for grading...');
+        const aiResponse = await getAITutorResponse(
+          `Grade this essay. Question: "${q.text}" Answer: "${studentAns}" Return ONLY JSON: {"score": 85, "feedback": "Good..."}`
+        );
+        console.log('Gemini raw response:', aiResponse);
+        
+        // Clean JSON response
+        const cleanJson = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+        console.log('Cleaned JSON:', cleanJson);
+        
+        const result = JSON.parse(cleanJson);
+        theoryScore = result.score || 0;
+        theoryFeedback = result.feedback || "Newel Graded.";
+        
+        console.log('AI Grading result:', { theoryScore, feedbackLength: theoryFeedback.length });
+      } catch (e) {
+        console.error('Gemini API error:', e);
+        // Fallback scoring based on answer length
+        theoryScore = studentAns.length > 50 ? 70 : 40;
+        theoryFeedback = "Newel grading unavailable. Score based on answer length.";
+        console.log('Using fallback scoring:', { theoryScore, answerLength: studentAns.length });
+      }
+    } else {
+      console.log('No theory question found in this assessment');
+    }
+
+    // Calculate final score
+    let finalPercent = 0;
+    console.log('Score calculation inputs:', { theoryQIndex, mcqCount, theoryScore, mcqScore });
     
-    setScore(finalScore);
+    // IMPORTANT: For YOUR system, final assessments should be 100% theory or 100% MCQ
+    // Check if this is a THEORY-only final assessment
+    const hasTheory = theoryQIndex >= 0;
+    const hasMCQ = mcqCount > 0;
+    
+    if (hasTheory && hasMCQ) {
+      // Mixed assessment - use 70% MCQ, 30% Theory weighting
+      const mcqPercent = (mcqScore / mcqCount) * 100;
+      finalPercent = (mcqPercent * 0.7) + (theoryScore * 0.3);
+      console.log('Mixed assessment (70% MCQ, 30% Theory):', { 
+        mcqPercent, theoryScore, finalPercent 
+      });
+    } else if (hasMCQ) {
+      // MCQ-only assessment
+      finalPercent = (mcqScore / mcqCount) * 100;
+      console.log('MCQ-only assessment:', { finalPercent });
+    } else if (hasTheory) {
+      // Theory-only assessment (YOUR FINAL ASSESSMENTS)
+      finalPercent = theoryScore;
+      console.log('Theory-only assessment (Final Assessment):', { finalPercent });
+    } else {
+      // No questions - this shouldn't happen
+      finalPercent = 0;
+      console.error('No questions found in assessment!');
+    }
+
+    console.log('Final score calculated:', { finalPercent, rounded: Math.round(finalPercent) });
+    
+    // Update UI state
+    setScore(finalPercent);
+    setFeedback(theoryFeedback);
     setSubmitted(true);
     
-    if (finalScore >= passThreshold) {
-      console.log('Checkpoint passed!');
+    if (finalPercent >= passThreshold) {
+      console.log('Passed! Showing confetti');
       setShowConfetti(true);
+    } else {
+      console.log('Not passed:', { finalPercent, passThreshold });
     }
     
-    onComplete(finalScore, finalScore >= passThreshold);
-  };
+    // Save submission to database
+    if (username && assessmentId) {
+      const answersMap: Record<string, string> = {};
+      questions.forEach((q, idx) => {
+        if (q.id) {
+          answersMap[q.id] = answers[idx] || '';
+        } else {
+          console.error('Question missing ID:', q);
+          answersMap[`q${idx}`] = answers[idx] || '';
+        }
+      });
+      
+      // Build submission object - match what your database expects
+      const submission: Submission = {
+        assessmentId: assessmentId,
+        username: username,
+        answers: answersMap,
+        submittedAt: Date.now(), // timestamp in milliseconds
+        graded: true,
+        score: Math.round(finalPercent),
+        feedback: theoryFeedback || `Auto-graded with score: ${Math.round(finalPercent)}%`,
+        ai_graded: true
+      };
+      
+      console.log('Saving final assessment submission:', submission);
+      
+      try {
+        await saveSubmission(submission);
+        console.log('Submission saved successfully');
+      } catch (saveError) {
+        console.error('Failed to save submission:', saveError);
+        // Continue anyway - the UI should still update
+      }
+    } else {
+      console.error('Missing username or assessmentId:', { username, assessmentId });
+    }
+    
+    console.log('=== FINAL ASSESSMENT SUBMISSION END ===');
+    
+    // Call the completion callback
+    onComplete(finalPercent, finalPercent >= passThreshold);
+    
+  } catch (error) {
+    console.error('Critical error in handleCourseAssessmentSubmit:', error);
+    alert('An error occurred while submitting your assessment. Please try again.');
+  } finally {
+    setGrading(false);
+  }
+};
+
+  const handleCheckpointSubmit = () => {
+  let rawScore = 0;
+  
+  questions.forEach((q, idx) => {
+    if (q.type === 'MCQ' && answers[idx] === q.correctAnswer) {
+      rawScore++;
+    }
+  });
+  
+  const finalScore = questions.length > 0 ? (rawScore / questions.length) * 100 : 0;
+  
+  setScore(finalScore);
+  setSubmitted(true);
+  
+  if (finalScore >= passThreshold) {
+    setShowConfetti(true);
+  }
+  
+  onComplete(finalScore, finalScore >= passThreshold);
+};
 
   const handleSubmit = (forced = false) => {
-    console.log('handleSubmit called', { forced, submitted, grading, isAssessment, isCourseFinal });
+    
     
     if (forced && !submitted) {
-      console.log("Time's up! Auto-submitting.");
+      
       alert("Time's up! Submitting now.");
     }
     
     if (isAssessment) {
-      console.log('Submitting as teacher assessment');
+      
       handleTeacherAssignedSubmit();
     } else if (isCourseFinal) {
-      console.log('Submitting as course final assessment');
+      
       handleCourseAssessmentSubmit();
     } else {
-      console.log('Submitting as regular checkpoint');
+      
       handleCheckpointSubmit();
     }
   };

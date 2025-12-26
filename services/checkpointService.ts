@@ -90,19 +90,32 @@ export const getCheckpointQuestions = async (checkpointId: string): Promise<Ques
     
     // Map data correctly - adjust based on actual structure
     const questions = data.map(item => {
-      const q = item.questions;
+      const q = Array.isArray(item.questions) ? item.questions[0] : item.questions;
+      if (!q) {
+        // Return a fallback question if q is null/undefined
+        return {
+          id: `fallback-${Math.random()}`,
+          text: 'Question not available',
+          type: 'MCQ' as const,
+          difficulty: 'IGCSE' as const,
+          correctAnswer: '',
+          options: [] as string[],
+          modelAnswer: ''
+        } as Question;
+      }
+      
       return {
         id: q.id,
-        text: q.text,
-        type: q.type || 'MCQ',
-        difficulty: q.difficulty || 'IGCSE',
-        correctAnswer: q.correct_answer,
-        options: q.options || [],
+        text: q.text || 'Question text not available',
+        type: (q.type as 'MCQ' | 'THEORY') || 'MCQ',
+        difficulty: (q.difficulty as 'IGCSE' | 'AS' | 'A_LEVEL') || 'IGCSE',
+        correctAnswer: q.correct_answer || '',
+        options: q.options || [] as string[],
         modelAnswer: q.model_answer || ''
       } as Question;
     });
-    
-    console.log('✅ Processed questions:', questions.length, 'questions found');
+
+    console.log(`✅ Returning ${questions.length} questions for checkpoint ${checkpointId}`);
     return questions;
   } catch (error) {
     console.error('❌ getCheckpointQuestions error:', error);

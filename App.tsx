@@ -38,19 +38,17 @@ interface NeuroscienceInsightProps {
 
 const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
   const [currentFact, setCurrentFact] = useState<string>('');
-  const [facts] = useState<string[]>(window.neuroscienceFacts || [
-    "The human brain has about 86 billion neurons, each connected to thousands of others.",
-    "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
-    "Neuroplasticity allows your brain to reorganize itself throughout your life.",
-    "Sleep is crucial for memory consolidation and neural repair.",
-    "The brain is 73% water. Dehydration of just 2% can impair attention and memory."
-  ]);
+  const [fade, setFade] = useState(true);
 
   useEffect(() => {
     const updateFact = () => {
-      if (facts.length > 0) {
-        const idx = Math.floor(Math.random() * facts.length);
-        setCurrentFact(facts[idx]);
+      if (window.neuroscienceFacts && window.neuroscienceFacts.length > 0) {
+        const idx = Math.floor(Math.random() * window.neuroscienceFacts.length);
+        setFade(false);
+        setTimeout(() => {
+          setCurrentFact(window.neuroscienceFacts![idx]);
+          setFade(true);
+        }, 300);
       }
     };
 
@@ -58,7 +56,7 @@ const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
     const interval = setInterval(updateFact, 671000); // 11 minutes 11 seconds
 
     return () => clearInterval(interval);
-  }, [facts]);
+  }, []);
 
   return (
     <div 
@@ -87,8 +85,8 @@ const NeuroscienceInsight: React.FC<NeuroscienceInsightProps> = ({ theme }) => {
           
           <p className={`text-lg leading-relaxed transition-opacity duration-300 ease-in-out ${
             theme === 'Cyber-Dystopian' ? 'text-green-200/90' : 'text-white/90'
-          }`}>
-            {currentFact || facts[0]}
+          } ${fade ? 'opacity-100' : 'opacity-0'}`}>
+            {currentFact || window.neuroscienceFacts?.[0] || "Learning about the brain helps you learn better..."}
           </p>
           
           <div className="mt-4 flex items-center gap-2 text-sm opacity-70">

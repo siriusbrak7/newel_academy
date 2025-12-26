@@ -15,174 +15,176 @@ const simpleHash = (password: string): string => {
 export const authService = {
   // Login with username/password
   async login(username: string, password: string): Promise<User | null> {
-    console.log('🔐 Supabase login attempt:', username);
-    
-    try {
-      // Query user from Supabase
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', username)
-        .single();
+  console.log('🔐 Supabase login attempt:', username);
+  
+  try {
+    // Query user from Supabase
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .single();
 
-      if (error) {
-        console.log('❌ User not found:', error.message);
-        return null;
-      }
-
-      if (!data) {
-        console.log('❌ No user data returned');
-        return null;
-      }
-
-      // Verify password using Base64 hash
-      const passwordHash = simpleHash(password);
-      if (data.password_hash !== passwordHash) {
-        console.log('❌ Invalid password');
-        console.log('   Input hash:', passwordHash);
-        console.log('   Stored hash:', data.password_hash);
-        return null;
-      }
-
-      console.log('✅ Authentication successful:', username);
-
-      // Return User object
-      const user: User = {
-        username: data.username,
-        role: data.role,
-        approved: data.approved,
-        securityQuestion: data.security_question || '',
-        securityAnswer: data.security_answer || '',
-        gradeLevel: data.grade_level || undefined,
-        assignedStudents: data.assigned_students || undefined,
-        lastLogin: Date.now(),
-        loginHistory: data.login_history 
-          ? data.login_history.map((d: string) => new Date(d).getTime())
-          : []
-      };
-
-      // Update last login time
-      await this.updateLastLogin(username);
-      
-      return user;
-    } catch (error) {
-      console.error('❌ Authentication error:', error);
+    if (error) {
+      console.log('❌ User not found:', error.message);
       return null;
     }
-  },
+
+    if (!data) {
+      console.log('❌ No user data returned');
+      return null;
+    }
+
+    // Verify password using Base64 hash
+    const passwordHash = simpleHash(password);
+    if (data.password_hash !== passwordHash) {
+      console.log('❌ Invalid password');
+      console.log('   Input hash:', passwordHash);
+      console.log('   Stored hash:', data.password_hash);
+      return null;
+    }
+
+    console.log('✅ Authentication successful:', username);
+
+    // Return User object
+    const user: User = {
+      username: data.username,
+      role: data.role,
+      approved: data.approved,
+      securityQuestion: data.security_question || '',
+      securityAnswer: data.security_answer || '',
+      gradeLevel: data.grade_level || undefined,
+      assignedStudents: data.assigned_students || undefined,
+      lastLogin: Date.now(),
+      loginHistory: data.login_history 
+        ? data.login_history.map((d: string) => new Date(d).getTime())
+        : []
+    };
+
+    // Update last login time
+    await this.updateLastLogin(username);
+    
+    return user;
+  } catch (error) {
+    console.error('❌ Authentication error:', error);
+    return null;
+  }
+},
 
   // Update last login timestamp
   async updateLastLogin(username: string): Promise<void> {
-    try {
-      // Get current login history
-      const { data: userData } = await supabase
-        .from('users')
-        .select('login_history')
-        .eq('username', username)
-        .single();
+  try {
+    // Get user by username to find ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id, login_history')
+      .eq('username', username)
+      .single();
 
-      const currentHistory = userData?.login_history || [];
-      const updatedHistory = [
-        ...currentHistory,
-        new Date().toISOString()
-      ].slice(-10); // Keep last 10 logins
+    if (!userData) return;
 
-      await supabase
-        .from('users')
-        .update({
-          last_login: new Date().toISOString(),
-          login_history: updatedHistory
-        })
-        .eq('username', username);
-    } catch (error) {
-      console.error('❌ Failed to update last login:', error);
-    }
-  },
+    const currentHistory = userData?.login_history || [];
+    const updatedHistory = [
+      ...currentHistory,
+      new Date().toISOString()
+    ].slice(-10); // Keep last 10 logins
+
+    await supabase
+      .from('users')
+      .update({
+        last_login: new Date().toISOString(),
+        login_history: updatedHistory
+      })
+      .eq('id', userData.id);
+  } catch (error) {
+    console.error('❌ Failed to update last login:', error);
+  }
+},
 
   // Register new user
   async register(userData: {
-    username: string;
-    password: string;
-    role: 'student' | 'teacher' | 'admin';
-    gradeLevel?: string;
-    securityQuestion: string;
-    securityAnswer: string;
-  }): Promise<{ success: boolean; message: string }> {
-    try {
-      // Check if user already exists
-      const { data: existing } = await supabase
-        .from('users')
-        .select('username')
-        .eq('username', userData.username)
-        .single();
+  username: string;
+  password: string;
+  role: 'student' | 'teacher' | 'admin';
+  gradeLevel?: string;
+  securityQuestion: string;
+  securityAnswer: string;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    // Check if user already exists
+    const { data: existing } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', userData.username)
+      .single();
 
-      if (existing) {
-        return { success: false, message: 'Username already exists' };
-      }
-
-      // Create new user
-      const { error } = await supabase
-        .from('users')
-        .insert({
-          username: userData.username,
-          password_hash: simpleHash(userData.password),
-          role: userData.role,
-          approved: userData.role === 'admin', // Auto-approve admins
-          security_question: userData.securityQuestion,
-          security_answer: userData.securityAnswer.toLowerCase(),
-          grade_level: userData.gradeLevel || null,
-          created_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
-      return { 
-        success: true, 
-        message: userData.role === 'admin' 
-          ? 'Admin account created successfully!' 
-          : 'Registration successful! Awaiting admin approval.' 
-      };
-    } catch (error: any) {
-      console.error('❌ Registration error:', error);
-      return { success: false, message: error.message || 'Registration failed' };
+    if (existing) {
+      return { success: false, message: 'Username already exists' };
     }
-  },
+
+    // Create new user
+    const { error } = await supabase
+      .from('users')
+      .insert({
+        username: userData.username,
+        password_hash: simpleHash(userData.password),
+        role: userData.role,
+        approved: userData.role === 'admin', // Auto-approve admins
+        security_question: userData.securityQuestion,
+        security_answer: userData.securityAnswer.toLowerCase(),
+        grade_level: userData.gradeLevel || null,
+        created_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+
+    return { 
+      success: true, 
+      message: userData.role === 'admin' 
+        ? 'Admin account created successfully!' 
+        : 'Registration successful! Awaiting admin approval.' 
+    };
+  } catch (error: any) {
+    console.error('❌ Registration error:', error);
+    return { success: false, message: error.message || 'Registration failed' };
+  }
+},
 
   // Password recovery
   async recoverPassword(username: string, securityAnswer: string, newPassword: string): Promise<{ success: boolean; message: string }> {
-    try {
-      // Verify user and security answer
-      const { data, error } = await supabase
-        .from('users')
-        .select('security_answer')
-        .eq('username', username)
-        .single();
+  try {
+    // Verify user and security answer
+    const { data, error } = await supabase
+      .from('users')
+      .select('security_answer')
+      .eq('username', username)
+      .single();
 
-      if (error || !data) {
-        return { success: false, message: 'User not found' };
-      }
-
-      if (data.security_answer !== securityAnswer.toLowerCase()) {
-        return { success: false, message: 'Incorrect security answer' };
-      }
-
-      // Update password
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          password_hash: simpleHash(newPassword),
-          updated_at: new Date().toISOString()
-        })
-        .eq('username', username);
-
-      if (updateError) throw updateError;
-
-      return { success: true, message: 'Password reset successful' };
-    } catch (error: any) {
-      console.error('❌ Password recovery error:', error);
-      return { success: false, message: error.message || 'Password recovery failed' };
+    if (error || !data) {
+      return { success: false, message: 'User not found' };
     }
-  },
+
+    if (data.security_answer !== securityAnswer.toLowerCase()) {
+      return { success: false, message: 'Incorrect security answer' };
+    }
+
+    // Update password
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        password_hash: simpleHash(newPassword),
+        updated_at: new Date().toISOString()
+      })
+      .eq('username', username);
+
+    if (updateError) throw updateError;
+
+    return { success: true, message: 'Password reset successful' };
+  } catch (error: any) {
+    console.error('❌ Password recovery error:', error);
+    return { success: false, message: error.message || 'Password recovery failed' };
+  }
+},
 
   // Check if user exists (for registration)
   async checkUserExists(username: string): Promise<boolean> {

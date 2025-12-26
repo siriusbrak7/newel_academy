@@ -392,6 +392,7 @@
     
     <!-- 33 Neuroscience Facts -->
     <script>
+      // 33 Neuroscience Facts - Will be exposed to React app
       const neuroscienceFacts = [
         "The human brain has about 86 billion neurons, each connected to thousands of others.",
         "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
@@ -428,40 +429,13 @@
         "Laughter increases endorphins and dopamine, enhancing learning capacity."
       ];
 
-      // This will be called by React app when it's ready
-      window.initNeuroscienceFacts = function(container) {
-        if (!document.getElementById('neuroscience-fact-container') && container) {
-          const neuroscienceContainer = document.createElement('div');
-          neuroscienceContainer.id = 'neuroscience-fact-container';
-          neuroscienceContainer.innerHTML = `
-            <div class="fact-content">
-              <i class="fas fa-brain"></i>
-              <div>
-                <h3>Neuroscience Insight</h3>
-                <p id="neuroscience-fact"></p>
-              </div>
-            </div>
-          `;
-          
-          // Append to the container (after main content)
-          container.appendChild(neuroscienceContainer);
-
-          const factElement = document.getElementById('neuroscience-fact');
-          const displayFact = () => {
-            const idx = Math.floor(Math.random() * neuroscienceFacts.length);
-            factElement.textContent = neuroscienceFacts[idx];
-            factElement.style.opacity = '0';
-            setTimeout(() => {
-              factElement.style.opacity = '1';
-            }, 100);
-          };
-
-          displayFact();
-          setInterval(displayFact, 671000); // 11 minutes 11 seconds
-          
-          return neuroscienceContainer;
-        }
-        return null;
+      // Expose to global window for React to access
+      window.neuroscienceFacts = neuroscienceFacts;
+      
+      // Initialize function for React to call
+      window.initNeuroscienceFacts = function() {
+        console.log('Neuroscience facts loaded:', neuroscienceFacts.length);
+        return neuroscienceFacts;
       };
 
       // Also expose facts for React to use directly
