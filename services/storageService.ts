@@ -1782,35 +1782,49 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
     const courses: CourseStructure = {};
     
     topicsData.forEach(topic => {
-      const subjectName = 'General'; // Default fallback
-      
-      if (!courses[subjectName]) {
-        courses[subjectName] = {};
+  // Extract subject name safely
+  let subjectName = 'General';
+  
+  try {
+    if (topic.subject) {
+      if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+        subjectName = (topic.subject[0] as any)?.name || 'General';
+      } else if (typeof topic.subject === 'object' && topic.subject !== null) {
+        subjectName = (topic.subject as any)?.name || 'General';
       }
+    }
+  } catch (error) {
+    console.warn('Could not extract subject name for topic:', topic.id);
+    subjectName = 'General';
+  }
+  
+  if (!courses[subjectName]) {
+    courses[subjectName] = {};
+  }
 
-      console.log(`📊 DEBUG: Adding topic - Subject: ${subjectName}, Title: ${topic.title}`);
-      
-      courses[subjectName][topic.id] = {
-        id: topic.id,
-        title: topic.title,
-        gradeLevel: topic.grade_level,
-        description: topic.description || '',
-        subtopics: [],
-        materials: (topic.materials || []).map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          type: m.type,
-          content: m.content || m.storage_path || ''
-        })),
-        checkpoints: (topic.checkpoints || []).map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          checkpointNumber: c.checkpoint_number,
-          requiredScore: c.required_score,
-          questionCount: c.question_count
-        }))
-      };
-    });
+  console.log(`📊 DEBUG: Adding topic - Subject: ${subjectName}, Title: ${topic.title}`);
+  
+  courses[subjectName][topic.id] = {
+    id: topic.id,
+    title: topic.title,
+    gradeLevel: topic.grade_level,
+    description: topic.description || '',
+    subtopics: [],
+    materials: (topic.materials || []).map((m: any) => ({
+      id: m.id,
+      title: m.title,
+      type: m.type,
+      content: m.content || m.storage_path || ''
+    })),
+    checkpoints: (topic.checkpoints || []).map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      checkpointNumber: c.checkpoint_number,
+      requiredScore: c.required_score,
+      questionCount: c.question_count
+    }))
+  };
+});
 
     console.log(`📊 DEBUG: Final courses structure for grade ${gradeLevel}:`, {
       subjects: Object.keys(courses),
