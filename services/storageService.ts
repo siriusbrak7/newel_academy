@@ -32,6 +32,74 @@ const ALLOWED_FILE_TYPES = [
 ];
 const SUPABASE_STORAGE_URL = 'https://utihfxcdejjkqydtsiqj.supabase.co/storage/v1/object/public/materials/';
 
+// Add this function to your storageService.ts, around line 50 (after the constants)
+
+// =====================================================
+// HELPER FUNCTIONS
+// =====================================================
+
+/**
+ * Gets the user ID (UUID) from the database for a given username
+ */
+export const getUserId = async (username?: string): Promise<string | null> => {
+  console.log('🔍 getUserId called with:', { username, type: typeof username });
+  
+  // If no username provided, try to get it from localStorage
+  if (!username) {
+    console.warn('⚠️ No username provided to getUserId, checking localStorage...');
+    
+    try {
+      const stored = localStorage.getItem('newel_currentUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        username = user.username;
+        console.log('📦 Retrieved username from localStorage:', username);
+      } else {
+        console.error('❌ No user found in localStorage');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error reading localStorage:', error);
+      return null;
+    }
+  }
+  
+  // Still no username? Critical error
+  if (!username) {
+    console.error('❌ CRITICAL: No username available for user ID lookup');
+    console.error('   LocalStorage content:', localStorage.getItem('newel_currentUser'));
+    return null;
+  }
+  
+  // Now we have a username, look it up
+  try {
+    console.log('🔎 Looking up user ID for:', username);
+    
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username.trim())
+      .maybeSingle();
+    
+    if (error) {
+      console.error('❌ Supabase query error:', error.message);
+      return null;
+    }
+    
+    if (!data) {
+      console.error('❌ No user found in database for username:', username);
+      return null;
+    }
+    
+    console.log('✅ Found user ID:', data.id, 'for username:', username);
+    return data.id;
+    
+  } catch (err) {
+    console.error('❌ Unexpected error in getUserId:', err);
+    return null;
+  }
+};
+
 // =====================================================
 // INITIALIZATION
 // =====================================================
@@ -1198,21 +1266,40 @@ export const getTopicCheckpoints = async (topicId: string): Promise<any[]> => {
 };
 
 export const getStudentCheckpointProgress = async (username: string, topicId: string): Promise<Record<string, any>> => {
-  try {
-    const { data: userData } = await supabase.from('users').select('id').eq('username', username).single();
-    if (!userData) return {};
+  if (!username) {
+    console.error('❌ No username provided to getStudentCheckpointProgress');
+    return {};
+  }
+  
+  const userId = await getUserId(username);
+  if (!userId) {
+    console.error('❌ Could not find user ID for:', username);
+    return {};
+  }
 
-    const { data: checkpoints } = await supabase.from('checkpoints').select('id').eq('topic_id', topicId);
-    if (!checkpoints || checkpoints.length === 0) return {};
+  try {
+    // 1. First, get checkpoints for this topic
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('id')
+      .eq('topic_id', topicId);
+    
+    if (!checkpoints || checkpoints.length === 0) {
+      console.log('📭 No checkpoints found for topic:', topicId);
+      return {};
+    }
 
     const checkpointIds = checkpoints.map(cp => cp.id);
+    
+    // 2. Get progress for these checkpoints
     const { data: progressData } = await supabase
       .from('student_checkpoint_progress')
       .select('*')
-      .eq('user_id', userData.id)
+      .eq('user_id', userId)
       .in('checkpoint_id', checkpointIds);
 
     const progressDict: Record<string, any> = {};
+    
     progressData?.forEach(item => {
       progressDict[item.checkpoint_id] = {
         score: item.score,
@@ -1220,8 +1307,18 @@ export const getStudentCheckpointProgress = async (username: string, topicId: st
         completedAt: item.completed_at
       };
     });
+    
+    console.log('📊 Checkpoint progress retrieved:', {
+      topicId,
+      username,
+      checkpointCount: checkpointIds.length,
+      progressCount: progressData?.length || 0
+    });
+    
     return progressDict;
-  } catch {
+    
+  } catch (error) {
+    console.error('❌ Error fetching checkpoint progress:', error);
     return {};
   }
 };
@@ -1233,21 +1330,33 @@ export const saveCheckpointProgress = async (
   passed: boolean
 ): Promise<void> => {
   try {
-    const { data: userData } = await supabase.from('users').select('id').eq('username', username).single();
-    if (!userData) throw new Error('User not found');
+    console.log('💾 Saving checkpoint progress:', { username, checkpointId, score, passed });
+    
+    const userId = await getUserId(username);
+    if (!userId) {
+      console.error('❌ Cannot save checkpoint: User ID not found for:', username);
+      throw new Error("User not found");
+    }
 
     const { error } = await supabase
       .from('student_checkpoint_progress')
       .upsert({
-        user_id: userData.id,
+        user_id: userId,  // ← Changed from userData.id to userId
         checkpoint_id: checkpointId,
         score: Math.round(score),
         passed: passed,
         completed_at: new Date().toISOString()
       }, { onConflict: 'user_id,checkpoint_id' });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase save error:', error);
+      throw error;
+    }
+    
+    console.log('✅ Checkpoint progress saved successfully');
+    
   } catch (error) {
+    console.error('❌ Failed to save checkpoint progress:', error);
     throw error;
   }
 };
