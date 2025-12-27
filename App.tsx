@@ -23,7 +23,13 @@ import { initializeSupabase, sessionService } from './services/supabaseService';
 import { 
   Rocket, Brain, Zap, Target, Clock, Users, BookOpen, 
   MessageSquare, CheckCircle, Star, Award, Globe,
-  Mail, ExternalLink, Sparkles, Cpu, Shield, TrendingUp
+  Mail, ExternalLink, Sparkles, Cpu, Shield, TrendingUp,
+  ClipboardList,
+  LogIn,
+  LogOut,
+  Trophy,
+  User as UserIcon,
+  X
 } from 'lucide-react';
 
 // Declare ThemeManager from index.html
@@ -480,6 +486,7 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ADD THIS
   const location = useLocation();
 
   useEffect(() => {
@@ -514,6 +521,11 @@ const App: React.FC = () => {
     window.ThemeManager?.setTheme(theme);
   }, [theme, initializing]);
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
   const handleLogin = (user: User) => {
     const now = Date.now();
     const updatedUser: User = {
@@ -530,6 +542,7 @@ const App: React.FC = () => {
     sessionService.clearSession();
     setAuth({ loggedIn: false, user: null });
     setSidebarOpen(false);
+    setMobileMenuOpen(false);
   };
 
   if (initializing) {
@@ -553,9 +566,90 @@ const App: React.FC = () => {
         notifications={2}
         onOpenAuth={() => setShowAuthModal(true)}
         currentTheme={theme}
+        onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)} // ADD THIS PROP
       />
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentTheme={theme} setTheme={setTheme} />
+
+      {/* Mobile Navigation Menu - ADDED HERE */}
+      <div className={`mobile-nav-container ${mobileMenuOpen ? 'active' : ''}`}>
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-xl font-bold text-white">Menu</h2>
+          <button 
+            className="close-mobile-menu text-white p-2"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        <Link to="/courses" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+          <BookOpen size={20} />
+          <span>Courses</span>
+        </Link>
+        
+        <Link to="/leaderboard" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+          <Trophy size={20} />
+          <span>Leaderboard</span>
+        </Link>
+        
+        <Link to="/assessments" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+          <ClipboardList size={20} />
+          <span>Assessments</span>
+        </Link>
+        
+        <Link to="/sprint-challenge" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+          <Zap size={20} />
+          <span>222-Sprint</span>
+        </Link>
+        
+        {auth.loggedIn && auth.user?.role === 'teacher' && (
+          <Link to="/teacher-dashboard" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+            <UserIcon size={20} />
+            <span>Teacher Dashboard</span>
+          </Link>
+        )}
+        
+        {auth.loggedIn && auth.user?.role === 'student' && (
+          <Link to="/student-dashboard" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+            <UserIcon size={20} />
+            <span>My Dashboard</span>
+          </Link>
+        )}
+        
+        {auth.loggedIn && auth.user?.role === 'admin' && (
+          <Link to="/admin" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
+            <Shield size={20} />
+            <span>Admin Panel</span>
+          </Link>
+        )}
+        
+        {!auth.loggedIn && (
+          <button 
+            className="mobile-nav-item text-left"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setShowAuthModal(true);
+            }}
+          >
+            <LogIn size={20} />
+            <span>Login / Register</span>
+          </button>
+        )}
+        
+        {auth.loggedIn && (
+          <button 
+            className="mobile-nav-item text-left text-red-400"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              handleLogout();
+            }}
+          >
+            <LogOut size={20} />
+            <span>Logout</span>
+          </button>
+        )}
+      </div>
 
       {showAuthModal && !auth.loggedIn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">

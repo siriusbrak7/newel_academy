@@ -2,6 +2,11 @@
 import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material } from '../types';
 import { supabase } from './supabaseClient';
 
+// Add caching variables at the TOP of the file (right after imports)
+let coursesCache: CourseStructure | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
 // =====================================================
 // DEMO ACCOUNT CONFIGURATION
 // =====================================================
@@ -261,152 +266,213 @@ export const deleteUser = async (username: string): Promise<void> => {
 // =====================================================
 // storageService.ts - Updated getCourses function
 // Replace the entire getCourses function with this optimized version:
-export const getCourses = async (): Promise<CourseStructure> => {
-  console.time('getCourses');
-  console.log('🚀 Fetching courses (optimized)...');
-  
-  try {
-    // Fetch topics with ONLY essential data - no materials, no subtopics initially
-    const { data: topicsData, error: topicsError } = await supabase
-      .from('topics')
-      .select(`
-        id,
-        title,
-        description,
-        grade_level,
-        sort_order,
-        subject:subject_id (name),
-        checkpoints_required,
-        checkpoint_pass_percentage,
-        final_assessment_required
-      `)
-      .order('sort_order', { ascending: true })
-      .order('title', { ascending: true });
+// storageService.ts - REPLACE THE ENTIRE getCourses FUNCTION WITH THIS:
 
-    if (topicsError) throw topicsError;
 
-    const courses: CourseStructure = {};
-    
-    if (!topicsData || topicsData.length === 0) {
-      console.log('📊 No topics found in database');
-      console.timeEnd('getCourses');
-      return {};
+
+// =====================================================
+// COURSE MANAGEMENT - OPTIMIZED WITH CACHING
+// =====================================================
+  export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
+    // Return cached data if valid
+    if (!forceRefresh && coursesCache && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+      console.log('📦 Returning cached courses (fast!)');
+      return coursesCache;
     }
-
-    // Get topic IDs for batch fetching
-    const topicIds = topicsData.map(topic => topic.id);
     
-    // Batch fetch materials for ALL topics at once
-    const { data: materialsData } = await supabase
-      .from('materials')
-      .select('*')
-      .in('topic_id', topicIds)
-      .order('sort_order', { ascending: true });
+    console.time('getCourses');
+    console.log('🚀 Fetching courses (optimized with caching)...');
+    
+    try {
+      // Fetch topics with ONLY essential data - no materials, no subtopics initially
+      const { data: topicsData, error: topicsError } = await supabase
+        .from('topics')
+        .select(`
+          id,
+          title,
+          description,
+          grade_level,
+          sort_order,
+          subject:subject_id (name),
+          checkpoints_required,
+          checkpoint_pass_percentage,
+          final_assessment_required
+        `)
+        .order('sort_order', { ascending: true })
+        .order('title', { ascending: true });
 
-    // Batch fetch subtopics for ALL topics at once
-    const { data: subtopicsData } = await supabase
-      .from('subtopics')
-      .select('*')
-      .in('topic_id', topicIds)
-      .order('sort_order', { ascending: true });
+      if (topicsError) throw topicsError;
 
-    // Organize materials by topic_id for quick lookup
-    const materialsByTopic: Record<string, Material[]> = {};
-    if (materialsData) {
-      materialsData.forEach((m: any) => {
-        if (!materialsByTopic[m.topic_id]) {
-          materialsByTopic[m.topic_id] = [];
+      const courses: CourseStructure = {};
+      
+      if (!topicsData || topicsData.length === 0) {
+        console.log('📊 No topics found in database');
+        console.timeEnd('getCourses');
+        return {};
+      }
+
+      // Get topic IDs for batch fetching
+      const topicIds = topicsData.map(topic => topic.id);
+      
+      // Batch fetch materials for ALL topics at once
+      const { data: materialsData } = await supabase
+        .from('materials')
+        .select('*')
+        .in('topic_id', topicIds)
+        .order('sort_order', { ascending: true });
+
+      // Batch fetch subtopics for ALL topics at once
+      const { data: subtopicsData } = await supabase
+        .from('subtopics')
+        .select('*')
+        .in('topic_id', topicIds)
+        .order('sort_order', { ascending: true });
+
+      // Organize materials by topic_id for quick lookup
+      const materialsByTopic: Record<string, Material[]> = {};
+      if (materialsData) {
+        materialsData.forEach((m: any) => {
+          if (!materialsByTopic[m.topic_id]) {
+            materialsByTopic[m.topic_id] = [];
+          }
+          materialsByTopic[m.topic_id].push({
+            id: m.id,
+            title: m.title,
+            type: m.type as 'text' | 'link' | 'file',
+            content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
+          });
+        });
+      }
+
+      // Organize subtopics by topic_id for quick lookup
+      const subtopicsByTopic: Record<string, string[]> = {};
+      if (subtopicsData) {
+        subtopicsData.forEach((s: any) => {
+          if (!subtopicsByTopic[s.topic_id]) {
+            subtopicsByTopic[s.topic_id] = [];
+          }
+          subtopicsByTopic[s.topic_id].push(s.name);
+        });
+      }
+
+      // Process topics
+      topicsData.forEach(topic => {
+        // SAFELY extract subject name from joined data
+        let subjectName = 'Uncategorized';
+        
+        if (topic.subject) {
+          if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+            subjectName = topic.subject[0]?.name || 'Uncategorized';
+          } else if (typeof topic.subject === 'object') {
+            subjectName = (topic.subject as any)?.name || 'Uncategorized';
+          }
         }
-        materialsByTopic[m.topic_id].push({
-          id: m.id,
-          title: m.title,
-          type: m.type as 'text' | 'link' | 'file',
-          content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
+        
+        if (!courses[subjectName]) {
+          courses[subjectName] = {};
+        }
+
+        courses[subjectName][topic.id] = {
+          id: topic.id,
+          title: topic.title,
+          gradeLevel: topic.grade_level || '9',
+          description: topic.description || '',
+          subtopics: subtopicsByTopic[topic.id] || [],
+          materials: materialsByTopic[topic.id] || [],
+          subtopicQuestions: {}, // Don't load questions here - load on demand
+          checkpoints_required: topic.checkpoints_required || 3,
+          checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
+          final_assessment_required: topic.final_assessment_required !== false
+        };
+      });
+
+      console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects, ${topicsData.length} topics`);
+      
+      // Cache the result
+      coursesCache = courses;
+      cacheTimestamp = Date.now();
+      console.timeEnd('getCourses');
+      
+      return courses;
+    } catch (error) {
+      console.error('❌ Get courses error:', error);
+      console.timeEnd('getCourses');
+      return coursesCache || {}; // Return cache if available, even on error
+    }
+  }; // <-- This closes the getCourses function
+
+  // =====================================================
+  // PERFORMANCE MONITORING HELPER
+  // =====================================================
+  export const measureLoadTime = async <T>(
+    taskName: string,
+    task: () => Promise<T>
+  ): Promise<T> => {
+    const startTime = performance.now();
+    console.log(`⏱️ Starting: ${taskName}`);
+    
+    try {
+      const result = await task();
+      const endTime = performance.now();
+      const duration = (endTime - startTime) / 1000;
+      
+      console.log(`✅ ${taskName} completed in ${duration.toFixed(2)}s`);
+      
+      // Log slow operations
+      if (duration > 3) {
+        console.warn(`⚠️ ${taskName} took ${duration.toFixed(2)}s (consider optimizing)`);
+      }
+      
+      return result;
+    } catch (error) {
+      const endTime = performance.now();
+      const duration = (endTime - startTime) / 1000;
+      console.error(`❌ ${taskName} failed after ${duration.toFixed(2)}s:`, error);
+      throw error;
+    }
+  };
+
+  // =====================================================
+  // GET TOPIC QUESTIONS (ON DEMAND)
+  // =====================================================
+  export const getTopicQuestions = async (topicId: string): Promise<Record<string, any[]>> => {
+    try {
+      const { data: questionsData, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('topic_id', topicId);
+
+      if (error) throw error;
+
+      const subtopicQuestions: Record<string, any[]> = {};
+      
+      (questionsData || []).forEach(q => {
+        const subtopic = q.subtopic_name || 'general';
+        if (!subtopicQuestions[subtopic]) {
+          subtopicQuestions[subtopic] = [];
+        }
+        
+        subtopicQuestions[subtopic].push({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          difficulty: q.difficulty || 'IGCSE',
+          topic: q.topic_name || '',
+          options: q.options || [],
+          correctAnswer: q.correct_answer || '',
+          modelAnswer: q.model_answer
         });
       });
+
+      return subtopicQuestions;
+    } catch (error) {
+      console.error('❌ Get topic questions error:', error);
+      return {};
     }
-
-    // Organize subtopics by topic_id for quick lookup
-    const subtopicsByTopic: Record<string, string[]> = {};
-    if (subtopicsData) {
-      subtopicsData.forEach((s: any) => {
-        if (!subtopicsByTopic[s.topic_id]) {
-          subtopicsByTopic[s.topic_id] = [];
-        }
-        subtopicsByTopic[s.topic_id].push(s.name);
-      });
-    }
-
-    // Process topics
-    topicsData.forEach(topic => {
-      const subjectName = Array.isArray(topic.subject) && topic.subject.length > 0 
-        ? topic.subject[0]?.name || 'Uncategorized'
-        : (topic.subject as any)?.name || 'Uncategorized';
-      
-      if (!courses[subjectName]) {
-        courses[subjectName] = {};
-      }
-
-      courses[subjectName][topic.id] = {
-        id: topic.id,
-        title: topic.title,
-        gradeLevel: topic.grade_level || '9',
-        description: topic.description || '',
-        subtopics: subtopicsByTopic[topic.id] || [],
-        materials: materialsByTopic[topic.id] || [],
-        subtopicQuestions: {}, // Don't load questions here - load on demand
-        checkpoints_required: topic.checkpoints_required || 3,
-        checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
-        final_assessment_required: topic.final_assessment_required !== false
-      };
-    });
-
-    console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects, ${topicsData.length} topics`);
-    console.timeEnd('getCourses');
-    return courses;
-  } catch (error) {
-    console.error('❌ Get courses error:', error);
-    console.timeEnd('getCourses');
-    return {};
-  }
-}; // <-- This closes the getCourses function
+  };
 
 // Add this function to load questions only when needed
-export const getTopicQuestions = async (topicId: string): Promise<Record<string, any[]>> => {
-  try {
-    const { data: questionsData, error } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('topic_id', topicId);
 
-    if (error) throw error;
-
-    const subtopicQuestions: Record<string, any[]> = {};
-    
-    (questionsData || []).forEach(q => {
-      const subtopic = q.subtopic_name || 'general';
-      if (!subtopicQuestions[subtopic]) {
-        subtopicQuestions[subtopic] = [];
-      }
-      
-      subtopicQuestions[subtopic].push({
-        id: q.id,
-        text: q.text,
-        type: q.type,
-        difficulty: q.difficulty || 'IGCSE',
-        topic: q.topic_name || '',
-        options: q.options || [],
-        correctAnswer: q.correct_answer || '',
-        modelAnswer: q.model_answer
-      });
-    });
-
-    return subtopicQuestions;
-  } catch (error) {
-    console.error('❌ Get topic questions error:', error);
-    return {};
-  }
-};
 // In storageService.ts, update the saveTopic function:
 // storageService.ts - Updated saveTopic function
 export const saveTopic = async (subject: string, topic: Topic): Promise<void> => {

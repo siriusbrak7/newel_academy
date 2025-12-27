@@ -475,3 +475,88 @@ body.mobile-modal-open {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* ===== MOBILE NAVIGATION FIXES ===== */
+
+/* Show mobile menu button */
+.mobile-menu-button {
+  display: block !important;
+}
+
+/* Mobile navigation container */
+.mobile-nav-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 1000;
+  padding: 1rem;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.mobile-nav-container.active {
+  display: flex;
+}
+
+/* Mobile nav items */
+.mobile-nav-item {
+  display: flex !important;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  color: white;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Move courses button from footer to header */
+footer .courses-button {
+  display: none !important;
+}
+
+/* Make header buttons visible on mobile */
+@media (max-width: 768px) {
+  /* Hide desktop navigation */
+  .desktop-nav {
+    display: none !important;
+  }
+  
+  /* Show mobile navigation trigger */
+  .mobile-nav-trigger {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Ensure header has proper spacing */
+  header {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  /* Add courses button to header on mobile */
+  .mobile-courses-button {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #06b6d4;
+    color: white;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    min-height: 44px;
+  }
+}

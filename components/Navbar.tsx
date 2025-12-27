@@ -12,7 +12,14 @@ import {
   VolumeX,
   LogIn,
   Star,
-  Cpu
+  Cpu,
+  Menu, // ADD THIS
+  X, // ADD THIS
+  ClipboardList,
+  Zap,
+  Users,
+  Shield,
+  User as UserIcon
 } from 'lucide-react';
 import { DEFAULT_THEME } from '../constants';
 
@@ -23,6 +30,7 @@ interface NavbarProps {
   notifications: number;
   onOpenAuth: () => void;
   currentTheme?: Theme;
+  onToggleMobileMenu?: () => void; // ADD THIS
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -31,7 +39,8 @@ const Navbar: React.FC<NavbarProps> = ({
   toggleSidebar,
   notifications,
   onOpenAuth,
-  currentTheme = DEFAULT_THEME
+  currentTheme = DEFAULT_THEME,
+  onToggleMobileMenu // ADD THIS
 }) => {
   const [soundOn, setSoundOn] = useState(true);
 
@@ -60,40 +69,39 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav
-      className={`w-full h-16 border-b flex items-center justify-between px-6 sticky top-0 z-50 transition-all duration-300 ${
+      className={`w-full h-16 border-b flex items-center justify-between px-4 md:px-6 sticky top-0 z-50 transition-all duration-300 ${
         currentTheme === 'Cosmic'
           ? 'bg-black/20 border-white/10'
           : 'bg-black/30 border-green-500/20 cyber-box-glow'
       }`}
     >
       {/* Left: Logo + Mobile Menu */}
-      <div className="flex items-center gap-4">
-        <Link
-          to="/"
-          className="text-3xl font-bold cursor-pointer hover:opacity-80 transition-opacity"
-        >
-          <span
-            style={{ fontFamily: "'Pacifico', cursive" }}
-            className={`bg-clip-text text-transparent ${
-              currentTheme === 'Cosmic'
-                ? 'bg-gradient-to-r from-cyan-400 to-purple-400'
-                : 'bg-gradient-to-r from-green-400 to-emerald-400 cyber-text-glow'
-            }`}
-          >
-            The Newel
-          </span>
-        </Link>
-
-        {/* Mobile menu button */}
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Mobile menu button - only show when user is logged in */}
         {user && (
           <button
-            onClick={toggleSidebar}
+            onClick={onToggleMobileMenu}
             className={`md:hidden p-2 rounded-lg transition-colors ${
               currentTheme === 'Cosmic'
                 ? 'text-white hover:bg-white/10'
                 : 'text-green-400 hover:bg-green-500/20 cyber-box-glow'
             }`}
-            aria-label="Open menu"
+            aria-label="Open mobile menu"
+          >
+            <Menu size={24} />
+          </button>
+        )}
+        
+        {/* Sidebar toggle for desktop */}
+        {user && (
+          <button
+            onClick={toggleSidebar}
+            className={`hidden md:flex p-2 rounded-lg transition-colors ${
+              currentTheme === 'Cosmic'
+                ? 'text-white hover:bg-white/10'
+                : 'text-green-400 hover:bg-green-500/20 cyber-box-glow'
+            }`}
+            aria-label="Open sidebar"
           >
             <svg
               className="w-6 h-6"
@@ -110,10 +118,41 @@ const Navbar: React.FC<NavbarProps> = ({
             </svg>
           </button>
         )}
+
+        <Link
+          to="/"
+          className="text-2xl md:text-3xl font-bold cursor-pointer hover:opacity-80 transition-opacity"
+        >
+          <span
+            style={{ fontFamily: "'Pacifico', cursive" }}
+            className={`bg-clip-text text-transparent ${
+              currentTheme === 'Cosmic'
+                ? 'bg-gradient-to-r from-cyan-400 to-purple-400'
+                : 'bg-gradient-to-r from-green-400 to-emerald-400 cyber-text-glow'
+            }`}
+          >
+            The Newel
+          </span>
+        </Link>
       </div>
 
       {/* Right side */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center gap-3 md:space-x-4">
+        {/* Mobile courses button for students/teachers */}
+        {user && user.role !== 'admin' && (
+          <Link
+            to="/courses"
+            className={`md:hidden flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ${
+              currentTheme === 'Cosmic'
+                ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30'
+                : 'bg-green-600/20 text-green-300 border border-green-500/30'
+            }`}
+          >
+            <BookOpen size={14} />
+            <span>Courses</span>
+          </Link>
+        )}
+
         {/* Theme indicator */}
         {user && (
           <div
@@ -136,7 +175,9 @@ const Navbar: React.FC<NavbarProps> = ({
             {/* MAIN NAV LINKS — hidden on mobile */}
             <div className="hidden md:flex space-x-4 md:space-x-6 text-sm font-medium">
               <Link
-                to="/"
+                to={user.role === 'admin' ? '/admin' : 
+                     user.role === 'teacher' ? '/teacher-dashboard' : 
+                     '/student-dashboard'}
                 className={`flex items-center gap-2 transition-colors ${
                   currentTheme === 'Cosmic'
                     ? 'text-white/80 hover:text-cyan-400'
@@ -177,10 +218,10 @@ const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
               <button
                 onClick={() => setSoundOn(!soundOn)}
-                className={`transition-colors ${
+                className={`transition-colors hidden md:block ${
                   currentTheme === 'Cosmic'
                     ? 'text-white/60 hover:text-white'
                     : 'text-green-400/60 hover:text-green-300'
@@ -214,9 +255,22 @@ const Navbar: React.FC<NavbarProps> = ({
                 <Settings size={20} />
               </button>
 
+              {/* Mobile logout button */}
               <button
                 onClick={onLogout}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
+                className={`md:hidden p-2 rounded-lg ${
+                  currentTheme === 'Cosmic'
+                    ? 'text-red-300 hover:bg-red-500/20'
+                    : 'text-red-400 hover:bg-red-900/30'
+                }`}
+              >
+                <LogOut size={20} />
+              </button>
+
+              {/* Desktop logout button */}
+              <button
+                onClick={onLogout}
+                className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
                   currentTheme === 'Cosmic'
                     ? 'bg-red-500/20 hover:bg-red-500/40 text-red-300 border-red-500/30'
                     : 'bg-red-900/30 hover:bg-red-900/50 text-red-400 border-red-700/50'
@@ -230,14 +284,15 @@ const Navbar: React.FC<NavbarProps> = ({
         ) : (
           <button
             onClick={onOpenAuth}
-            className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 md:px-6 py-2 rounded-lg text-sm font-bold transition-all ${
               currentTheme === 'Cosmic'
                 ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white'
                 : 'bg-gradient-to-r from-green-600 to-emerald-600 text-black cyber-box-glow'
             }`}
           >
             <LogIn size={16} />
-            Login
+            <span className="hidden md:inline">Login</span>
+            <span className="md:hidden">Login</span>
           </button>
         )}
       </div>
