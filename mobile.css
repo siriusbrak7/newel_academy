@@ -10,6 +10,85 @@
 
 * {
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ===== MOBILE NAVIGATION FIXES ===== */
+
+/* Mobile navigation container */
+.mobile-nav-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.98);
+  z-index: 9999; /* Higher than everything */
+  padding-top: calc(1rem + var(--safe-area-inset-top, 0px));
+  padding-bottom: calc(1rem + var(--safe-area-inset-bottom, 0px));
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  backdrop-filter: blur(10px);
+}
+
+.mobile-nav-container.active {
+  display: flex;
+}
+
+/* Mobile nav items */
+.mobile-nav-item {
+  display: flex !important;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  color: white;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Fix for Cyber theme mobile nav */
+.cyber-bg .mobile-nav-item {
+  border-color: rgba(0, 255, 65, 0.2);
+  color: #00ff41;
+}
+
+.cyber-bg .mobile-nav-item:hover {
+  background: rgba(0, 255, 65, 0.1);
+}
+
+/* Mobile menu close button */
+.close-mobile-menu {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Prevent body scroll when mobile menu is open */
+body.mobile-menu-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ===== SMALL PHONES (up to 375px) ===== */
@@ -36,6 +115,12 @@
   
   .gap-6 {
     gap: 1rem !important;
+  }
+  
+  /* Mobile nav adjustments */
+  .mobile-nav-item {
+    padding: 0.875rem 1rem;
+    font-size: 0.9375rem;
   }
 }
 
@@ -100,6 +185,9 @@
     padding-right: 1rem !important;
     backdrop-filter: none !important; /* Remove blur for mobile performance */
     background: rgba(0, 0, 0, 0.95) !important; /* Solid background */
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
   }
   
   /* Hide text in navbar buttons */
@@ -251,6 +339,27 @@
     border-radius: 0 !important;
   }
   
+  /* ===== THEME ELEMENT FIXES ===== */
+  /* Hide complex theme elements on mobile for performance */
+  .star-field,
+  .constellation,
+  .rocket,
+  .rocket-exhaust,
+  .asteroid,
+  .saturn,
+  .cyber-grid,
+  .cyber-scanline,
+  .matrix-column,
+  .space-icon {
+    display: none !important;
+  }
+  
+  /* Simplify theme backgrounds on mobile */
+  .cosmic-bg::before,
+  .cyber-bg::before {
+    opacity: 0.5 !important; /* Reduce intensity */
+  }
+  
   /* ===== UTILITY CLASSES ===== */
   
   /* Hide on mobile */
@@ -342,6 +451,15 @@
   .rounded-3xl {
     border-radius: 1.5rem !important;
   }
+  
+  /* Show some theme elements on tablet */
+  .star-field,
+  .constellation,
+  .rocket,
+  .cyber-grid {
+    display: block !important;
+    opacity: 0.7; /* Reduce intensity for performance */
+  }
 }
 
 /* ===== LANDSCAPE ORIENTATION ===== */
@@ -378,6 +496,17 @@
   .h-64 {
     height: 150px !important;
   }
+  
+  /* Mobile nav adjustments for landscape */
+  .mobile-nav-container {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  
+  .mobile-nav-item {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
 }
 
 /* ===== DARK MODE ENHANCEMENTS ===== */
@@ -393,6 +522,11 @@
   button.bg-white\/10 {
     background: rgba(255, 255, 255, 0.15) !important;
   }
+  
+  /* Mobile nav in dark mode */
+  .mobile-nav-container {
+    background: rgba(0, 0, 0, 0.98) !important;
+  }
 }
 
 /* ===== HIGH CONTRAST MODE ===== */
@@ -403,6 +537,11 @@
   
   button, a {
     text-decoration: underline !important;
+  }
+  
+  /* Mobile nav in high contrast */
+  .mobile-nav-item {
+    border-width: 2px !important;
   }
 }
 
@@ -419,12 +558,18 @@
     opacity: 1 !important;
     transform: none !important;
   }
+  
+  /* Mobile nav without animations */
+  .mobile-nav-container {
+    transition: none !important;
+  }
 }
 
 /* ===== PRINT STYLES ===== */
 @media print {
   nav, 
   .sidebar, 
+  .mobile-nav-container,
   button:not(.print-keep),
   .no-print {
     display: none !important;
@@ -468,95 +613,25 @@
   padding-top: var(--safe-area-inset-top, 0px) !important;
 }
 
-/* Prevent body scrolling on mobile when modal is open */
-body.mobile-modal-open {
-  overflow: hidden !important;
-  position: fixed !important;
-  width: 100% !important;
-  height: 100% !important;
+/* Z-index fix for overlapping elements */
+.mobile-nav-fixed {
+  z-index: 9999 !important;
 }
 
-/* ===== MOBILE NAVIGATION FIXES ===== */
-
-/* Show mobile menu button */
-.mobile-menu-button {
-  display: block !important;
+/* Hide theme manager elements that might interfere */
+body > .star-field,
+body > .constellation,
+body > .rocket,
+body > .cyber-grid,
+body > .matrix-column {
+  z-index: 1 !important; /* Put theme elements behind content */
 }
 
-/* Mobile navigation container */
-.mobile-nav-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.95);
-  z-index: 1000;
-  padding: 1rem;
-  display: none;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.mobile-nav-container.active {
-  display: flex;
-}
-
-/* Mobile nav items */
-.mobile-nav-item {
-  display: flex !important;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  color: white;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.mobile-nav-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-/* Move courses button from footer to header */
-footer .courses-button {
-  display: none !important;
-}
-
-/* Make header buttons visible on mobile */
-@media (max-width: 768px) {
-  /* Hide desktop navigation */
-  .desktop-nav {
-    display: none !important;
-  }
-  
-  /* Show mobile navigation trigger */
-  .mobile-nav-trigger {
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    min-height: 44px;
-  }
-  
-  /* Ensure header has proper spacing */
-  header {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  /* Add courses button to header on mobile */
-  .mobile-courses-button {
-    display: inline-flex !important;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: #06b6d4;
-    color: white;
-    border-radius: 0.5rem;
-    text-decoration: none;
-    min-height: 44px;
-  }
+/* Ensure content is above theme elements */
+#root,
+.mobile-nav-container,
+nav,
+.sidebar {
+  z-index: 10 !important;
+  position: relative;
 }

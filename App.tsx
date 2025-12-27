@@ -19,7 +19,10 @@ import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
 
-// Icons
+// IMPORT MOBILE CSS FIRST
+import './mobile.css';
+
+// Icons - FIXED: User icon aliased to UserIcon
 import { 
   Rocket, Brain, Zap, Target, Clock, Users, BookOpen, 
   MessageSquare, CheckCircle, Star, Award, Globe,
@@ -28,8 +31,8 @@ import {
   LogIn,
   LogOut,
   Trophy,
-  User as UserIcon,
-  X
+  X,
+  User as UserIcon // Aliased to avoid conflict with User type
 } from 'lucide-react';
 
 // Declare ThemeManager from index.html
@@ -144,6 +147,9 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
       iconColor: "text-indigo-400"
     }
   ];
+
+  // Add this useEffect to handle body scroll lock
+
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center text-center px-4 relative overflow-hidden">
@@ -275,7 +281,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </div>
         </div>
 
-                {/* AI Ethics Section - Updated with pointing to words */}
+        {/* AI Ethics Section - Updated with pointing to words */}
         <div className={`p-10 rounded-2xl backdrop-blur-sm border mb-20 animate-fade-in ${
           theme === 'Cyber-Dystopian'
             ? 'cyber-box-glow bg-black/70 border-green-500/30'
@@ -326,76 +332,76 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </p>
         </div>
 
-            {/* Platform Features with Dashboard Previews */}
-    <div className="mb-20">
-      <h2 className={`text-3xl font-bold mb-12 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-        Platform Features
-      </h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {/* Feature 1: Progress Tracking */}
-        <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
-          <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-cyan-500/10 to-blue-500/10'}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`} />
-              <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Progress Analytics</h3>
-            </div>
-            <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-              Real-time performance tracking with detailed insights on strengths and areas for improvement
-            </p>
-            <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
-              <div className="flex justify-between items-center text-sm">
-                <span className={theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}>Biology</span>
-                <span className="text-green-400 font-bold">85%</span>
+        {/* Platform Features with Dashboard Previews */}
+        <div className="mb-20">
+          <h2 className={`text-3xl font-bold mb-12 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
+            Platform Features
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Feature 1: Progress Tracking */}
+            <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
+              <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-cyan-500/10 to-blue-500/10'}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <TrendingUp className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`} />
+                  <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Progress Analytics</h3>
+                </div>
+                <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
+                  Real-time performance tracking with detailed insights on strengths and areas for improvement
+                </p>
+                <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className={theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}>Biology</span>
+                    <span className="text-green-400 font-bold">85%</span>
+                  </div>
+                  <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+                    <div className="h-full bg-green-500" style={{ width: '85%' }}></div>
+                  </div>
+                </div>
               </div>
-              <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
-                <div className="h-full bg-green-500" style={{ width: '85%' }}></div>
+            </div>
+            
+            {/* Feature 2: Interactive Learning */}
+            <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
+              <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-purple-500/10 to-pink-500/10'}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <Brain className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-purple-400'}`} />
+                  <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Personal Learning Assistant</h3>
+                </div>
+                <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
+                  Get instant explanations and personalized learning paths with your personal learning assistant
+                </p>
+                <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-cyan-400" />
+                    <span className={`text-xs ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>"Explain cellular respiration..."</span>
+                  </div>
+                  <div className="text-xs text-white/40 mt-1">24/7 instant response</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Feature 3: Gamified Challenges */}
+            <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
+              <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/10'}`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <Zap className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-yellow-400'}`} />
+                  <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Sprint Challenges</h3>
+                </div>
+                <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
+                  Test your knowledge with timed 222-second sprints and climb the leaderboards
+                </p>
+                <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>222 Sprint Score</span>
+                    <span className="text-yellow-400 font-bold">15/20</span>
+                  </div>
+                  <div className="text-xs text-white/40 mt-1">Rank: Top 10%</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        
-        {/* Feature 2: Interactive Learning */}
-        <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
-          <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-purple-500/10 to-pink-500/10'}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <Brain className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-purple-400'}`} />
-              <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Personal Learning Assistant</h3>
-            </div>
-            <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-              Get instant explanations and personalized learning paths with your personal learning assistant
-            </p>
-            <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-cyan-400" />
-                <span className={`text-xs ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>"Explain cellular respiration..."</span>
-              </div>
-              <div className="text-xs text-white/40 mt-1">24/7 instant response</div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Feature 3: Gamified Challenges */}
-        <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
-          <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/10'}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <Zap className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-yellow-400'}`} />
-              <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Sprint Challenges</h3>
-            </div>
-            <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-              Test your knowledge with timed 222-second sprints and climb the leaderboards
-            </p>
-            <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
-              <div className="flex justify-between items-center">
-                <span className={`text-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>222 Sprint Score</span>
-                <span className="text-yellow-400 font-bold">15/20</span>
-              </div>
-              <div className="text-xs text-white/40 mt-1">Rank: Top 10%</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
         {/* Final CTA */}
         <div
@@ -486,7 +492,7 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // ADD THIS
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -545,6 +551,18 @@ const App: React.FC = () => {
     setMobileMenuOpen(false);
   };
 
+      useEffect(() => {
+      if (mobileMenuOpen) {
+        document.body.classList.add('mobile-menu-open');
+      } else {
+        document.body.classList.remove('mobile-menu-open');
+      }
+      
+      return () => {
+        document.body.classList.remove('mobile-menu-open');
+      };
+    }, [mobileMenuOpen]);
+
   if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
@@ -566,89 +584,123 @@ const App: React.FC = () => {
         notifications={2}
         onOpenAuth={() => setShowAuthModal(true)}
         currentTheme={theme}
-        onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)} // ADD THIS PROP
+        onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentTheme={theme} setTheme={setTheme} />
 
-      {/* Mobile Navigation Menu - ADDED HERE */}
-      <div className={`mobile-nav-container ${mobileMenuOpen ? 'active' : ''}`}>
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-xl font-bold text-white">Menu</h2>
+      
+
+      {/* Mobile Navigation Menu - FIXED VERSION */}
+      <div className={`mobile-nav-container ${mobileMenuOpen ? 'active' : ''} ${theme === 'Cyber-Dystopian' ? 'cyber-bg' : ''}`}>
+        <div className="flex justify-between items-center mb-8 p-4">
+          <h2 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-white'}`}>
+            Menu
+          </h2>
           <button 
-            className="close-mobile-menu text-white p-2"
+            className={`close-mobile-menu p-2 rounded-lg ${theme === 'Cyber-Dystopian' ? 'text-green-400 hover:bg-green-500/20' : 'text-white hover:bg-white/10'}`}
             onClick={() => setMobileMenuOpen(false)}
           >
             <X size={24} />
           </button>
         </div>
         
-        <Link to="/courses" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-          <BookOpen size={20} />
-          <span>Courses</span>
-        </Link>
-        
-        <Link to="/leaderboard" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-          <Trophy size={20} />
-          <span>Leaderboard</span>
-        </Link>
-        
-        <Link to="/assessments" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-          <ClipboardList size={20} />
-          <span>Assessments</span>
-        </Link>
-        
-        <Link to="/sprint-challenge" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-          <Zap size={20} />
-          <span>222-Sprint</span>
-        </Link>
-        
-        {auth.loggedIn && auth.user?.role === 'teacher' && (
-          <Link to="/teacher-dashboard" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-            <UserIcon size={20} />
-            <span>Teacher Dashboard</span>
-          </Link>
-        )}
-        
-        {auth.loggedIn && auth.user?.role === 'student' && (
-          <Link to="/student-dashboard" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-            <UserIcon size={20} />
-            <span>My Dashboard</span>
-          </Link>
-        )}
-        
-        {auth.loggedIn && auth.user?.role === 'admin' && (
-          <Link to="/admin" className="mobile-nav-item" onClick={() => setMobileMenuOpen(false)}>
-            <Shield size={20} />
-            <span>Admin Panel</span>
-          </Link>
-        )}
-        
-        {!auth.loggedIn && (
-          <button 
-            className="mobile-nav-item text-left"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              setShowAuthModal(true);
-            }}
+        <div className="p-4 space-y-2">
+          <Link 
+            to="/courses" 
+            className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+            onClick={() => setMobileMenuOpen(false)}
           >
-            <LogIn size={20} />
-            <span>Login / Register</span>
-          </button>
-        )}
-        
-        {auth.loggedIn && (
-          <button 
-            className="mobile-nav-item text-left text-red-400"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              handleLogout();
-            }}
+            <BookOpen size={20} />
+            <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>Courses</span>
+          </Link>
+          
+          <Link 
+            to="/leaderboard" 
+            className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+            onClick={() => setMobileMenuOpen(false)}
           >
-            <LogOut size={20} />
-            <span>Logout</span>
-          </button>
-        )}
+            <Trophy size={20} />
+            <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>Leaderboard</span>
+          </Link>
+          
+          <Link 
+            to="/assessments" 
+            className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <ClipboardList size={20} />
+            <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>Assessments</span>
+          </Link>
+          
+          <Link 
+            to="/sprint-challenge" 
+            className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Zap size={20} />
+            <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>222-Sprint</span>
+          </Link>
+          
+          {auth.loggedIn && auth.user?.role === 'teacher' && (
+            <Link 
+              to="/teacher-dashboard" 
+              className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Users size={20} />
+              <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>Teacher Dashboard</span>
+            </Link>
+          )}
+          
+          {auth.loggedIn && auth.user?.role === 'student' && (
+            <Link 
+              to="/student-dashboard" 
+              className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <UserIcon size={20} />
+              <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>My Dashboard</span>
+            </Link>
+          )}
+          
+          {auth.loggedIn && auth.user?.role === 'admin' && (
+            <Link 
+              to="/admin" 
+              className={`mobile-nav-item ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Shield size={20} />
+              <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>Admin Panel</span>
+            </Link>
+          )}
+          
+          {!auth.loggedIn && (
+            <button 
+              className={`mobile-nav-item text-left w-full ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-green-500/30' : 'border-white/10'}`}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setShowAuthModal(true);
+              }}
+            >
+              <LogIn size={20} />
+              <span className={theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}>Login / Register</span>
+            </button>
+          )}
+          
+          {auth.loggedIn && (
+            <button 
+              className={`mobile-nav-item text-left w-full text-red-400 ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow border-red-500/30' : 'border-white/10'}`}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleLogout();
+              }}
+            >
+              <LogOut size={20} />
+              <span>Logout</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {showAuthModal && !auth.loggedIn && (
@@ -729,7 +781,7 @@ const App: React.FC = () => {
               <div className={`text-2xl font-bold mb-2 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>
                 The Newel
               </div>
-              <p className="text-sm">Enhanced Science Learning Platform</p>
+              <p className="text-sm">Science Learning Platform</p>
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/" className="hover:underline">Home</Link>
