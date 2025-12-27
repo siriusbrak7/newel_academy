@@ -2,6 +2,7 @@
 // Dashboards.tsx - Updated Chart.js imports
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { QuickMaterialUpload } from './CourseSystem/QuickMaterialUpload';
 import { User, StudentStats, Assessment, Announcement, CourseStructure, LeaderboardEntry } from '../types';
 import {
   getUsers,
@@ -902,7 +903,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <td className="p-4 text-white font-mono">#{i+1}</td>
                   <td className="p-4 font-bold text-white">{entry.username}</td>
                   <td className="p-4">
-                    <span className="bg-white/10 px-2 py-1 rounded text-xs">{entry.grade_level}</span>
+                    <span className="bg-white/10 px-2 py-1 rounded text-xs">{entry.gradeLevel}</span>
                   </td>
                   <td className="p-4 text-right font-mono text-cyan-300">
                     {Math.round(entry.score || 0)}%

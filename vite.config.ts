@@ -17,14 +17,20 @@ export default defineConfig({
     outDir: 'dist',
     target: 'es2020',
     rollupOptions: {
-      external: ['crypto'], // Externalize crypto for browser
+      external: ['crypto'],
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+      },
     },
   },
+  base: '/',
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
-    'global': 'window', // Fix global for browser
+    'global': 'window',
   },
   optimizeDeps: {
-    exclude: ['bcryptjs'], // Exclude bcrypt from optimization
+    exclude: ['bcryptjs'],
+    // ADD THIS for better TypeScript handling:
+    include: ['react', 'react-dom', 'react-router-dom']
   },
 });

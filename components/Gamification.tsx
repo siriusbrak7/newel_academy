@@ -1,14 +1,17 @@
 // Gamification.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Zap, TrendingUp, Users, Star, Award, Timer, Target, Brain, Crown } from 'lucide-react';
-import { getLeaderboards, saveSprintScore } from '../services/storageService'; // Use the new service
+import { 
+  Trophy, Zap, TrendingUp, Users, Star, Award, Timer, Target, 
+  Brain, Crown, BookOpen, ClipboardList, AlertCircle 
+} from 'lucide-react';
+import { getLeaderboards, saveSprintScore } from '../services/storageService';
 
 interface LeaderboardEntry {
   username: string;
   score: number;
   grade_level?: string;
-  type: 'academic' | 'challenge' | 'assessments';
+  
 }
 
 interface LeaderboardData {
@@ -231,6 +234,7 @@ export const SprintChallenge: React.FC = () => {
   );
 };
 
+// Updated LeaderboardView with renderTable function inside
 export const LeaderboardView: React.FC = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData>({
     academic: [],
@@ -240,91 +244,73 @@ export const LeaderboardView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'academic' | 'challenge' | 'assessments'>('academic');
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  const loadLeaderboards = async () => {
-    try {
-      setLoading(true);
-      
-      // Get username from localStorage
-      const storedUser = localStorage.getItem('newel_currentUser');
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          setUsername(user.username);
-        } catch (e) {
-          console.error('Failed to parse user:', e);
+    const loadLeaderboards = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get username from localStorage
+        const storedUser = localStorage.getItem('newel_currentUser');
+        if (storedUser) {
+          try {
+            const user = JSON.parse(storedUser);
+            setUsername(user.username);
+          } catch (e) {
+            console.error('Failed to parse user:', e);
+          }
         }
-      }
-      
-      // Fetch leaderboards
-      const data = await getLeaderboards();
-      console.log('📊 Leaderboard data loaded:', data);
-      
-      // Ensure data structure
-      const safeData = {
-        academic: Array.isArray(data?.academic) ? data.academic : [],
-        challenge: Array.isArray(data?.challenge) ? data.challenge : [],
-        assessments: Array.isArray(data?.assessments) ? data.assessments : []
-      };
-      
-      // If no data, use demo data
-      if (safeData.academic.length === 0 && safeData.challenge.length === 0 && safeData.assessments.length === 0) {
-        console.log('Using demo leaderboard data');
-        setLeaderboardData({
-          academic: [
-            { username: 'student1', score: 95, grade_level: '12', type: 'academic' },
-            { username: 'student2', score: 88, grade_level: '11', type: 'academic' },
-            { username: 'student3', score: 82, grade_level: '10', type: 'academic' },
-            { username: 'student4', score: 78, grade_level: '9', type: 'academic' },
-            { username: 'student5', score: 91, grade_level: '12', type: 'academic' }
-          ],
-          challenge: [
-            { username: 'gamer1', score: 4500, grade_level: '12', type: 'challenge' },
-            { username: 'gamer2', score: 3800, grade_level: '11', type: 'challenge' },
-            { username: 'gamer3', score: 3200, grade_level: '10', type: 'challenge' },
-            { username: 'speed_learner', score: 2900, grade_level: '9', type: 'challenge' },
-            { username: 'quiz_champ', score: 4100, grade_level: '12', type: 'challenge' }
-          ],
-          assessments: [
-            { username: 'test_taker', score: 92, grade_level: '12', type: 'assessments' },
-            { username: 'quiz_master', score: 87, grade_level: '11', type: 'assessments' },
-            { username: 'exam_ace', score: 94, grade_level: '10', type: 'assessments' },
-            { username: 'assignment_pro', score: 89, grade_level: '9', type: 'assessments' },
-            { username: 'top_student', score: 96, grade_level: '12', type: 'assessments' }
-          ]
-        });
-      } else {
+        
+        // Fetch leaderboards - ONLY REAL DATA
+        const data = await getLeaderboards();
+        console.log('📊 Leaderboard data loaded:', data);
+        
+        // Ensure data structure
+        const safeData = {
+          academic: Array.isArray(data?.academic) ? data.academic : [],
+          challenge: Array.isArray(data?.challenge) ? data.challenge : [],
+          assessments: Array.isArray(data?.assessments) ? data.assessments : []
+        };
+        
+        // Set only real data - NO DEMO DATA
         setLeaderboardData(safeData);
+        
+        // Log if any leaderboard is empty
+        if (safeData.academic.length === 0) {
+          console.log('Academic leaderboard is empty - no academic data yet');
+        }
+        if (safeData.challenge.length === 0) {
+          console.log('Challenge leaderboard is empty - no challenge data yet');
+        }
+        if (safeData.assessments.length === 0) {
+          console.log('Assessments leaderboard is empty - no assessment data yet');
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading leaderboards:', error);
+        setError('Failed to load leaderboards. Please try again later.');
+        // Set empty data on error - NO DEMO DATA
+        setLeaderboardData({
+          academic: [],
+          challenge: [],
+          assessments: []
+        });
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('❌ Error loading leaderboards:', error);
-      // Set demo data on error too
-      setLeaderboardData({
-        academic: [
-          { username: 'Demo Student 1', score: 85, grade_level: '12', type: 'academic' },
-          { username: 'Demo Student 2', score: 79, grade_level: '11', type: 'academic' },
-          { username: 'Demo Student 3', score: 92, grade_level: '10', type: 'academic' }
-        ],
-        challenge: [
-          { username: 'Demo Gamer 1', score: 3500, grade_level: '12', type: 'challenge' },
-          { username: 'Demo Gamer 2', score: 2800, grade_level: '11', type: 'challenge' },
-          { username: 'Demo Gamer 3', score: 3100, grade_level: '10', type: 'challenge' }
-        ],
-        assessments: [
-          { username: 'Demo Test Taker', score: 88, grade_level: '12', type: 'assessments' },
-          { username: 'Demo Quizzer', score: 91, grade_level: '11', type: 'assessments' },
-          { username: 'Demo Examiner', score: 84, grade_level: '10', type: 'assessments' }
-        ]
-      });
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadLeaderboards();
+  }, []);
+
+  const getCurrentUserRank = (entries: LeaderboardEntry[]) => {
+    if (!username) return null;
+    return entries.findIndex(entry => entry.username === username) + 1;
   };
 
-  loadLeaderboards();
-}, []);
-
+  // In the renderTable function, update the table header and cell:
   const renderTable = (entries: LeaderboardEntry[]) => {
     if (!entries || entries.length === 0) {
       return (
@@ -341,7 +327,7 @@ export const LeaderboardView: React.FC = () => {
             <th className="p-4">Rank</th>
             <th className="p-4">Student</th>
             <th className="p-4">Score</th>
-            <th className="p-4">Type</th>
+            <th className="p-4">Grade</th> {/* Changed from Type to Grade */}
             <th className="p-4 text-right">Badge</th>
           </tr>
         </thead>
@@ -389,7 +375,7 @@ export const LeaderboardView: React.FC = () => {
                 </td>
                 <td className="p-4">
                   <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-white/10">
-                    {entry.type}
+                    Grade {entry.grade_level || 'N/A'}
                   </span>
                 </td>
                 <td className="p-4 text-right">
@@ -422,6 +408,28 @@ export const LeaderboardView: React.FC = () => {
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto p-8">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <h3 className="text-xl font-bold text-white mb-2">Unable to Load Leaderboards</h3>
+          <p className="text-white/70 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentData = leaderboardData[activeTab];
+  const currentUserRank = getCurrentUserRank(currentData);
+  const totalEntries = currentData.length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">

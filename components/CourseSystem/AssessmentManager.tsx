@@ -589,7 +589,7 @@ export const AssessmentManager: React.FC = () => {
                       }`}>
                         {sub.score}%
                       </span>
-                      {sub.aiGraded && (
+                      {sub.ai_graded && (
                         <p className="text-[10px] text-purple-400 flex items-center gap-1 justify-end uppercase tracking-widest">
                           <Brain size={10}/> Newel Graded
                         </p>

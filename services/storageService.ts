@@ -893,13 +893,14 @@ export const getLeaderboards = async (): Promise<{
 
     // Add to your return statement
     return {
-      academic: courseEntries, // Use course scores for academic leaderboard
+      academic: courseEntries.map(entry => ({
+        ...entry,
+        type: 'academic' as const  // Convert 'course' type to 'academic'
+      })), // Use course scores for academic leaderboard
       challenge: [], // Placeholder - will be populated below
       assessments: assessmentEntries
     };
 
-    console.log('Leaderboards fetched: ${assessmentEntries.length} real assessment entries');
-    return leaderboards;
   } catch (error) {
     console.error('Get leaderboards error:', error);
     return { academic: [], challenge: [], assessments: [] };

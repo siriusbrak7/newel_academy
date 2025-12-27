@@ -201,6 +201,7 @@ export interface LeaderboardEntry {
   username: string;
   score: number;
   gradeLevel?: string;
+   type?: 'academic' | 'challenge' | 'assessments'; // Make it optional
 }
 
 export interface StudentStats {
