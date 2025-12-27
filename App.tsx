@@ -740,7 +740,7 @@ const App: React.FC = () => {
             element={
               <RequireAuth allowedRoles={['teacher', 'student']} user={auth.user} loggedIn={auth.loggedIn}>
                 {auth.user?.role === 'teacher' 
-                  ? <Navigate to="/teacher-dashboard" /> // Redirect teachers to dashboard
+                  ? <CourseManager />
                   : <StudentCourseList user={auth.user!} />}
                 </RequireAuth>
               }
