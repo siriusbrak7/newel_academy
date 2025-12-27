@@ -739,11 +739,12 @@ const App: React.FC = () => {
             path="/courses"
             element={
               <RequireAuth allowedRoles={['teacher', 'student']} user={auth.user} loggedIn={auth.loggedIn}>
-                {auth.user?.role === 'teacher' ? <CourseManager /> : <StudentCourseList user={auth.user!} />}
-              </RequireAuth>
-            }
-          />
-
+                {auth.user?.role === 'teacher' 
+                  ? <Navigate to="/teacher-dashboard" /> // Redirect teachers to dashboard
+                  : <StudentCourseList user={auth.user!} />}
+                </RequireAuth>
+              }
+            />  
           <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetail /></RequireAuth>} />
 
           <Route
