@@ -18,19 +18,16 @@ export default defineConfig({
     target: 'es2020',
     rollupOptions: {
       external: ['crypto'],
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-      },
     },
+    emptyOutDir: true,
+    assetsDir: 'assets',
   },
-  base: './',
+  base: '/',
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
     'global': 'window',
   },
   optimizeDeps: {
     exclude: ['bcryptjs'],
-    // ADD THIS for better TypeScript handling:
-    include: ['react', 'react-dom', 'react-router-dom']
   },
 });
