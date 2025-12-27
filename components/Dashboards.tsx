@@ -1,8 +1,6 @@
 ﻿// Dashboards.tsx - COMPLETE FIXED VERSION FOR DEPLOYMENT
-// Dashboards.tsx - Updated Chart.js imports
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { QuickMaterialUpload } from './CourseSystem/QuickMaterialUpload';
 import { User, StudentStats, Assessment, Announcement, CourseStructure, LeaderboardEntry } from '../types';
 import {
   getUsers,
@@ -17,13 +15,15 @@ import {
   getProgress,
   calculateUserStats,
   saveTopic,
-  getStudentCourseHistory,  // ADD THIS
-  getStudentAssessmentFeedback,  // ADD THIS
+  getStudentCourseHistory,
+  getStudentAssessmentFeedback,
   getStudentTopicPerformance,
   saveAnnouncement,
   getSubmissions,
   refreshAllLeaderboards,
-  getPendingTheorySubmissions
+  getPendingTheorySubmissions,
+  uploadFileToSupabase,
+  deleteMaterial
 } from '../services/storageService';
 import { 
   Check, 
@@ -46,10 +46,18 @@ import {
   BookOpen as BookOpenIcon,
   Users,
   BarChart3,
-  Target,  // ADD THIS
+  Target,
   MessageSquare,
-  CheckCircle,  // ADD THIS
-  ChevronDown  // ADD THIS
+  CheckCircle,
+  ChevronDown,
+  FileText,
+  Link as LinkIcon,
+  // ADD THESE MISSING ICONS:
+  File as FileIcon, // Renamed to avoid conflict with JavaScript File
+  Trash2, 
+  Plus,
+  // Add any other icons used in the component...
+  TrendingUp as TrendingUpIcon // Already imported above
 } from 'lucide-react';
 
 // Fixed Chart.js imports
@@ -82,6 +90,9 @@ try {
     save() { console.log('PDF export disabled - install jspdf') }
   };
 }
+
+// ... REST OF YOUR CODE (AdminDashboard, TeacherDashboard, StudentDashboard components remain the same)
+// Just make sure to replace the problematic icon usages as shown below
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -459,7 +470,7 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-// --- TEACHER DASHBOARD - Fixed Blur Issue ---
+// --- TEACHER DASHBOARD - Enhanced with Course Management ---
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [dashboardVersion, setDashboardVersion] = useState(0); 
   const [stats, setStats] = useState<StudentStats[]>([]);
@@ -471,25 +482,32 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     challenge: [], 
     assessments: [] 
   });
-  const [theorySubmissions, setTheorySubmissions] = useState<any[]>([]);
 
   const [activeLeaderboard, setActiveLeaderboard] = useState<'academic' | 'challenge' | 'assessments'>('assessments');
 
-  // Instruction Editor State
+  // Course Management State
   const [courses, setCourses] = useState<CourseStructure>({});
   const [selSubject, setSelSubject] = useState('Biology');
   const [selTopic, setSelTopic] = useState('');
   const [instructionText, setInstructionText] = useState('');
   const [loading, setLoading] = useState(true);
-
-  const loadTheorySubmissions = async () => {
-    try {
-      const submissions = await getPendingTheorySubmissions();
-      setTheorySubmissions(submissions || []);
-    } catch (error) {
-      console.error('Error loading theory submissions:', error);
-    }
-  };
+  
+  // NEW: Material Upload State
+  const [newMaterial, setNewMaterial] = useState({
+    title: '',
+    type: 'text' as 'text' | 'link' | 'file',
+    content: ''
+  });
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // NEW: Create Topic State
+  const [showCreateTopic, setShowCreateTopic] = useState(false);
+  const [newTopic, setNewTopic] = useState({
+    title: '',
+    gradeLevel: '9',
+    description: ''
+  });
 
   const loadData = async () => {
     console.log("Refreshing Teacher Dashboard Data...");
@@ -507,14 +525,13 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       const leaderboards = await getLeaderboards();
       setLeaderboardData(leaderboards);
       
-      const courseData = await getCourses();
+      const courseData = await getCourses(true); // Force refresh
       setCourses(courseData);
       
       if (!courseData[selSubject] && Object.keys(courseData).length > 0) {
         setSelSubject(Object.keys(courseData)[0]);
       }
     } catch (error) {
-      
       console.error('Error loading teacher dashboard:', error);
     } finally {
       setLoading(false);
@@ -528,6 +545,9 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     if (selSubject && selTopic && courses[selSubject]?.[selTopic]) {
       setInstructionText(courses[selSubject][selTopic].description || '');
+      // Reset material form when topic changes
+      setNewMaterial({ title: '', type: 'text', content: '' });
+      setMaterialFile(null);
     }
   }, [selSubject, selTopic, courses]);
 
@@ -548,14 +568,17 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       alert("Announcement Posted!");
       forceRefresh();
     } catch (error) {
-      
       console.error('Error posting announcement:', error);
       alert("Failed to post announcement");
     }
   };
 
   const handleSaveInstructions = async () => {
-    if (!selSubject || !selTopic) return;
+    if (!selSubject || !selTopic) {
+      alert("Please select a topic first");
+      return;
+    }
+    
     const topic = courses[selSubject]?.[selTopic];
     if (!topic) return;
 
@@ -565,9 +588,152 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       alert("Instructions Saved!");
       forceRefresh(); 
     } catch (error) {
-      
       console.error('Error saving instructions:', error);
       alert("Failed to save instructions");
+    }
+  };
+
+  // NEW: Handle adding new material
+  const handleAddMaterial = async () => {
+    if (!selSubject || !selTopic) {
+      alert("Please select a topic first");
+      return;
+    }
+    
+    if (!newMaterial.title) {
+      alert("Material title is required");
+      return;
+    }
+
+    const topic = courses[selSubject]?.[selTopic];
+    if (!topic) return;
+
+    let content = newMaterial.content;
+    
+    if (newMaterial.type === 'file') {
+      if (!materialFile) {
+        alert("Please select a file");
+        return;
+      }
+      
+      setIsUploading(true);
+      try {
+        const url = await uploadFileToSupabase(materialFile);
+        if (!url) {
+          alert("File upload failed");
+          setIsUploading(false);
+          return;
+        }
+        content = url;
+      } catch (error) {
+        console.error('Upload error:', error);
+        alert("Upload failed");
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    } else if (!content) {
+      alert(`${newMaterial.type === 'link' ? 'URL' : 'Content'} is required`);
+      return;
+    }
+
+    const newMat = {
+      id: `temp_${Date.now()}`,
+      title: newMaterial.title,
+      type: newMaterial.type,
+      content: content
+    };
+
+    try {
+      const updatedTopic = { 
+        ...topic, 
+        materials: [...(topic.materials || []), newMat] 
+      };
+      
+      await saveTopic(selSubject, updatedTopic);
+      alert("✅ Material added successfully!");
+      
+      // Reset form
+      setNewMaterial({ title: '', type: 'text', content: '' });
+      setMaterialFile(null);
+      forceRefresh();
+    } catch (error) {
+      console.error('Error adding material:', error);
+      alert("Failed to add material");
+    }
+  };
+
+  // NEW: Handle deleting material
+  // In your TeacherDashboard component, replace the handleDeleteMaterial function:
+
+const handleDeleteMaterial = async (materialIndex: number) => {
+  if (!selSubject || !selTopic) {
+    alert("Please select a topic first");
+    return;
+  }
+  
+  const topic = courses[selSubject]?.[selTopic];
+  if (!topic || !topic.materials || topic.materials.length === 0) return;
+
+  const material = topic.materials[materialIndex];
+  if (!material) return;
+
+  const confirmed = window.confirm(`Delete "${material.title}"? This cannot be undone.`);
+  if (!confirmed) return;
+
+  try {
+    // If material has a real ID (not temp_), delete from database
+    if (material.id && !material.id.startsWith('temp_')) {
+      await deleteMaterial(material.id);
+    }
+    
+    // Remove from local array
+    const updatedMaterials = [...topic.materials];
+    updatedMaterials.splice(materialIndex, 1);
+
+    const updatedTopic = { 
+      ...topic, 
+      materials: updatedMaterials 
+    };
+    
+    await saveTopic(selSubject, updatedTopic);
+    alert("✅ Material deleted!");
+    forceRefresh();
+  } catch (error) {
+    console.error('Error deleting material:', error);
+    alert("Failed to delete material");
+  }
+};
+
+  // NEW: Handle creating new topic
+  const handleCreateTopic = async () => {
+    if (!newTopic.title.trim()) {
+      alert("Topic title is required");
+      return;
+    }
+
+    try {
+      const topicData: any = {
+        title: newTopic.title,
+        gradeLevel: newTopic.gradeLevel,
+        description: newTopic.description,
+        subtopics: [],
+        materials: [],
+        checkpoints_required: 3,
+        checkpoint_pass_percentage: 80,
+        final_assessment_required: true
+      };
+
+      await saveTopic(selSubject, topicData);
+      alert("✅ Topic created successfully!");
+      
+      // Reset form and refresh
+      setNewTopic({ title: '', gradeLevel: '9', description: '' });
+      setShowCreateTopic(false);
+      forceRefresh();
+    } catch (error) {
+      console.error('Error creating topic:', error);
+      alert("Failed to create topic");
     }
   };
 
@@ -595,7 +761,6 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       doc.save(`${user.username}_class_report.pdf`);
     } catch (error) {
-      
       console.error('Error exporting report:', error);
       alert("Failed to export report");
     }
@@ -621,13 +786,22 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     );
   }
 
+  const editingTopic = selSubject && selTopic && courses[selSubject] 
+    ? courses[selSubject][selTopic] 
+    : null;
+
+  // Get available subjects
+  const availableSubjects = Object.keys(courses).filter(subject => 
+    Object.keys(courses[subject] || {}).length > 0
+  );
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white">Teacher Dashboard</h2>
-          <div className="text-sm text-white/50">Student Data Only....</div>
+          <div className="text-sm text-white/50">Manage students, courses, and assessments</div>
         </div>
         <div className="flex gap-2">
           <button 
@@ -665,21 +839,8 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
       
-      {/* Main Actions - REMOVED BACKDROP-BLUR */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Link 
-          to="/courses" 
-          className="bg-white/5 rounded-2xl border border-white/10 p-6 flex items-center gap-6 hover:bg-white/10 transition-colors group"
-        >
-          <div className="bg-purple-900/50 p-4 rounded-xl group-hover:scale-110 transition-transform">
-            <BookOpenIcon size={32} className="text-purple-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white">Manage Courses</h3>
-            <p className="text-white/50 text-sm">Add topics, upload materials, and create checkpoints.</p>
-          </div>
-        </Link>
-
+      {/* Main Actions - SIMPLIFIED: Only Assessments (Removed Manage Courses) */}
+      <div className="grid md:grid-cols-1 gap-6">
         <Link 
           to="/assessments" 
           className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 rounded-2xl border border-cyan-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
@@ -694,32 +855,10 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             <p className="text-white/60 text-sm">Create MCQ/Written quizzes, use Newel Auto-Grading, and review student submissions.</p>
           </div>
         </Link>
-        
-        <Link 
-          to="/courses" 
-          className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 rounded-2xl border border-purple-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
-        >
-          <div className="bg-purple-900/50 p-4 rounded-xl shadow-purple-500/20 shadow-lg">
-            <MessageSquare size={32} className="text-purple-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              Grade Theory Submissions 
-              {theorySubmissions.length > 0 && (
-                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                  {theorySubmissions.length} new
-                </span>
-              )}
-            </h3>
-            <p className="text-white/60 text-sm">
-              Review and grade student theory answers from checkpoint assessments.
-            </p>
-          </div>
-        </Link>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Left Column: Analytics & Instructions */}
+        {/* Left Column: Analytics */}
         <div className="md:col-span-2 space-y-6">
           {/* Analytics Chart */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
@@ -770,18 +909,101 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Quick Instructions Editor */}
+          {/* ENHANCED: Course & Materials Manager */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <ClipboardList size={20} className="text-orange-400"/> Quick Course Instructions
-            </h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <BookOpenIcon size={20} className="text-orange-400"/> Course & Materials Manager
+              </h3>
+              <button
+                onClick={() => setShowCreateTopic(!showCreateTopic)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showCreateTopic 
+                    ? 'bg-cyan-600 text-white' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {showCreateTopic ? 'Cancel' : '+ New Topic'}
+              </button>
+            </div>
+
+            {/* Create New Topic Form (Conditional) */}
+            {showCreateTopic && (
+              <div className="mb-6 p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                <h4 className="text-lg font-medium text-white mb-4">Create New Topic</h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Topic Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newTopic.title}
+                      onChange={(e) => setNewTopic({...newTopic, title: e.target.value})}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      placeholder="e.g., Cell Biology"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Subject
+                      </label>
+                      <select
+                        value={selSubject}
+                        onChange={(e) => setSelSubject(e.target.value)}
+                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      >
+                        {availableSubjects.map(subject => (
+                          <option key={subject} value={subject}>{subject}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Grade Level
+                      </label>
+                      <select
+                        value={newTopic.gradeLevel}
+                        onChange={(e) => setNewTopic({...newTopic, gradeLevel: e.target.value})}
+                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      >
+                        {['9', '10', '11', '12'].map(grade => (
+                          <option key={grade} value={grade}>Grade {grade}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      value={newTopic.description}
+                      onChange={(e) => setNewTopic({...newTopic, description: e.target.value})}
+                      rows={3}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      placeholder="Brief description..."
+                    />
+                  </div>
+                  <button
+                    onClick={handleCreateTopic}
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Create Topic
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Topic Selection */}
             <div className="flex gap-4 mb-4">
               <select 
                 className="bg-black/20 border border-white/10 rounded-lg p-2 text-white flex-1" 
                 value={selSubject} 
                 onChange={e => setSelSubject(e.target.value)}
               >
-                {Object.keys(courses).map(s => <option key={s} value={s}>{s}</option>)}
+                {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <select 
                 className="bg-black/20 border border-white/10 rounded-lg p-2 text-white flex-1" 
@@ -790,22 +1012,188 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
               >
                 <option value="">Select Topic</option>
                 {selSubject && courses[selSubject] && Object.values(courses[selSubject]).map((t: any) => 
-                  <option key={t.id} value={t.id}>{t.title}</option>
+                  <option key={t.id} value={t.id}>{t.title} (Grade {t.gradeLevel})</option>
                 )}
               </select>
             </div>
-            <textarea 
-              className="w-full h-32 bg-black/20 border border-white/10 rounded-lg p-3 text-white text-sm mb-4" 
-              placeholder="Select a topic to edit its instructions/description..."
-              value={instructionText}
-              onChange={e => setInstructionText(e.target.value)}
-            />
-            <button 
-              onClick={handleSaveInstructions} 
-              className="bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-6 rounded-lg text-sm flex items-center gap-2"
-            >
-              <Save size={16}/> Save Instructions
-            </button>
+
+            {/* Only show if topic is selected */}
+            {selTopic && editingTopic && (
+              <>
+                {/* Topic Description Editor */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Topic Description
+                  </label>
+                  <textarea 
+                    className="w-full h-32 bg-black/20 border border-white/10 rounded-lg p-3 text-white text-sm" 
+                    placeholder="Enter topic description/instructions..."
+                    value={instructionText}
+                    onChange={e => setInstructionText(e.target.value)}
+                  />
+                  <button 
+                    onClick={handleSaveInstructions} 
+                    className="mt-3 bg-orange-600 hover:bg-orange-500 text-white font-medium py-2 px-6 rounded-lg text-sm flex items-center gap-2"
+                  >
+                    <Save size={16}/> Save Description
+                  </button>
+                </div>
+
+                {/* Existing Materials */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-medium text-white mb-4">
+                    Materials ({editingTopic.materials?.length || 0})
+                  </h4>
+                  {editingTopic.materials?.length === 0 ? (
+                    <div className="text-center py-4 bg-gray-900/30 rounded-xl">
+                      <FileText className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                      <p className="text-gray-400 text-sm">No materials yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {editingTopic.materials?.map((material, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded ${
+                              material.type === 'file' ? 'bg-green-900/30' : 
+                              material.type === 'link' ? 'bg-blue-900/30' : 
+                              'bg-gray-800'
+                            }`}>
+                              {material.type === 'file' ? <FileIcon size={16} /> : 
+                               material.type === 'link' ? <LinkIcon size={16} /> : 
+                               <FileText size={16} />}
+                            </div>
+                            <div>
+                              <p className="text-white font-medium">{material.title}</p>
+                              <p className="text-xs text-gray-400 uppercase">{material.type}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {material.type === 'link' || material.type === 'file' ? (
+                              <a
+                                href={material.content}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors"
+                              >
+                                Open
+                              </a>
+                            ) : (
+                              <button
+                                onClick={() => alert(material.content)}
+                                className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors"
+                              >
+                                View
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteMaterial(index)}
+                              className="p-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add New Material */}
+                <div className="bg-gray-900/30 rounded-xl p-4 border border-gray-700">
+                  <h4 className="text-lg font-medium text-white mb-4">Add New Material</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Material Title *
+                      </label>
+                      <input
+                        type="text"
+                        value={newMaterial.title}
+                        onChange={(e) => setNewMaterial({...newMaterial, title: e.target.value})}
+                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                        placeholder="e.g., Worksheet PDF"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Type
+                        </label>
+                        <select
+                          value={newMaterial.type}
+                          onChange={(e) => setNewMaterial({...newMaterial, type: e.target.value as any})}
+                          className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                        >
+                          <option value="text">Text</option>
+                          <option value="link">Link</option>
+                          <option value="file">File</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          {newMaterial.type === 'file' ? 'Select File' : 
+                           newMaterial.type === 'link' ? 'URL *' : 'Content *'}
+                        </label>
+                        {newMaterial.type === 'file' ? (
+                          <div className="relative">
+                            <div className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white">
+                              {materialFile ? (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-green-400 text-sm">{materialFile.name}</span>
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                </div>
+                              ) : (
+                                <div className="text-gray-400 text-sm">No file selected</div>
+                              )}
+                            </div>
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => setMaterialFile(e.target.files?.[0] || null)}
+                            />
+                          </div>
+                        ) : newMaterial.type === 'link' ? (
+                          <input
+                            type="url"
+                            value={newMaterial.content}
+                            onChange={(e) => setNewMaterial({...newMaterial, content: e.target.value})}
+                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                            placeholder="https://..."
+                          />
+                        ) : (
+                          <textarea
+                            value={newMaterial.content}
+                            onChange={(e) => setNewMaterial({...newMaterial, content: e.target.value})}
+                            rows={3}
+                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                            placeholder="Enter material content..."
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleAddMaterial}
+                      disabled={isUploading}
+                      className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isUploading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          Add Material
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -821,13 +1209,13 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-white text-sm" 
                 placeholder="Title (e.g. Exam next week)"
                 value={announcementText.title}
-                onChange={e => setAnnouncementText({...announcementText, title: e.target.value})}
+                onChange={(e) => setAnnouncementText({...announcementText, title: e.target.value})}
               />
               <textarea 
                 className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-white text-sm h-24" 
                 placeholder="Message content..."
                 value={announcementText.content}
-                onChange={e => setAnnouncementText({...announcementText, content: e.target.value})}
+                onChange={(e) => setAnnouncementText({...announcementText, content: e.target.value})}
               />
               <button 
                 onClick={handlePostAnnouncement} 
