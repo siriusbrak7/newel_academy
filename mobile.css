@@ -439,3 +439,39 @@
     page-break-inside: avoid;
   }
 }
+
+/* ===== MOBILE-FIRST UTILITY CLASSES ===== */
+.mobile-tap-target {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+.mobile-text-large {
+  font-size: 16px !important; /* Prevents iOS zoom */
+}
+
+.mobile-full-width {
+  width: 100vw !important;
+  margin-left: calc(-1 * var(--safe-area-inset-left, 0px)) !important;
+  margin-right: calc(-1 * var(--safe-area-inset-right, 0px)) !important;
+  padding-left: var(--safe-area-inset-left, 0px) !important;
+  padding-right: var(--safe-area-inset-right, 0px) !important;
+}
+
+/* Fix for iPhone bottom bar */
+.mobile-bottom-safe {
+  padding-bottom: calc(1rem + var(--safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Fix for iPhone notch */
+.mobile-top-safe {
+  padding-top: var(--safe-area-inset-top, 0px) !important;
+}
+
+/* Prevent body scrolling on mobile when modal is open */
+body.mobile-modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}

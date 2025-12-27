@@ -8,7 +8,8 @@ import {
   saveTopic, 
   uploadFileToSupabase,
   getPendingTheorySubmissions,
-  getTopicCheckpoints
+  getTopicCheckpoints,
+  getTopicQuestions  // ADD THIS IMPORT
 } from '../../services/storageService';
 import { 
   Plus, Save, Upload, File, Link as LinkIcon, FileText, 
@@ -45,6 +46,11 @@ export const CourseManager: React.FC = () => {
   const [theorySubmissions, setTheorySubmissions] = useState<any[]>([]);
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [filterGrade, setFilterGrade] = useState<string>('all');
+  
+  // ADD THESE STATES FOR LAZY LOADING QUESTIONS
+  const [topicQuestions, setTopicQuestions] = useState<Record<string, Record<string, Question[]>>>({});
+  const [loadingQuestions, setLoadingQuestions] = useState<string | null>(null);
+  const [showQuestionsForTopic, setShowQuestionsForTopic] = useState<string | null>(null);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -54,6 +60,32 @@ export const CourseManager: React.FC = () => {
     loadCourses();
     loadTheorySubmissions();
   }, []);
+
+  // FIXED: Move loadQuestionsForTopic function inside the component
+  const loadQuestionsForTopic = async (topicId: string) => {
+    if (topicQuestions[topicId]) {
+      return; // Already loaded
+    }
+    
+    setLoadingQuestions(topicId);
+    try {
+      const questions = await getTopicQuestions(topicId);
+      setTopicQuestions(prev => ({
+        ...prev,
+        [topicId]: questions
+      }));
+    } catch (error) {
+      console.error('Failed to load questions:', error);
+    } finally {
+      setLoadingQuestions(null);
+    }
+  };
+
+  // When user clicks on a topic to view questions
+  const handleViewQuestions = async (topicId: string) => {
+    await loadQuestionsForTopic(topicId);
+    setShowQuestionsForTopic(topicId);
+  };
 
   const loadTheorySubmissions = async () => {
     try {
@@ -75,6 +107,7 @@ export const CourseManager: React.FC = () => {
     setViewMode('edit');
     setAddMatForm({ title: '', type: 'text', content: '' });
     setAddMatFile(null);
+    setShowQuestionsForTopic(null); // Hide questions when selecting a new topic
   };
 
   const handleSwitchToCreate = () => {
@@ -93,6 +126,7 @@ export const CourseManager: React.FC = () => {
       finalAssessmentRequired: true
     });
     setCreateFile(null);
+    setShowQuestionsForTopic(null);
   };
 
   const handleCreateTopic = async () => {
@@ -214,6 +248,63 @@ export const CourseManager: React.FC = () => {
     return matchesSearch && matchesGrade;
   });
 
+  // Add QuestionsView component inside the main component
+  const QuestionsView = ({ topicId }: { topicId: string }) => {
+    const questions = topicQuestions[topicId] || {};
+    
+    return (
+      <div className="mt-6 bg-gray-900/50 border border-gray-700 rounded-xl p-6">
+        <h4 className="text-lg font-medium text-white mb-4 flex items-center justify-between">
+          <span>Topic Questions</span>
+          <button
+            onClick={() => setShowQuestionsForTopic(null)}
+            className="text-sm text-gray-400 hover:text-white"
+          >
+            Hide
+          </button>
+        </h4>
+        
+        {loadingQuestions === topicId ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+            <p className="mt-2 text-gray-400">Loading questions...</p>
+          </div>
+        ) : Object.keys(questions).length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            No questions available for this topic
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {Object.entries(questions).map(([subtopic, qs]) => (
+              <div key={subtopic} className="mb-6">
+                <h5 className="font-medium text-cyan-300 mb-3 text-sm uppercase tracking-wider">
+                  {subtopic} ({qs.length} questions)
+                </h5>
+                <div className="space-y-3">
+                  {qs.map((q: any) => (
+                    <div key={q.id} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                      <p className="text-white mb-2">{q.text}</p>
+                      <div className="flex items-center gap-3 text-sm text-gray-400">
+                        <span className="px-2 py-1 bg-gray-700 rounded">{q.type}</span>
+                        <span className="px-2 py-1 bg-gray-700 rounded">{q.difficulty}</span>
+                        {q.options && (
+                          <span className="px-2 py-1 bg-gray-700 rounded">
+                            {q.options.length} options
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black">
       {/* Header */}
@@ -275,6 +366,7 @@ export const CourseManager: React.FC = () => {
                         setSelectedTopicId(null);
                         setViewMode('create');
                         setSearchTerm('');
+                        setShowQuestionsForTopic(null);
                       }}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         activeSubject === subject
@@ -557,13 +649,27 @@ export const CourseManager: React.FC = () => {
                           <p className="text-gray-300 mt-4">{editingTopic.description}</p>
                         )}
                       </div>
-                      <button
-                        onClick={handleSwitchToCreate}
-                        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                      >
-                        New Topic
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewQuestions(editingTopic.id)}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          View Questions
+                        </button>
+                        <button
+                          onClick={handleSwitchToCreate}
+                          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                        >
+                          New Topic
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Questions View - Conditionally rendered */}
+                    {showQuestionsForTopic === editingTopic.id && (
+                      <QuestionsView topicId={editingTopic.id} />
+                    )}
 
                     {/* Existing Materials */}
                     <div className="mb-8">
