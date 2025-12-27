@@ -9,7 +9,8 @@ import {
   uploadFileToSupabase,
   getPendingTheorySubmissions,
   getTopicCheckpoints,
-  getTopicQuestions
+  getTopicQuestions,
+  deleteMaterial
 } from '../../services/storageService';
 import { 
   Plus, Save, Upload, File, Link as LinkIcon, FileText, 
@@ -103,37 +104,63 @@ export const CourseManager: React.FC = () => {
   const parsedSubtopics = createForm.subtopics.split(',').map(s => s.trim()).filter(Boolean);
 
   // ADD DELETE MATERIAL FUNCTION
-  const handleDeleteMaterial = async (materialIndex: number) => {
-    if (!editingTopic || !selectedTopicId || !courses[activeSubject]) {
-      alert('No topic selected');
-      return;
+  // Replace the current handleDeleteMaterial function with this:
+const handleDeleteMaterial = async (materialIndex: number, materialId?: string) => {
+  if (!editingTopic || !selectedTopicId || !courses[activeSubject]) {
+    alert('No topic selected');
+    return;
+  }
+
+  const material = editingTopic.materials[materialIndex];
+  if (!material) {
+    alert('Material not found');
+    return;
+  }
+
+  const confirmed = window.confirm(`Are you sure you want to delete "${material.title}"? This action cannot be undone.`);
+  if (!confirmed) return;
+
+  try {
+    console.log('🗑️ Starting material deletion process...');
+    console.log('Material details:', {
+      title: material.title,
+      id: material.id,
+      type: material.type
+    });
+
+    // Try to delete from database if we have a valid material ID
+    // Material IDs from database are UUIDs, not temp_ IDs
+    if (material.id && !material.id.startsWith('temp_')) {
+      try {
+        console.log(`🗑️ Attempting to delete material from database: ${material.id}`);
+        await deleteMaterial(material.id);
+        console.log(`✅ Successfully deleted material from database: ${material.id}`);
+      } catch (dbError) {
+        console.error('❌ Failed to delete from database, but will continue with local delete:', dbError);
+        // Continue with local delete even if database delete fails
+      }
+    } else {
+      console.log('ℹ️ Material has temp ID or no ID, skipping database deletion');
     }
 
-    const confirmed = window.confirm('Are you sure you want to delete this material? This action cannot be undone.');
-    if (!confirmed) return;
+    // Remove the material from the local array
+    const updatedMaterials = [...editingTopic.materials];
+    updatedMaterials.splice(materialIndex, 1);
 
-    try {
-      // Remove the material from the array
-      const updatedMaterials = [...editingTopic.materials];
-      updatedMaterials.splice(materialIndex, 1);
-
-      const updatedTopic = { 
-        ...editingTopic, 
-        materials: updatedMaterials 
-      };
-      
-      await saveTopic(activeSubject, updatedTopic);
-      
-      // Refresh courses data
-      const updatedCourses = await getCourses();
-      setCourses(updatedCourses);
-      
-      alert('✅ Material deleted successfully!');
-    } catch (error) {
-      console.error('Error deleting material:', error);
-      alert('Failed to delete material. Please try again.');
-    }
-  };
+    const updatedTopic = { 
+      ...editingTopic, 
+      materials: updatedMaterials 
+    };
+    
+    // Save the updated topic (without the deleted material)
+    console.log('💾 Saving updated topic to database...');
+    await saveTopic(activeSubject, updatedTopic);
+    
+    // Force refresh the courses data to get latest from database
+    console.log('🔄 Refreshing courses data...');
+    const updatedCourses = await getCourses(true); // Force refresh cache
+    setCourses(updatedCourses);
+    console.log('✅ Material deletion process completed successfully!');
 
   const handleSelectTopic = (topicId: string) => {
     setSelectedTopicId(topicId);
@@ -142,6 +169,23 @@ export const CourseManager: React.FC = () => {
     setAddMatFile(null);
     setShowQuestionsForTopic(null); // Hide questions when selecting a new topic
   };
+  // Also update the editingTopic reference
+    const refreshedTopic = updatedCourses[activeSubject]?.[selectedTopicId];
+    if (refreshedTopic) {
+      // We need to trigger a re-render by updating state
+      // This is a bit hacky but works
+      setSelectedTopicId(null);
+      setTimeout(() => setSelectedTopicId(selectedTopicId), 100);
+    }
+    
+    console.log('✅ Material deletion process completed');
+    alert('✅ Material deleted successfully!');
+    
+  } catch (error) {
+    console.error('❌ Error during material deletion:', error);
+    alert('Failed to delete material. Please try again.');
+  }
+};
 
   const handleSwitchToCreate = () => {
     setSelectedTopicId(null);
@@ -337,6 +381,10 @@ export const CourseManager: React.FC = () => {
       </div>
     );
   };
+
+  function handleSelectTopic(id: string): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black">

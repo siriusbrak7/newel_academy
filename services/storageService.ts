@@ -1349,6 +1349,28 @@ export const uploadFileToSupabase = async (file: File): Promise<string | null> =
   }
 };
 
+// Add this function to storageService.ts (after the uploadFileToSupabase function)
+export const deleteMaterial = async (materialId: string): Promise<void> => {
+  try {
+    console.log(`🗑️ Attempting to delete material: ${materialId}`);
+    
+    const { error } = await supabase
+      .from('materials')
+      .delete()
+      .eq('id', materialId);
+    
+    if (error) {
+      console.error('❌ Database delete error:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Material ${materialId} deleted from database`);
+  } catch (error) {
+    console.error('❌ Error deleting material from database:', error);
+    throw error;
+  }
+};
+
 // =====================================================
 // EXPORT/IMPORT
 // =====================================================
