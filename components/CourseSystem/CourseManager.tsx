@@ -9,7 +9,7 @@ import {
   uploadFileToSupabase,
   getPendingTheorySubmissions,
   getTopicCheckpoints,
-  getTopicQuestions  // ADD THIS IMPORT
+  getTopicQuestions
 } from '../../services/storageService';
 import { 
   Plus, Save, Upload, File, Link as LinkIcon, FileText, 
@@ -101,6 +101,39 @@ export const CourseManager: React.FC = () => {
     : null;
   
   const parsedSubtopics = createForm.subtopics.split(',').map(s => s.trim()).filter(Boolean);
+
+  // ADD DELETE MATERIAL FUNCTION
+  const handleDeleteMaterial = async (materialIndex: number) => {
+    if (!editingTopic || !selectedTopicId || !courses[activeSubject]) {
+      alert('No topic selected');
+      return;
+    }
+
+    const confirmed = window.confirm('Are you sure you want to delete this material? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      // Remove the material from the array
+      const updatedMaterials = [...editingTopic.materials];
+      updatedMaterials.splice(materialIndex, 1);
+
+      const updatedTopic = { 
+        ...editingTopic, 
+        materials: updatedMaterials 
+      };
+      
+      await saveTopic(activeSubject, updatedTopic);
+      
+      // Refresh courses data
+      const updatedCourses = await getCourses();
+      setCourses(updatedCourses);
+      
+      alert('✅ Material deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      alert('Failed to delete material. Please try again.');
+    }
+  };
 
   const handleSelectTopic = (topicId: string) => {
     setSelectedTopicId(topicId);
@@ -673,7 +706,12 @@ export const CourseManager: React.FC = () => {
 
                     {/* Existing Materials */}
                     <div className="mb-8">
-                      <h4 className="text-lg font-medium text-white mb-4">Existing Materials</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-medium text-white">Existing Materials ({editingTopic.materials?.length || 0})</h4>
+                        {editingTopic.materials?.length > 0 && (
+                          <span className="text-sm text-gray-400">Click trash icon to delete</span>
+                        )}
+                      </div>
                       {editingTopic.materials?.length === 0 ? (
                         <div className="text-center py-8 bg-gray-900/50 rounded-xl">
                           <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
@@ -682,8 +720,8 @@ export const CourseManager: React.FC = () => {
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {editingTopic.materials?.map((material) => (
-                            <div key={material.id} className="bg-gray-900/50 border border-gray-700 rounded-xl p-4">
+                          {editingTopic.materials?.map((material, index) => (
+                            <div key={material.id || index} className="bg-gray-900/50 border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-colors">
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
                                   <div className={`p-2 rounded-lg ${
@@ -706,18 +744,27 @@ export const CourseManager: React.FC = () => {
                                       href={material.content}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg transition-colors"
+                                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
                                     >
-                                      Open
+                                      <Eye className="w-3 h-3" /> Open
                                     </a>
                                   ) : (
                                     <button
-                                      onClick={() => alert(material.content)}
-                                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg transition-colors"
+                                      onClick={() => {
+                                        alert(`Material Content:\n\n${material.content.substring(0, 500)}${material.content.length > 500 ? '...' : ''}`);
+                                      }}
+                                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
                                     >
-                                      View
+                                      <Eye className="w-3 h-3" /> View
                                     </button>
                                   )}
+                                  <button
+                                    onClick={() => handleDeleteMaterial(index)}
+                                    className="p-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded-lg transition-colors"
+                                    title="Delete Material"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -858,7 +905,7 @@ export const CourseManager: React.FC = () => {
               <p className="text-gray-400">Review and grade student theory answers</p>
             </div>
             
-            {/* Theory submissions content (same as before but with updated styling) */}
+            {/* Theory submissions content */}
             <div className="p-6">
               {theorySubmissions.length === 0 ? (
                 <div className="text-center py-12">
