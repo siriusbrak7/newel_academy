@@ -1092,7 +1092,7 @@ const handleDeleteMaterial = async (materialIndex: number) => {
                               </button>
                             )}
                             <button
-                              onClick={() => handleAddMaterial()}
+                              onClick={() => handleDeleteMaterial(index)}
                               className="p-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded transition-colors"
                               title="Delete"
                             >
