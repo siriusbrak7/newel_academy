@@ -240,61 +240,88 @@ const handleDeleteMaterial = async (materialIndex: number, id: string) => {
   };
 
   const handleAddMaterialToTopic = async () => {
-    if (!editingTopic) return;
-    if (!addMatForm.title) {
-      alert("Title required");
+  if (!editingTopic) return;
+  if (!addMatForm.title) {
+    alert("Title required");
+    return;
+  }
+
+  let content = addMatForm.content;
+  if (addMatForm.type === 'file') {
+    if (!addMatFile) {
+      alert("Please select a file");
       return;
     }
-
-    let content = addMatForm.content;
-    if (addMatForm.type === 'file') {
-      if (!addMatFile) {
-        alert("Please select a file");
-        return;
-      }
-      setIsUploading(true);
-      try {
-        const url = await uploadFileToSupabase(addMatFile);
-        if (!url) {
-          alert("Upload failed");
-          setIsUploading(false);
-          return;
-        }
-        content = url;
-      } catch (error) {
-        console.error('Upload error:', error);
+    setIsUploading(true);
+    try {
+      const url = await uploadFileToSupabase(addMatFile);
+      if (!url) {
         alert("Upload failed");
         setIsUploading(false);
         return;
       }
+      content = url;
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert("Upload failed");
       setIsUploading(false);
-    } else if (!content) {
-      alert("Content required");
       return;
     }
+    setIsUploading(false);
+  } else if (!content) {
+    alert("Content required");
+    return;
+  }
 
-    const newMat: Material = {
-      id: `temp_${Date.now()}`,
-      title: addMatForm.title,
-      type: addMatForm.type as 'text' | 'link' | 'file',
-      content: content
-    };
+  const newMat: Material = {
+    id: `temp_${Date.now()}`,
+    title: addMatForm.title,
+    type: addMatForm.type as 'text' | 'link' | 'file',
+    content: content
+  };
 
-    const updatedTopic = { 
-      ...editingTopic, 
-      materials: [...editingTopic.materials, newMat] 
-    };
-    
+  // ✅ CRITICAL: Update LOCAL state immediately
+  const updatedTopic = { 
+    ...editingTopic, 
+    materials: [...editingTopic.materials, newMat] 
+  };
+  
+  // Update the courses state locally FIRST
+  setCourses(prev => ({
+    ...prev,
+    [activeSubject]: {
+      ...prev[activeSubject],
+      [selectedTopicId!]: updatedTopic
+    }
+  }));
+  
+  try {
+    // Then save to database
     await saveTopic(activeSubject, updatedTopic);
     
-    const updatedCourses = await getCourses();
+    // Get fresh data from database (optional, but ensures sync)
+    const updatedCourses = await getCourses(true);
     setCourses(updatedCourses);
     
     alert('✅ Material added successfully!');
     
+    // Reset form
     setAddMatForm({ title: '', type: 'text', content: '' });
     setAddMatFile(null);
-  };
+  } catch (error) {
+    console.error('Error adding material:', error);
+    alert("Failed to save material to database");
+    
+    // Revert local state on error
+    setCourses(prev => ({
+      ...prev,
+      [activeSubject]: {
+        ...prev[activeSubject],
+        [selectedTopicId!]: editingTopic // Revert to original
+      }
+    }));
+  }
+};
 
   // Get filtered topics
   const allTopics = Object.values(courses[activeSubject] || {}) as Topic[];

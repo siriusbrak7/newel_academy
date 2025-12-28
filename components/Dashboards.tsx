@@ -595,73 +595,97 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   // NEW: Handle adding new material
   const handleAddMaterial = async () => {
-    if (!selSubject || !selTopic) {
-      alert("Please select a topic first");
+  if (!selSubject || !selTopic) {
+    alert("Please select a topic first");
+    return;
+  }
+  
+  if (!newMaterial.title) {
+    alert("Material title is required");
+    return;
+  }
+
+  const topic = courses[selSubject]?.[selTopic];
+  if (!topic) return;
+
+  let content = newMaterial.content;
+  
+  if (newMaterial.type === 'file') {
+    if (!materialFile) {
+      alert("Please select a file");
       return;
     }
     
-    if (!newMaterial.title) {
-      alert("Material title is required");
-      return;
-    }
-
-    const topic = courses[selSubject]?.[selTopic];
-    if (!topic) return;
-
-    let content = newMaterial.content;
-    
-    if (newMaterial.type === 'file') {
-      if (!materialFile) {
-        alert("Please select a file");
-        return;
-      }
-      
-      setIsUploading(true);
-      try {
-        const url = await uploadFileToSupabase(materialFile);
-        if (!url) {
-          alert("File upload failed");
-          setIsUploading(false);
-          return;
-        }
-        content = url;
-      } catch (error) {
-        console.error('Upload error:', error);
-        alert("Upload failed");
+    setIsUploading(true);
+    try {
+      const url = await uploadFileToSupabase(materialFile);
+      if (!url) {
+        alert("File upload failed");
         setIsUploading(false);
         return;
       }
+      content = url;
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert("Upload failed");
       setIsUploading(false);
-    } else if (!content) {
-      alert(`${newMaterial.type === 'link' ? 'URL' : 'Content'} is required`);
       return;
     }
+    setIsUploading(false);
+  } else if (!content) {
+    alert(`${newMaterial.type === 'link' ? 'URL' : 'Content'} is required`);
+    return;
+  }
 
-    const newMat = {
-      id: `temp_${Date.now()}`,
-      title: newMaterial.title,
-      type: newMaterial.type,
-      content: content
-    };
-
-    try {
-      const updatedTopic = { 
-        ...topic, 
-        materials: [...(topic.materials || []), newMat] 
-      };
-      
-      await saveTopic(selSubject, updatedTopic);
-      alert("✅ Material added successfully!");
-      
-      // Reset form
-      setNewMaterial({ title: '', type: 'text', content: '' });
-      setMaterialFile(null);
-      forceRefresh();
-    } catch (error) {
-      console.error('Error adding material:', error);
-      alert("Failed to add material");
-    }
+  const newMat = {
+    id: `temp_${Date.now()}`,
+    title: newMaterial.title,
+    type: newMaterial.type,
+    content: content
   };
+
+  // ✅ CRITICAL: Update LOCAL state immediately
+  const updatedTopic = { 
+    ...topic, 
+    materials: [...(topic.materials || []), newMat] 
+  };
+  
+  // Update local state FIRST
+  setCourses(prev => ({
+    ...prev,
+    [selSubject]: {
+      ...prev[selSubject],
+      [selTopic]: updatedTopic
+    }
+  }));
+
+  try {
+    await saveTopic(selSubject, updatedTopic);
+    alert("✅ Material added successfully!");
+    
+    // Reset form
+    setNewMaterial({ title: '', type: 'text', content: '' });
+    setMaterialFile(null);
+    
+    // Optional: Force refresh to sync with database
+    setTimeout(() => {
+      forceRefresh();
+    }, 500);
+    
+  } catch (error) {
+    console.error('Error adding material:', error);
+    alert("Failed to add material");
+    
+    // Revert local state on error
+    setCourses(prev => ({
+      ...prev,
+      [selSubject]: {
+        ...prev[selSubject],
+        [selTopic]: topic // Revert to original
+      }
+    }));
+  }
+};
 
   // NEW: Handle deleting material
   // In your TeacherDashboard component, replace the handleDeleteMaterial function:

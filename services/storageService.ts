@@ -538,8 +538,9 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
 
     // ✅ CRITICAL FIX: Save materials to materials table
     // ✅ CRITICAL FIX: Save materials to materials table
+  // In the saveTopic function, after saving the topic:
   if (topic.materials && topic.materials.length > 0) {
-    console.log(`Saving ${topic.materials.length} materials to database`);
+    console.log(`💾 Saving ${topic.materials.length} materials...`);
     
     // FIRST: Delete all existing materials for this topic
     const { error: deleteError } = await supabase
@@ -548,8 +549,7 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
       .eq('topic_id', topicId);
       
     if (deleteError) {
-      console.error('Error deleting old materials:', deleteError);
-      // Don't throw - we'll try to insert anyway
+      console.warn('⚠️ Could not delete old materials:', deleteError.message);
     }
     
     // THEN: Insert the current materials
@@ -557,19 +557,22 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
       topic_id: topicId,
       title: material.title,
       type: material.type,
-      content: material.content,
+      content: material.type === 'file' ? material.content : material.content,
       storage_path: material.type === 'file' ? material.content : null,
       sort_order: index,
       created_at: new Date().toISOString()
     }));
     
-    const { error: materialsError } = await supabase
-      .from('materials')
-      .insert(materialsToInsert);
-    
-    if (materialsError) {
-      console.error('Error saving materials:', materialsError);
-      // Don't throw - topic is saved, materials might fail but we continue
+    if (materialsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('materials')
+        .insert(materialsToInsert);
+      
+      if (insertError) {
+        console.error('❌ Error inserting materials:', insertError.message);
+      } else {
+        console.log(`✅ Successfully saved ${materialsToInsert.length} materials`);
+      }
     }
   }
 
