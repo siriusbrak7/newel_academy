@@ -666,6 +666,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   // NEW: Handle deleting material
   // In your TeacherDashboard component, replace the handleDeleteMaterial function:
 // Add this function to your TeacherDashboard component
+// Add this to your TeacherDashboard component:
 const handleDeleteMaterial = async (materialIndex: number) => {
   if (!selSubject || !selTopic) {
     alert("Please select a topic first");
@@ -678,14 +679,12 @@ const handleDeleteMaterial = async (materialIndex: number) => {
   const material = topic.materials[materialIndex];
   if (!material) return;
 
-  const confirmed = window.confirm(`Are you sure you want to delete "${material.title}"?`);
+  const confirmed = window.confirm(`Delete "${material.title}"?`);
   if (!confirmed) return;
 
   try {
-    // Remove the material from the array
-    const updatedMaterials = [...topic.materials];
-    updatedMaterials.splice(materialIndex, 1);
-
+    // Remove from array
+    const updatedMaterials = topic.materials.filter((_, i) => i !== materialIndex);
     const updatedTopic = { 
       ...topic, 
       materials: updatedMaterials 
@@ -693,17 +692,17 @@ const handleDeleteMaterial = async (materialIndex: number) => {
     
     await saveTopic(selSubject, updatedTopic);
     
-    // If material has a real ID (not temp), delete from database
+    // Delete from database if it has a real ID
     if (material.id && !material.id.startsWith('temp_')) {
       try {
         await deleteMaterial(material.id);
       } catch (dbError) {
-        console.error('Failed to delete from database:', dbError);
+        console.warn('Could not delete from database:', dbError);
       }
     }
     
     forceRefresh();
-    alert('✅ Material deleted successfully!');
+    alert('✅ Material deleted!');
   } catch (error) {
     console.error('Error deleting material:', error);
     alert('Failed to delete material');

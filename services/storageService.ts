@@ -537,28 +537,41 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<void> =>
     }
 
     // ✅ CRITICAL FIX: Save materials to materials table
-    if (topic.materials && topic.materials.length > 0) {
-      console.log(`Saving ${topic.materials.length} materials to database`);
+    // ✅ CRITICAL FIX: Save materials to materials table
+  if (topic.materials && topic.materials.length > 0) {
+    console.log(`Saving ${topic.materials.length} materials to database`);
+    
+    // FIRST: Delete all existing materials for this topic
+    const { error: deleteError } = await supabase
+      .from('materials')
+      .delete()
+      .eq('topic_id', topicId);
       
-      const materialsToInsert = topic.materials.map((material, index) => ({
-        topic_id: topicId,
-        title: material.title,
-        type: material.type,
-        content: material.content,
-        storage_path: material.type === 'file' ? material.content : null,
-        sort_order: index,
-        created_at: new Date().toISOString()
-      }));
-      
-      const { error: materialsError } = await supabase
-        .from('materials')
-        .insert(materialsToInsert);
-      
-      if (materialsError) {
-        console.error('Error saving materials:', materialsError);
-        // Don't throw - topic is saved, materials might fail but we continue
-      }
+    if (deleteError) {
+      console.error('Error deleting old materials:', deleteError);
+      // Don't throw - we'll try to insert anyway
     }
+    
+    // THEN: Insert the current materials
+    const materialsToInsert = topic.materials.map((material, index) => ({
+      topic_id: topicId,
+      title: material.title,
+      type: material.type,
+      content: material.content,
+      storage_path: material.type === 'file' ? material.content : null,
+      sort_order: index,
+      created_at: new Date().toISOString()
+    }));
+    
+    const { error: materialsError } = await supabase
+      .from('materials')
+      .insert(materialsToInsert);
+    
+    if (materialsError) {
+      console.error('Error saving materials:', materialsError);
+      // Don't throw - topic is saved, materials might fail but we continue
+    }
+  }
 
     
   } catch (error) {

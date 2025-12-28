@@ -104,69 +104,61 @@ export const CourseManager: React.FC = () => {
   const parsedSubtopics = createForm.subtopics.split(',').map(s => s.trim()).filter(Boolean);
 
   // FIXED: CORRECT handleDeleteMaterial function
-    const handleDeleteMaterial = async (materialIndex: number, id: string) => {
-    if (!editingTopic || !selectedTopicId || !courses[activeSubject]) {
-      alert('No topic selected');
-      return;
-    }
+  // Change this function (lines ~108-150):
+const handleDeleteMaterial = async (materialIndex: number, id: string) => {
+  if (!editingTopic || !selectedTopicId || !courses[activeSubject]) {
+    alert('No topic selected');
+    return;
+  }
 
-    const material = editingTopic.materials[materialIndex];
-    if (!material) {
-      alert('Material not found');
-      return;
-    }
+  const material = editingTopic.materials[materialIndex];
+  if (!material) {
+    alert('Material not found');
+    return;
+  }
 
-    const confirmed = window.confirm(`Are you sure you want to delete "${material.title}"? This action cannot be undone.`);
-    if (!confirmed) return;
+  const confirmed = window.confirm(`Are you sure you want to delete "${material.title}"?`);
+  if (!confirmed) return;
 
-    try {
-      console.log('🗑️ Starting material deletion process...');
-      console.log('Material details:', {
-        title: material.title,
-        id: material.id,
-        type: material.type
-      });
+  try {
+    console.log('🗑️ Starting material deletion process...');
+    
+    // Remove the material from the local array
+    const updatedMaterials = [...editingTopic.materials];
+    updatedMaterials.splice(materialIndex, 1);
 
-      // Remove the material from the local array FIRST
-      const updatedMaterials = [...editingTopic.materials];
-      updatedMaterials.splice(materialIndex, 1);
-
-      const updatedTopic = { 
-        ...editingTopic, 
-        materials: updatedMaterials 
-      };
-      
-      // Save the updated topic FIRST (with one less material)
-      console.log('💾 Saving updated topic to database...');
-      await saveTopic(activeSubject, updatedTopic);
-      
-      // THEN delete from materials table if it has a real ID
-      if (material.id && !material.id.startsWith('temp_')) {
-        try {
-          console.log(`🗑️ Attempting to delete material from database: ${material.id}`);
-          await deleteMaterial(material.id);
-          console.log(`✅ Successfully deleted material from database: ${material.id}`);
-        } catch (dbError) {
-          console.error('❌ Failed to delete from materials table:', dbError);
-          // Don't alert user - the topic was saved successfully without this material
-        }
-      } else {
-        console.log('ℹ️ Material has temp ID or no ID, skipping database deletion');
+    const updatedTopic = { 
+      ...editingTopic, 
+      materials: updatedMaterials 
+    };
+    
+    // Save the updated topic
+    console.log('💾 Saving updated topic to database...');
+    await saveTopic(activeSubject, updatedTopic); // Use activeSubject, not selSubject
+    
+    // Delete from materials table if it has a real ID
+    if (material.id && !material.id.startsWith('temp_')) {
+      try {
+        console.log(`🗑️ Attempting to delete material from database: ${material.id}`);
+        await deleteMaterial(material.id);
+        console.log(`✅ Successfully deleted material from database: ${material.id}`);
+      } catch (dbError) {
+        console.error('❌ Failed to delete from materials table:', dbError);
       }
-      
-      // Force refresh the courses data to get latest from database
-      console.log('🔄 Refreshing courses data...');
-      const updatedCourses = await getCourses(true); // Force refresh cache
-      setCourses(updatedCourses);
-      
-      console.log('✅ Material deletion process completed successfully!');
-      alert('✅ Material deleted successfully!');
-      
-    } catch (error) {
-      console.error('❌ Error during material deletion:', error);
-      alert('Failed to delete material. Please try again.');
     }
-  };
+    
+    // Refresh courses data
+    console.log('🔄 Refreshing courses data...');
+    const updatedCourses = await getCourses(true);
+    setCourses(updatedCourses);
+    
+    console.log('✅ Material deletion process completed successfully!');
+    alert('✅ Material deleted successfully!');
+  } catch (error) {
+    console.error('❌ Error during material deletion:', error);
+    alert('Failed to delete material. Please try again.');
+  }
+};
 
   // FIXED: Add the missing handleSelectTopic function
   const handleSelectTopic = (topicId: string) => {
