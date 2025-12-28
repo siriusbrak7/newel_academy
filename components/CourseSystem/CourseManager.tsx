@@ -104,7 +104,7 @@ export const CourseManager: React.FC = () => {
   const parsedSubtopics = createForm.subtopics.split(',').map(s => s.trim()).filter(Boolean);
 
   // FIXED: CORRECT handleDeleteMaterial function
-  const handleDeleteMaterial = async (materialIndex: number, materialId?: string) => {
+    const handleDeleteMaterial = async (materialIndex: number, id: string) => {
     if (!editingTopic || !selectedTopicId || !courses[activeSubject]) {
       alert('No topic selected');
       return;
@@ -127,22 +127,7 @@ export const CourseManager: React.FC = () => {
         type: material.type
       });
 
-      // Try to delete from database if we have a valid material ID
-      // Material IDs from database are UUIDs, not temp_ IDs
-      if (material.id && !material.id.startsWith('temp_')) {
-        try {
-          console.log(`🗑️ Attempting to delete material from database: ${material.id}`);
-          await deleteMaterial(material.id);
-          console.log(`✅ Successfully deleted material from database: ${material.id}`);
-        } catch (dbError) {
-          console.error('❌ Failed to delete from database, but will continue with local delete:', dbError);
-          // Continue with local delete even if database delete fails
-        }
-      } else {
-        console.log('ℹ️ Material has temp ID or no ID, skipping database deletion');
-      }
-
-      // Remove the material from the local array
+      // Remove the material from the local array FIRST
       const updatedMaterials = [...editingTopic.materials];
       updatedMaterials.splice(materialIndex, 1);
 
@@ -151,26 +136,30 @@ export const CourseManager: React.FC = () => {
         materials: updatedMaterials 
       };
       
-      // Save the updated topic (without the deleted material)
+      // Save the updated topic FIRST (with one less material)
       console.log('💾 Saving updated topic to database...');
       await saveTopic(activeSubject, updatedTopic);
+      
+      // THEN delete from materials table if it has a real ID
+      if (material.id && !material.id.startsWith('temp_')) {
+        try {
+          console.log(`🗑️ Attempting to delete material from database: ${material.id}`);
+          await deleteMaterial(material.id);
+          console.log(`✅ Successfully deleted material from database: ${material.id}`);
+        } catch (dbError) {
+          console.error('❌ Failed to delete from materials table:', dbError);
+          // Don't alert user - the topic was saved successfully without this material
+        }
+      } else {
+        console.log('ℹ️ Material has temp ID or no ID, skipping database deletion');
+      }
       
       // Force refresh the courses data to get latest from database
       console.log('🔄 Refreshing courses data...');
       const updatedCourses = await getCourses(true); // Force refresh cache
       setCourses(updatedCourses);
-      console.log('✅ Material deletion process completed successfully!');
-
-      // Also update the editingTopic reference
-      const refreshedTopic = updatedCourses[activeSubject]?.[selectedTopicId];
-      if (refreshedTopic) {
-        // We need to trigger a re-render by updating state
-        // This is a bit hacky but works
-        setSelectedTopicId(null);
-        setTimeout(() => setSelectedTopicId(selectedTopicId), 100);
-      }
       
-      console.log('✅ Material deletion process completed');
+      console.log('✅ Material deletion process completed successfully!');
       alert('✅ Material deleted successfully!');
       
     } catch (error) {

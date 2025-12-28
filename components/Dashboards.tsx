@@ -594,7 +594,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   // NEW: Handle adding new material
-  const handleAddMaterial = async () => {
+  const handleAddMaterial = async (index: number) => {
     if (!selSubject || !selTopic) {
       alert("Please select a topic first");
       return;
@@ -666,44 +666,6 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   // NEW: Handle deleting material
   // In your TeacherDashboard component, replace the handleDeleteMaterial function:
 
-const handleDeleteMaterial = async (materialIndex: number) => {
-  if (!selSubject || !selTopic) {
-    alert("Please select a topic first");
-    return;
-  }
-  
-  const topic = courses[selSubject]?.[selTopic];
-  if (!topic || !topic.materials || topic.materials.length === 0) return;
-
-  const material = topic.materials[materialIndex];
-  if (!material) return;
-
-  const confirmed = window.confirm(`Delete "${material.title}"? This cannot be undone.`);
-  if (!confirmed) return;
-
-  try {
-    // If material has a real ID (not temp_), delete from database
-    if (material.id && !material.id.startsWith('temp_')) {
-      await deleteMaterial(material.id);
-    }
-    
-    // Remove from local array
-    const updatedMaterials = [...topic.materials];
-    updatedMaterials.splice(materialIndex, 1);
-
-    const updatedTopic = { 
-      ...topic, 
-      materials: updatedMaterials 
-    };
-    
-    await saveTopic(selSubject, updatedTopic);
-    alert("✅ Material deleted!");
-    forceRefresh();
-  } catch (error) {
-    console.error('Error deleting material:', error);
-    alert("Failed to delete material");
-  }
-};
 
   // NEW: Handle creating new topic
   const handleCreateTopic = async () => {
@@ -1087,7 +1049,7 @@ const handleDeleteMaterial = async (materialIndex: number) => {
                               </button>
                             )}
                             <button
-                              onClick={() => handleDeleteMaterial(index)}
+                              onClick={() => handleAddMaterial(index)}
                               className="p-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded transition-colors"
                               title="Delete"
                             >
@@ -1174,7 +1136,7 @@ const handleDeleteMaterial = async (materialIndex: number) => {
                       </div>
                     </div>
                     <button
-                      onClick={handleAddMaterial}
+                      onClick={() => handleAddMaterial}
                       disabled={isUploading}
                       className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
