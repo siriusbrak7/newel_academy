@@ -189,55 +189,114 @@ const handleDeleteMaterial = async (materialIndex: number, id: string) => {
   };
 
   const handleCreateTopic = async () => {
-    if (!createForm.title) {
-      alert('Topic Title required');
-      return;
-    }
-    
-    let materialContent = createForm.materialContent;
+  if (!createForm.title.trim()) {
+    alert('Topic Title required');
+    return;
+  }
+  
+  let materialContent = createForm.materialContent;
 
-    if (createForm.materialType === 'file' && createFile) {
-      setIsUploading(true);
-      try {
-        const publicUrl = await uploadFileToSupabase(createFile);
-        if (!publicUrl) {
-          alert("Failed to upload file. Please try again.");
-          setIsUploading(false);
-          return;
-        }
-        materialContent = publicUrl;
-      } catch (error) {
-        console.error('Upload error:', error);
-        alert("Upload failed. Please try again.");
+  if (createForm.materialType === 'file' && createFile) {
+    setIsUploading(true);
+    try {
+      const publicUrl = await uploadFileToSupabase(createFile);
+      if (!publicUrl) {
+        alert("Failed to upload file. Please try again.");
         setIsUploading(false);
         return;
       }
+      materialContent = publicUrl;
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert("Upload failed. Please try again.");
       setIsUploading(false);
+      return;
     }
-    
-    const newTopic: any = {
-      title: createForm.title,
-      gradeLevel: createForm.gradeLevel,
-      description: createForm.description,
-      subtopics: parsedSubtopics,
-      materials: createForm.materialTitle ? [{
-        title: createForm.materialTitle,
-        type: createForm.materialType as 'text'|'link'|'file',
-        content: materialContent
-      }] : [],
-      checkpoints_required: createForm.checkpointsRequired,
-      checkpoint_pass_percentage: createForm.checkpointPassPercentage,
-      final_assessment_required: createForm.finalAssessmentRequired
-    };
+    setIsUploading(false);
+  }
+  
+  const newTopic: any = {
+    title: createForm.title,
+    gradeLevel: createForm.gradeLevel,
+    description: createForm.description,
+    subtopics: parsedSubtopics,
+    materials: createForm.materialTitle ? [{
+      title: createForm.materialTitle,
+      type: createForm.materialType as 'text'|'link'|'file',
+      content: materialContent
+    }] : [],
+    checkpoints_required: createForm.checkpointsRequired,
+    checkpoint_pass_percentage: createForm.checkpointPassPercentage,
+    final_assessment_required: createForm.finalAssessmentRequired
+  };
 
-    await saveTopic(activeSubject, newTopic);
+  // ✅ Generate a temporary ID for immediate display
+  const tempId = `temp_${Date.now()}`;
+  const newTopicWithId = {
+    ...newTopic,
+    id: tempId
+  };
+
+  try {
+    // ✅ Update LOCAL state immediately with the new topic
+    setCourses(prev => {
+      const updatedSubjects = { ...prev };
+      
+      if (!updatedSubjects[activeSubject]) {
+        updatedSubjects[activeSubject] = {};
+      }
+      
+      updatedSubjects[activeSubject][tempId] = newTopicWithId;
+      
+      return updatedSubjects;
+    });
     
-    const updatedCourses = await getCourses();
+    // Save to database (this will assign a real ID)
+    const savedTopic = await saveTopic(activeSubject, newTopic); // Note: saveTopic should return the saved topic with real ID
+    
+    // Get fresh data from database
+    const updatedCourses = await getCourses(true);
     setCourses(updatedCourses);
     
-    alert('✅ Topic saved successfully!');
-    handleSwitchToCreate();
-  };
+    // Reset form
+    setCreateForm({
+      title: '', 
+      gradeLevel: 'all', 
+      description: '', 
+      subtopics: '', 
+      materialTitle: '', 
+      materialType: 'text', 
+      materialContent: '',
+      checkpointsRequired: 3,
+      checkpointPassPercentage: 80,
+      finalAssessmentRequired: true
+    });
+    setCreateFile(null);
+    
+    // Clear the search term so the new topic appears
+    setSearchTerm('');
+    
+    // Select the newly created topic
+    if (savedTopic && savedTopic.id) {
+      setSelectedTopicId(savedTopic.id);
+      setViewMode('edit');
+    }
+    
+    alert('✅ Topic created successfully!');
+  } catch (error) {
+    console.error('Error creating topic:', error);
+    alert('Failed to create topic');
+    
+    // Remove the temporary topic on error
+    setCourses(prev => {
+      const updatedSubjects = { ...prev };
+      if (updatedSubjects[activeSubject] && updatedSubjects[activeSubject][tempId]) {
+        delete updatedSubjects[activeSubject][tempId];
+      }
+      return updatedSubjects;
+    });
+  }
+};
 
   const handleAddMaterialToTopic = async () => {
   if (!editingTopic) return;

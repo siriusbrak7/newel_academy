@@ -214,7 +214,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             Master Scientific Concepts
             <br />
             <span className="text-4xl md:text-5xl lg:text-6xl block mt-2 font-normal">
-              With your personal learning assistants...
+              With your personal learning assistant...
             </span>
           </h1>
 
@@ -233,7 +233,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
             >
               <span className="flex items-center justify-center gap-3">
                 <Rocket className="w-6 h-6" />
-                Start Learning...
+                Explore Science...
               </span>
             </button>
             

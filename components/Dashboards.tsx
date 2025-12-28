@@ -734,36 +734,83 @@ const handleDeleteMaterial = async (materialIndex: number) => {
 };
 
   // NEW: Handle creating new topic
-  const handleCreateTopic = async () => {
-    if (!newTopic.title.trim()) {
-      alert("Topic title is required");
-      return;
-    }
+const handleCreateTopic = async () => {
+  if (!newTopic.title.trim()) {
+    alert("Topic title is required");
+    return;
+  }
 
-    try {
-      const topicData: any = {
-        title: newTopic.title,
-        gradeLevel: newTopic.gradeLevel,
-        description: newTopic.description,
-        subtopics: [],
-        materials: [],
-        checkpoints_required: 3,
-        checkpoint_pass_percentage: 80,
-        final_assessment_required: true
+  // ✅ Define tempId here
+    const tempId = `temp_${Date.now()}`;
+
+
+  try {
+    const topicData: any = {
+      title: newTopic.title,
+      gradeLevel: newTopic.gradeLevel,
+      description: newTopic.description,
+      subtopics: [],
+      materials: [],
+      checkpoints_required: 3,
+      checkpoint_pass_percentage: 80,
+      final_assessment_required: true
+    };
+
+    
+    // ✅ Update local state immediately
+    setCourses(prev => {
+      const updated = { ...prev };
+      if (!updated[selSubject]) {
+        updated[selSubject] = {};
+      }
+      updated[selSubject][tempId] = {
+        ...topicData,
+        id: tempId
       };
+      return updated;
+    });
 
-      await saveTopic(selSubject, topicData);
-      alert("✅ Topic created successfully!");
+    // Save to database
+    const savedTopic = await saveTopic(selSubject, topicData);
+    
+    if (savedTopic && savedTopic.id) {
+      // Replace temp ID with real ID
+      setCourses(prev => {
+        const updated = { ...prev };
+        if (updated[selSubject] && updated[selSubject][tempId]) {
+          delete updated[selSubject][tempId];
+          updated[selSubject][savedTopic.id!] = {
+            ...topicData,
+            id: savedTopic.id
+          };
+        }
+        return updated;
+      });
       
-      // Reset form and refresh
-      setNewTopic({ title: '', gradeLevel: '9', description: '' });
-      setShowCreateTopic(false);
-      forceRefresh();
-    } catch (error) {
-      console.error('Error creating topic:', error);
-      alert("Failed to create topic");
+      // Select the new topic
+      setSelTopic(savedTopic.id);
     }
-  };
+
+    alert("✅ Topic created successfully!");
+    
+    // Reset form
+    setNewTopic({ title: '', gradeLevel: '9', description: '' });
+    setShowCreateTopic(false);
+    forceRefresh();
+  } catch (error) {
+    console.error('Error creating topic:', error);
+    alert("Failed to create topic");
+    
+    // Remove temp topic on error
+    setCourses(prev => {
+      const updated = { ...prev };
+      if (updated[selSubject] && updated[selSubject][tempId]) {
+        delete updated[selSubject][tempId];
+      }
+      return updated;
+    });
+  }
+};
 
   const handleExportReport = () => {
     try {
