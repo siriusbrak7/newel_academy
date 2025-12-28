@@ -594,7 +594,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   // NEW: Handle adding new material
-  const handleAddMaterial = async (index: number) => {
+  const handleAddMaterial = async () => {
     if (!selSubject || !selTopic) {
       alert("Please select a topic first");
       return;
@@ -665,7 +665,50 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   // NEW: Handle deleting material
   // In your TeacherDashboard component, replace the handleDeleteMaterial function:
+// Add this function to your TeacherDashboard component
+const handleDeleteMaterial = async (materialIndex: number) => {
+  if (!selSubject || !selTopic) {
+    alert("Please select a topic first");
+    return;
+  }
 
+  const topic = courses[selSubject]?.[selTopic];
+  if (!topic || !topic.materials) return;
+
+  const material = topic.materials[materialIndex];
+  if (!material) return;
+
+  const confirmed = window.confirm(`Are you sure you want to delete "${material.title}"?`);
+  if (!confirmed) return;
+
+  try {
+    // Remove the material from the array
+    const updatedMaterials = [...topic.materials];
+    updatedMaterials.splice(materialIndex, 1);
+
+    const updatedTopic = { 
+      ...topic, 
+      materials: updatedMaterials 
+    };
+    
+    await saveTopic(selSubject, updatedTopic);
+    
+    // If material has a real ID (not temp), delete from database
+    if (material.id && !material.id.startsWith('temp_')) {
+      try {
+        await deleteMaterial(material.id);
+      } catch (dbError) {
+        console.error('Failed to delete from database:', dbError);
+      }
+    }
+    
+    forceRefresh();
+    alert('✅ Material deleted successfully!');
+  } catch (error) {
+    console.error('Error deleting material:', error);
+    alert('Failed to delete material');
+  }
+};
 
   // NEW: Handle creating new topic
   const handleCreateTopic = async () => {
@@ -1049,7 +1092,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                               </button>
                             )}
                             <button
-                              onClick={() => handleAddMaterial(index)}
+                              onClick={() => handleAddMaterial()}
                               className="p-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded transition-colors"
                               title="Delete"
                             >
