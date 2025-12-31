@@ -237,19 +237,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               </span>
             </button>
             
-            {/* Email Button */}
-            <a
-              href="mailto:bbrak1235@gmail.com"
-              className={`px-8 py-5 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 font-['Poppins'] flex items-center gap-3 ${
-                theme === 'Cyber-Dystopian'
-                  ? 'border-2 border-green-500/50 text-green-400 hover:bg-green-500/10'
-                  : 'border-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10'
-              }`}
-            >
-              <Mail className="w-5 h-5" />
-              bbrak1235@gmail.com
-              <ExternalLink className="w-4 h-4" />
-            </a>
+            
           </div>
         </div>
 
@@ -332,76 +320,72 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           </p>
         </div>
 
-        {/* Platform Features with Dashboard Previews */}
-        <div className="mb-20">
-          <h2 className={`text-3xl font-bold mb-12 text-center font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
-            Platform Features
+        {/* How to Use Platform - Simple Guide */}
+        <div className={`mb-16 p-6 rounded-2xl border ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow bg-black/40 border-green-500/20' : 'bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-white/20'}`}>
+          <h2 className={`text-2xl font-bold mb-4 text-center ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>
+            🚀 How to Get Started
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1: Progress Tracking */}
-            <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
-              <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-cyan-500/10 to-blue-500/10'}`}>
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingUp className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`} />
-                  <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Progress Analytics</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>1</div>
+                <div>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Register & Get Approved</p>
+                  <p className="text-sm opacity-70">Sign up and wait for admin approval</p>
                 </div>
-                <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-                  Real-time performance tracking with detailed insights on strengths and areas for improvement
-                </p>
-                <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className={theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}>Biology</span>
-                    <span className="text-green-400 font-bold">85%</span>
-                  </div>
-                  <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
-                    <div className="h-full bg-green-500" style={{ width: '85%' }}></div>
-                  </div>
+              </div>
+              
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>2</div>
+                <div>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Study Materials</p>
+                  <p className="text-sm opacity-70">Access videos, PDFs, and interactive content</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>3</div>
+                <div>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Complete Checkpoints</p>
+                  <p className="text-sm opacity-70">Test your understanding after each section</p>
                 </div>
               </div>
             </div>
             
-            {/* Feature 2: Interactive Learning */}
-            <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
-              <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-purple-500/10 to-pink-500/10'}`}>
-                <div className="flex items-center gap-3 mb-4">
-                  <Brain className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-purple-400'}`} />
-                  <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Personal Learning Assistant</h3>
-                </div>
-                <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-                  Get instant explanations and personalized learning paths with your personal learning assistant
-                </p>
-                <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-cyan-400" />
-                    <span className={`text-xs ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>"Explain cellular respiration..."</span>
-                  </div>
-                  <div className="text-xs text-white/40 mt-1">24/7 instant response</div>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>4</div>
+                <div>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Ask Newel AI</p>
+                  <p className="text-sm opacity-70">Get instant help with difficult concepts</p>
                 </div>
               </div>
-            </div>
-            
-            {/* Feature 3: Gamified Challenges */}
-            <div className={`group ${theme === 'Cyber-Dystopian' ? 'cyber-box-glow' : 'border border-white/10'} rounded-2xl overflow-hidden hover:scale-[1.02] transition-transform`}>
-              <div className={`p-6 ${theme === 'Cyber-Dystopian' ? 'bg-black/50' : 'bg-gradient-to-br from-yellow-500/10 to-orange-500/10'}`}>
-                <div className="flex items-center gap-3 mb-4">
-                  <Zap className={`w-8 h-8 ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-yellow-400'}`} />
-                  <h3 className={`text-xl font-bold ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Sprint Challenges</h3>
-                </div>
-                <p className={`mb-4 ${theme === 'Cyber-Dystopian' ? 'text-green-300/70' : 'text-white/70'}`}>
-                  Test your knowledge with timed 222-second sprints and climb the leaderboards
-                </p>
-                <div className={`p-3 rounded-lg ${theme === 'Cyber-Dystopian' ? 'bg-black/30 border border-green-500/20' : 'bg-white/5'}`}>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>222 Sprint Score</span>
-                    <span className="text-yellow-400 font-bold">15/20</span>
-                  </div>
-                  <div className="text-xs text-white/40 mt-1">Rank: Top 10%</div>
+              
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>5</div>
+                <div>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>222-Sprint Challenge</p>
+                  <p className="text-sm opacity-70">Test speed & accuracy on the leaderboard</p>
                 </div>
               </div>
-            </div>
+        
+        <div className="flex items-start gap-2">
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>6</div>
+          <div>
+            <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Track Progress</p>
+            <p className="text-sm opacity-70">Use dashboard analytics to improve</p>
           </div>
         </div>
+      </div>
+    </div>
+    
+    <div className={`text-center text-sm mt-4 pt-4 border-t ${theme === 'Cyber-Dystopian' ? 'border-green-500/20 text-green-300/60' : 'border-white/10 text-white/60'}`}>
+      Need personalized help? <a href="mailto:bbrak1235@gmail.com" className={`underline ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>Contact Admin</a>
+    </div>
+  </div>
+
+        
 
         {/* Final CTA */}
         <div

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { User, Theme } from '../types';
+// components/Navbar.tsx - COMPLETE UPDATED VERSION WITH NOTIFICATIONS
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { User, Theme, Notification } from '../types';
 import {
   LogOut,
   BookOpen,
@@ -13,15 +14,21 @@ import {
   LogIn,
   Star,
   Cpu,
-  Menu, // ADD THIS
-  X, // ADD THIS
+  Menu,
+  X,
   ClipboardList,
   Zap,
   Users,
   Shield,
-  User as UserIcon
+  User as UserIcon,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
 import { DEFAULT_THEME } from '../constants';
+import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../services/storageService';
 
 interface NavbarProps {
   user: User | null;
@@ -30,19 +37,23 @@ interface NavbarProps {
   notifications: number;
   onOpenAuth: () => void;
   currentTheme?: Theme;
-  onToggleMobileMenu?: () => void; // ADD THIS
+  onToggleMobileMenu?: () => void;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
   user,
   onLogout,
   toggleSidebar,
-  notifications,
+  notifications: propNotifications,
   onOpenAuth,
   currentTheme = DEFAULT_THEME,
-  onToggleMobileMenu // ADD THIS
+  onToggleMobileMenu
 }) => {
   const [soundOn, setSoundOn] = useState(true);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [userNotifications, setUserNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const navigate = useNavigate();
 
   const themeConfig = {
     Cosmic: {
@@ -62,6 +73,61 @@ const Navbar: React.FC<NavbarProps> = ({
       label: 'Cyber',
       iconColor: 'text-green-300',
       font: 'font-mono'
+    }
+  };
+
+  // Load notifications
+  useEffect(() => {
+    if (user?.username) {
+      loadNotifications();
+      
+      // Refresh notifications every 30 seconds
+      const interval = setInterval(loadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.username]);
+
+  const loadNotifications = async () => {
+    if (!user?.username) return;
+    
+    try {
+      const notifications = await getUserNotifications(user.username);
+      setUserNotifications(notifications);
+      setUnreadCount(notifications.filter(n => !n.read).length);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Update local state
+      setUserNotifications(prev => 
+        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+      );
+    }
+    
+    // Navigate if action URL exists
+    if (notification.metadata?.actionUrl) {
+      navigate(notification.metadata.actionUrl);
+    }
+    
+    setShowNotifications(false);
+  };
+
+  const markAllAsRead = async () => {
+    if (!user?.username) return;
+    
+    try {
+      await markAllNotificationsAsRead(user.username);
+      setUserNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all as read:', error);
     }
   };
 
@@ -230,16 +296,98 @@ const Navbar: React.FC<NavbarProps> = ({
                 {soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
               </button>
 
-              <div
-                className={`relative cursor-pointer transition-colors ${
-                  currentTheme === 'Cosmic'
-                    ? 'text-white/60 hover:text-cyan-400'
-                    : 'text-green-400/60 hover:text-green-300 cyber-text-glow'
-                }`}
-              >
-                <Bell size={18} />
-                {notifications > 0 && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              {/* Notifications Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className={`relative p-2 rounded-lg transition-colors ${
+                    currentTheme === 'Cosmic'
+                      ? 'text-white/60 hover:text-cyan-400'
+                      : 'text-green-400/60 hover:text-green-300 cyber-text-glow'
+                  }`}
+                  aria-label="Notifications"
+                >
+                  <Bell size={18} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Notifications Dropdown Menu */}
+                {showNotifications && (
+                  <div className={`absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-xl shadow-2xl z-50 ${
+                    currentTheme === 'Cyber-Dystopian' 
+                      ? 'cyber-box-glow bg-black border-green-500/30' 
+                      : 'bg-slate-900 border border-white/10 backdrop-blur-lg'
+                  }`}>
+                    <div className="p-4 border-b border-white/10">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-bold text-white">Notifications</h3>
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-xs text-cyan-400 hover:text-cyan-300"
+                          >
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="max-h-72 overflow-y-auto">
+                      {userNotifications.length === 0 ? (
+                        <div className="p-4 text-center text-white/50">
+                          <Bell size={24} className="mx-auto mb-2 opacity-30" />
+                          <p className="text-sm">No notifications</p>
+                        </div>
+                      ) : (
+                        userNotifications.slice(0, 10).map(notification => (
+                          <div
+                            key={notification.id}
+                            onClick={() => handleNotificationClick(notification)}
+                            className={`p-4 border-b border-white/5 cursor-pointer transition-colors hover:bg-white/5 ${notification.read ? 'opacity-70' : ''}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`p-2 rounded-full ${
+                                notification.type === 'success' ? 'bg-green-500/20 text-green-400' : 
+                                notification.type === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
+                                notification.type === 'alert' ? 'bg-red-500/20 text-red-400' :
+                                'bg-cyan-500/20 text-cyan-400'
+                              }`}>
+                                {notification.type === 'success' && <CheckCircle size={14} />}
+                                {notification.type === 'warning' && <AlertCircle size={14} />}
+                                {notification.type === 'alert' && <Bell size={14} />}
+                                {notification.type === 'info' && <Info size={14} />}
+                              </div>
+                              <div className="flex-1">
+                                <p className={`text-sm ${notification.read ? 'text-white/80' : 'text-white font-medium'}`}>
+                                  {notification.text}
+                                </p>
+                                <p className="text-xs text-white/40 mt-1">
+                                  {new Date(notification.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                              {!notification.read && (
+                                <div className="w-2 h-2 bg-cyan-500 rounded-full mt-2"></div>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    
+                    <div className="p-3 border-t border-white/10">
+                      <Link
+                        to="/notifications"
+                        className="block text-center text-sm text-cyan-400 hover:text-cyan-300"
+                        onClick={() => setShowNotifications(false)}
+                      >
+                        View all notifications
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -296,6 +444,14 @@ const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
       </div>
+
+      {/* Click outside to close notifications */}
+      {showNotifications && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setShowNotifications(false)}
+        />
+      )}
     </nav>
   );
 };

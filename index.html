@@ -376,9 +376,13 @@
       
       @media (max-width: 480px) {
         .space-icon {
-          font-size: 14px;
+          position: absolute;
+          font-size: 20px;
+          z-index: 2;
+          pointer-events: none;
+          animation: float 15s ease-in-out infinite;
+          opacity: 0.2;
         }
-      }
     </style>
     
     <!-- 33 Neuroscience Facts -->
@@ -625,26 +629,24 @@
         }
         
         createSpaceIcons() {
-          const icons = ['🚀', '🛰️', '⭐', '🌌', '🪐', '☄️', '💫', '🔭'];
-          
-          // Clear previous icons
+          const icons = ['🪐']; // Only Saturn icon
           this.cleanupSpaceIcons();
           
-          // Create 15 floating space icons
-          for (let i = 0; i < 15; i++) {
-            const icon = document.createElement('div');
-            icon.className = 'space-icon';
-            icon.textContent = icons[Math.floor(Math.random() * icons.length)];
-            icon.style.left = `${Math.random() * 100}%`;
-            icon.style.top = `${Math.random() * 100}%`;
-            icon.style.animationDelay = `${Math.random() * 5}s`;
-            icon.style.animationDuration = `${8 + Math.random() * 8}s`;
-            icon.style.opacity = `${0.4 + Math.random() * 0.3}`;
-            icon.style.fontSize = `${18 + Math.random() * 12}px`;
-            this.themeContainer.appendChild(icon);
-            this.spaceIcons.push(icon);
-          }
+          // Create only 3-5 Saturn icons for minimal effect
+        for (let i = 0; i < 5; i++) {
+          const icon = document.createElement('div');
+          icon.className = 'space-icon';
+          icon.textContent = '🪐';
+          icon.style.left = `${10 + Math.random() * 80}%`;
+          icon.style.top = `${10 + Math.random() * 80}%`;
+          icon.style.animationDelay = `${Math.random() * 5}s`;
+          icon.style.animationDuration = `${15 + Math.random() * 10}s`;
+          icon.style.opacity = `${0.2 + Math.random() * 0.2}`; // Very subtle
+          icon.style.fontSize = `${20 + Math.random() * 15}px`;
+          this.themeContainer.appendChild(icon);
+          this.spaceIcons.push(icon);
         }
+      }
         
         cleanupSpaceIcons() {
           this.spaceIcons.forEach(icon => {

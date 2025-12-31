@@ -1,7 +1,8 @@
 ﻿// Dashboards.tsx - COMPLETE FIXED VERSION FOR DEPLOYMENT
+// dashboard.tsx - UPDATED IMPORTS SECTION
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { User, StudentStats, Assessment, Announcement, CourseStructure, LeaderboardEntry } from '../types';
+import { Link, useNavigate } from 'react-router-dom'; // ADD useNavigate
+import { User, StudentStats, Assessment, Announcement, CourseStructure, LeaderboardEntry, Notification, Role } from '../types';
 import {
   getUsers,
   saveUser,
@@ -23,7 +24,17 @@ import {
   refreshAllLeaderboards,
   getPendingTheorySubmissions,
   uploadFileToSupabase,
-  deleteMaterial
+  deleteMaterial,
+  // ADD THESE NOTIFICATION FUNCTIONS:
+  getUserNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  createNotification,
+  notifyCourseMaterialAdded,
+  notifyNewAssessment,
+  notifyTopic80PercentComplete,
+  notifyLeaderboardUpdate,
+  notifyNewSubmission
 } from '../services/storageService';
 import { 
   Check, 
@@ -43,7 +54,6 @@ import {
   Brain,
   Atom,
   Clock,
-  BookOpen as BookOpenIcon,
   Users,
   BarChart3,
   Target,
@@ -52,12 +62,17 @@ import {
   ChevronDown,
   FileText,
   Link as LinkIcon,
-  // ADD THESE MISSING ICONS:
-  File as FileIcon, // Renamed to avoid conflict with JavaScript File
+  File as FileIcon,
   Trash2, 
   Plus,
+  // ADD THESE NOTIFICATION ICONS:
+  Bell,
+  Info,
+  Star,
+  Sparkles,
+  Award,
   // Add any other icons used in the component...
-  TrendingUp as TrendingUpIcon // Already imported above
+  TrendingUp as TrendingUpIcon
 } from 'lucide-react';
 
 // Fixed Chart.js imports
@@ -90,10 +105,6 @@ try {
     save() { console.log('PDF export disabled - install jspdf') }
   };
 }
-
-// ... REST OF YOUR CODE (AdminDashboard, TeacherDashboard, StudentDashboard components remain the same)
-// Just make sure to replace the problematic icon usages as shown below
-
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<StudentStats[]>([]);
@@ -470,7 +481,7 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-// --- TEACHER DASHBOARD - Enhanced with Course Management ---
+// --- TEACHER DASHBOARD - Enhanced with Notifications & Student Performance ---
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [dashboardVersion, setDashboardVersion] = useState(0); 
   const [stats, setStats] = useState<StudentStats[]>([]);
@@ -492,7 +503,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [instructionText, setInstructionText] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // NEW: Material Upload State
+  // Material Upload State
   const [newMaterial, setNewMaterial] = useState({
     title: '',
     type: 'text' as 'text' | 'link' | 'file',
@@ -501,13 +512,26 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [materialFile, setMaterialFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
-  // NEW: Create Topic State
+  // Create Topic State
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [newTopic, setNewTopic] = useState({
     title: '',
     gradeLevel: '9',
     description: ''
   });
+
+  // Student Performance State
+  const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [studentPerformance, setStudentPerformance] = useState<any>(null);
+  const [loadingStudent, setLoadingStudent] = useState(false);
+  const [allStudents, setAllStudents] = useState<User[]>([]);
+
+  // Notifications State
+  const [teacherNotifications, setTeacherNotifications] = useState<Notification[]>([]);
+  const [teacherUnreadCount, setTeacherUnreadCount] = useState(0);
+
+  // Navigation
+  const navigate = useNavigate();
 
   const loadData = async () => {
     console.log("Refreshing Teacher Dashboard Data...");
@@ -538,9 +562,193 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  // Load Notifications
+  const loadTeacherNotifications = async () => {
+    if (!user?.username) return;
+    
+    try {
+      const notifications = await getUserNotifications(user.username);
+      setTeacherNotifications(notifications);
+      setTeacherUnreadCount(notifications.filter(n => !n.read).length);
+    } catch (error) {
+      console.error('Error loading teacher notifications:', error);
+    }
+  };
+
+  const handleTeacherNotificationClick = async (notification: Notification) => {
+    // Mark as read
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+      setTeacherUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Update local state
+      setTeacherNotifications(prev => 
+        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+      );
+    }
+    
+    // Navigate if action URL exists
+    if (notification.metadata?.actionUrl) {
+      navigate(notification.metadata.actionUrl);
+    }
+  };
+
+  const markAllTeacherNotificationsAsRead = async () => {
+    if (!user?.username) return;
+    
+    try {
+      await markAllNotificationsAsRead(user.username);
+      setTeacherNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setTeacherUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Load Students for Performance Viewer
+  const loadStudents = async () => {
+    try {
+      const statsData = await getAllStudentStats();
+      const studentUsers = statsData.filter(s => 
+        s.username !== 'admin' && 
+        s.username !== 'teacher_demo' && 
+        s.username !== 'student_demo'
+      );
+      
+      // Convert StudentStats to User objects
+      const students: User[] = studentUsers.map(s => ({
+        username: s.username,
+        role: 'student' as Role,
+        approved: true,
+        securityQuestion: '',
+        securityAnswer: '',
+        gradeLevel: s.gradeLevel,
+        lastLogin: Date.now()
+      }));
+      
+      setAllStudents(students);
+      
+      // If there are students, select the first one by default
+      if (students.length > 0 && !selectedStudent) {
+        setSelectedStudent(students[0].username);
+        loadStudentPerformance(students[0].username);
+      }
+    } catch (error) {
+      console.error('Error loading students:', error);
+    }
+  };
+
+  const loadStudentPerformance = async (username: string) => {
+    if (!username) return;
+    
+    setLoadingStudent(true);
+    try {
+      // Get student's course history
+      const courseHistory = await getStudentCourseHistory(username);
+      
+      // Get student's checkpoint progress from all topics
+      const courses = await getCourses(true);
+      const studentPerformanceData: any = {
+        username,
+        courseHistory: [],
+        checkpointSummary: {
+          totalCheckpoints: 0,
+          completedCheckpoints: 0,
+          averageScore: 0,
+          bySubject: {}
+        }
+      };
+
+      // Analyze performance by subject
+      Object.keys(courses).forEach(subject => {
+        Object.keys(courses[subject]).forEach(topicId => {
+          const topic = courses[subject][topicId];
+          if (topic.checkpoints && topic.checkpoints.length > 0) {
+            // Find this topic in course history
+            const topicHistory = courseHistory.find(ch => 
+              ch.topicId === topicId || ch.topicTitle === topic.title
+            );
+
+            if (topicHistory) {
+              studentPerformanceData.checkpointSummary.totalCheckpoints += topic.checkpoints.length;
+              studentPerformanceData.checkpointSummary.completedCheckpoints += 
+                topicHistory.checkpoints.filter((cp: any) => cp.passed).length;
+              
+              // Calculate average score for this topic
+              const topicScores = topicHistory.checkpoints
+                .filter((cp: any) => cp.passed && cp.score)
+                .map((cp: any) => cp.score);
+              
+              if (topicScores.length > 0) {
+                const avgScore = topicScores.reduce((a: number, b: number) => a + b, 0) / topicScores.length;
+                
+                if (!studentPerformanceData.checkpointSummary.bySubject[subject]) {
+                  studentPerformanceData.checkpointSummary.bySubject[subject] = {
+                    topics: 0,
+                    completedTopics: 0,
+                    avgScore: 0,
+                    checkpoints: {
+                      total: 0,
+                      completed: 0
+                    }
+                  };
+                }
+                
+                studentPerformanceData.checkpointSummary.bySubject[subject].topics++;
+                studentPerformanceData.checkpointSummary.bySubject[subject].completedTopics++;
+                studentPerformanceData.checkpointSummary.bySubject[subject].avgScore = 
+                  (studentPerformanceData.checkpointSummary.bySubject[subject].avgScore + avgScore) / 2;
+                studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.total += topic.checkpoints.length;
+                studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.completed += 
+                  topicHistory.checkpoints.filter((cp: any) => cp.passed).length;
+              }
+            }
+          }
+        });
+      });
+
+      // Calculate overall average
+      if (studentPerformanceData.checkpointSummary.completedCheckpoints > 0) {
+        const allScores: number[] = [];
+        courseHistory.forEach((ch: any) => {
+          ch.checkpoints.forEach((cp: any) => {
+            if (cp.passed && cp.score) allScores.push(cp.score);
+          });
+        });
+        
+        if (allScores.length > 0) {
+          studentPerformanceData.checkpointSummary.averageScore = 
+            allScores.reduce((a, b) => a + b, 0) / allScores.length;
+        }
+      }
+
+      studentPerformanceData.courseHistory = courseHistory;
+      setStudentPerformance(studentPerformanceData);
+      
+    } catch (error) {
+      console.error('Error loading student performance:', error);
+    } finally {
+      setLoadingStudent(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadTeacherNotifications();
+    
+    // Set up notification refresh every 30 seconds
+    const notificationInterval = setInterval(() => {
+      loadTeacherNotifications();
+    }, 30000);
+    
+    return () => clearInterval(notificationInterval);
   }, [dashboardVersion]);
+
+  useEffect(() => {
+    if (stats.length > 0) {
+      loadStudents();
+    }
+  }, [stats]);
 
   useEffect(() => {
     if (selSubject && selTopic && courses[selSubject]?.[selTopic]) {
@@ -562,14 +770,15 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         title: announcementText.title,
         content: announcementText.content,
         timestamp: Date.now(),
-        author: user.username
+        author: user.username,
+        expiresAt: Date.now() + (48 * 60 * 60 * 1000) // 48 hours from now
       });
       setAnnouncementText({ title: '', content: '' });
-      alert("Announcement Posted!");
+      alert("✅ Announcement Posted! (Will auto-remove in 48 hours)");
       forceRefresh();
     } catch (error) {
       console.error('Error posting announcement:', error);
-      alert("Failed to post announcement");
+      alert("❌ Failed to post announcement");
     }
   };
 
@@ -585,232 +794,240 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     try {
       const updatedTopic = { ...topic, description: instructionText };
       await saveTopic(selSubject, updatedTopic);
-      alert("Instructions Saved!");
+      
+      // Notify students about updated material
+      await notifyCourseMaterialAdded(
+        user.username,
+        selSubject,
+        topic.title,
+        topic.gradeLevel,
+        "Updated instructions"
+      );
+      
+      alert("✅ Instructions Saved & Students Notified!");
       forceRefresh(); 
     } catch (error) {
       console.error('Error saving instructions:', error);
-      alert("Failed to save instructions");
+      alert("❌ Failed to save instructions");
     }
   };
 
-  // NEW: Handle adding new material
   const handleAddMaterial = async () => {
-  if (!selSubject || !selTopic) {
-    alert("Please select a topic first");
-    return;
-  }
-  
-  if (!newMaterial.title) {
-    alert("Material title is required");
-    return;
-  }
-
-  const topic = courses[selSubject]?.[selTopic];
-  if (!topic) return;
-
-  let content = newMaterial.content;
-  
-  if (newMaterial.type === 'file') {
-    if (!materialFile) {
-      alert("Please select a file");
+    if (!selSubject || !selTopic) {
+      alert("Please select a topic first");
       return;
     }
     
-    setIsUploading(true);
-    try {
-      const url = await uploadFileToSupabase(materialFile);
-      if (!url) {
-        alert("File upload failed");
+    if (!newMaterial.title) {
+      alert("Material title is required");
+      return;
+    }
+
+    const topic = courses[selSubject]?.[selTopic];
+    if (!topic) return;
+
+    let content = newMaterial.content;
+    
+    if (newMaterial.type === 'file') {
+      if (!materialFile) {
+        alert("Please select a file");
+        return;
+      }
+      
+      setIsUploading(true);
+      try {
+        const url = await uploadFileToSupabase(materialFile);
+        if (!url) {
+          alert("File upload failed");
+          setIsUploading(false);
+          return;
+        }
+        content = url;
+      } catch (error) {
+        console.error('Upload error:', error);
+        alert("Upload failed");
         setIsUploading(false);
         return;
       }
-      content = url;
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert("Upload failed");
       setIsUploading(false);
+    } else if (!content) {
+      alert(`${newMaterial.type === 'link' ? 'URL' : 'Content'} is required`);
       return;
     }
-    setIsUploading(false);
-  } else if (!content) {
-    alert(`${newMaterial.type === 'link' ? 'URL' : 'Content'} is required`);
-    return;
-  }
 
-  const newMat = {
-    id: `temp_${Date.now()}`,
-    title: newMaterial.title,
-    type: newMaterial.type,
-    content: content
-  };
+    const newMat = {
+      id: `temp_${Date.now()}`,
+      title: newMaterial.title,
+      type: newMaterial.type,
+      content: content
+    };
 
-  // ✅ CRITICAL: Update LOCAL state immediately
-  const updatedTopic = { 
-    ...topic, 
-    materials: [...(topic.materials || []), newMat] 
-  };
-  
-  // Update local state FIRST
-  setCourses(prev => ({
-    ...prev,
-    [selSubject]: {
-      ...prev[selSubject],
-      [selTopic]: updatedTopic
-    }
-  }));
-
-  try {
-    await saveTopic(selSubject, updatedTopic);
-    alert("✅ Material added successfully!");
+    // Update local state FIRST
+    const updatedTopic = { 
+      ...topic, 
+      materials: [...(topic.materials || []), newMat] 
+    };
     
-    // Reset form
-    setNewMaterial({ title: '', type: 'text', content: '' });
-    setMaterialFile(null);
-    
-    // Optional: Force refresh to sync with database
-    setTimeout(() => {
-      forceRefresh();
-    }, 500);
-    
-  } catch (error) {
-    console.error('Error adding material:', error);
-    alert("Failed to add material");
-    
-    // Revert local state on error
     setCourses(prev => ({
       ...prev,
       [selSubject]: {
         ...prev[selSubject],
-        [selTopic]: topic // Revert to original
+        [selTopic]: updatedTopic
       }
     }));
-  }
-};
 
-  // NEW: Handle deleting material
-  // In your TeacherDashboard component, replace the handleDeleteMaterial function:
-// Add this function to your TeacherDashboard component
-// Add this to your TeacherDashboard component:
-const handleDeleteMaterial = async (materialIndex: number) => {
-  if (!selSubject || !selTopic) {
-    alert("Please select a topic first");
-    return;
-  }
-
-  const topic = courses[selSubject]?.[selTopic];
-  if (!topic || !topic.materials) return;
-
-  const material = topic.materials[materialIndex];
-  if (!material) return;
-
-  const confirmed = window.confirm(`Delete "${material.title}"?`);
-  if (!confirmed) return;
-
-  try {
-    // Remove from array
-    const updatedMaterials = topic.materials.filter((_, i) => i !== materialIndex);
-    const updatedTopic = { 
-      ...topic, 
-      materials: updatedMaterials 
-    };
-    
-    await saveTopic(selSubject, updatedTopic);
-    
-    // Delete from database if it has a real ID
-    if (material.id && !material.id.startsWith('temp_')) {
-      try {
-        await deleteMaterial(material.id);
-      } catch (dbError) {
-        console.warn('Could not delete from database:', dbError);
-      }
+    try {
+      await saveTopic(selSubject, updatedTopic);
+      
+      // Notify students about new material
+      await notifyCourseMaterialAdded(
+        user.username,
+        selSubject,
+        topic.title,
+        topic.gradeLevel,
+        newMaterial.title
+      );
+      
+      alert("✅ Material added & students notified!");
+      
+      // Reset form
+      setNewMaterial({ title: '', type: 'text', content: '' });
+      setMaterialFile(null);
+      
+      // Force refresh to sync with database
+      setTimeout(() => {
+        forceRefresh();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error adding material:', error);
+      alert("❌ Failed to add material");
+      
+      // Revert local state on error
+      setCourses(prev => ({
+        ...prev,
+        [selSubject]: {
+          ...prev[selSubject],
+          [selTopic]: topic // Revert to original
+        }
+      }));
     }
-    
-    forceRefresh();
-    alert('✅ Material deleted!');
-  } catch (error) {
-    console.error('Error deleting material:', error);
-    alert('Failed to delete material');
-  }
-};
+  };
 
-  // NEW: Handle creating new topic
-const handleCreateTopic = async () => {
-  if (!newTopic.title.trim()) {
-    alert("Topic title is required");
-    return;
-  }
+  const handleDeleteMaterial = async (materialIndex: number) => {
+    if (!selSubject || !selTopic) {
+      alert("Please select a topic first");
+      return;
+    }
 
-  // ✅ Define tempId here
+    const topic = courses[selSubject]?.[selTopic];
+    if (!topic || !topic.materials) return;
+
+    const material = topic.materials[materialIndex];
+    if (!material) return;
+
+    const confirmed = window.confirm(`Delete "${material.title}"?`);
+    if (!confirmed) return;
+
+    try {
+      const updatedMaterials = topic.materials.filter((_, i) => i !== materialIndex);
+      const updatedTopic = { 
+        ...topic, 
+        materials: updatedMaterials 
+      };
+      
+      await saveTopic(selSubject, updatedTopic);
+      
+      if (material.id && !material.id.startsWith('temp_')) {
+        try {
+          await deleteMaterial(material.id);
+        } catch (dbError) {
+          console.warn('Could not delete from database:', dbError);
+        }
+      }
+      
+      forceRefresh();
+      alert('✅ Material deleted!');
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      alert('❌ Failed to delete material');
+    }
+  };
+
+  const handleCreateTopic = async () => {
+    if (!newTopic.title.trim()) {
+      alert("Topic title is required");
+      return;
+    }
+
     const tempId = `temp_${Date.now()}`;
 
-
-  try {
-    const topicData: any = {
-      title: newTopic.title,
-      gradeLevel: newTopic.gradeLevel,
-      description: newTopic.description,
-      subtopics: [],
-      materials: [],
-      checkpoints_required: 3,
-      checkpoint_pass_percentage: 80,
-      final_assessment_required: true
-    };
-
-    
-    // ✅ Update local state immediately
-    setCourses(prev => {
-      const updated = { ...prev };
-      if (!updated[selSubject]) {
-        updated[selSubject] = {};
-      }
-      updated[selSubject][tempId] = {
-        ...topicData,
-        id: tempId
+    try {
+      const topicData: any = {
+        title: newTopic.title,
+        gradeLevel: newTopic.gradeLevel,
+        description: newTopic.description,
+        subtopics: [],
+        materials: [],
+        checkpoints_required: 3,
+        checkpoint_pass_percentage: 80,
+        final_assessment_required: true
       };
-      return updated;
-    });
 
-    // Save to database
-    const savedTopic = await saveTopic(selSubject, topicData);
-    
-    if (savedTopic && savedTopic.id) {
-      // Replace temp ID with real ID
+      // Update local state immediately
+      setCourses(prev => {
+        const updated = { ...prev };
+        if (!updated[selSubject]) {
+          updated[selSubject] = {};
+        }
+        updated[selSubject][tempId] = {
+          ...topicData,
+          id: tempId
+        };
+        return updated;
+      });
+
+      // Save to database
+      const savedTopic = await saveTopic(selSubject, topicData);
+      
+      if (savedTopic && savedTopic.id) {
+        // Replace temp ID with real ID
+        setCourses(prev => {
+          const updated = { ...prev };
+          if (updated[selSubject] && updated[selSubject][tempId]) {
+            delete updated[selSubject][tempId];
+            updated[selSubject][savedTopic.id!] = {
+              ...topicData,
+              id: savedTopic.id
+            };
+          }
+          return updated;
+        });
+        
+        // Select the new topic
+        setSelTopic(savedTopic.id);
+      }
+
+      alert("✅ Topic created successfully!");
+      
+      // Reset form
+      setNewTopic({ title: '', gradeLevel: '9', description: '' });
+      setShowCreateTopic(false);
+      forceRefresh();
+    } catch (error) {
+      console.error('Error creating topic:', error);
+      alert("❌ Failed to create topic");
+      
+      // Remove temp topic on error
       setCourses(prev => {
         const updated = { ...prev };
         if (updated[selSubject] && updated[selSubject][tempId]) {
           delete updated[selSubject][tempId];
-          updated[selSubject][savedTopic.id!] = {
-            ...topicData,
-            id: savedTopic.id
-          };
         }
         return updated;
       });
-      
-      // Select the new topic
-      setSelTopic(savedTopic.id);
     }
-
-    alert("✅ Topic created successfully!");
-    
-    // Reset form
-    setNewTopic({ title: '', gradeLevel: '9', description: '' });
-    setShowCreateTopic(false);
-    forceRefresh();
-  } catch (error) {
-    console.error('Error creating topic:', error);
-    alert("Failed to create topic");
-    
-    // Remove temp topic on error
-    setCourses(prev => {
-      const updated = { ...prev };
-      if (updated[selSubject] && updated[selSubject][tempId]) {
-        delete updated[selSubject][tempId];
-      }
-      return updated;
-    });
-  }
-};
+  };
 
   const handleExportReport = () => {
     try {
@@ -834,10 +1051,37 @@ const handleCreateTopic = async () => {
         y += 10;
       });
       
+      // Add notifications summary
+      y += 10;
+      if (teacherNotifications.length > 0) {
+        doc.text('Recent Teacher Alerts:', 10, y);
+        y += 10;
+        teacherNotifications.slice(0, 3).forEach((notification, i) => {
+          if (y > 280) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(`${i+1}. ${notification.text.substring(0, 50)}...`, 10, y);
+          y += 8;
+        });
+      }
+      
       doc.save(`${user.username}_class_report.pdf`);
     } catch (error) {
       console.error('Error exporting report:', error);
-      alert("Failed to export report");
+      alert("❌ Failed to export report");
+    }
+  };
+
+  const handleRefreshLeaderboards = async () => {
+    try {
+      await refreshAllLeaderboards();
+      const leaderboards = await getLeaderboards();
+      setLeaderboardData(leaderboards);
+      alert('✅ Leaderboards refreshed successfully!');
+    } catch (error) {
+      console.error('Error refreshing leaderboards:', error);
+      alert('❌ Failed to refresh leaderboards');
     }
   };
 
@@ -865,7 +1109,6 @@ const handleCreateTopic = async () => {
     ? courses[selSubject][selTopic] 
     : null;
 
-  // Get available subjects
   const availableSubjects = Object.keys(courses).filter(subject => 
     Object.keys(courses[subject] || {}).length > 0
   );
@@ -891,6 +1134,17 @@ const handleCreateTopic = async () => {
           >
             <RefreshCw size={16}/> Refresh Data
           </button>
+          {teacherUnreadCount > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => navigate('/teacher-notifications')}
+                className="flex items-center gap-2 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-200 border border-yellow-500/30 px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                <Bell size={16}/>
+                <span>{teacherUnreadCount} alert{teacherUnreadCount !== 1 ? 's' : ''}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -909,12 +1163,12 @@ const handleCreateTopic = async () => {
           <p className="text-2xl font-bold text-purple-400">{recentAssessments.length}</p>
         </div>
         <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
-          <p className="text-xs text-white/50 uppercase">Assessment Entries</p>
-          <p className="text-2xl font-bold text-green-400">{leaderboardData.assessments.length}</p>
+          <p className="text-xs text-white/50 uppercase">Unread Alerts</p>
+          <p className="text-2xl font-bold text-yellow-400">{teacherUnreadCount}</p>
         </div>
       </div>
       
-      {/* Main Actions - SIMPLIFIED: Only Assessments (Removed Manage Courses) */}
+      {/* Main Actions */}
       <div className="grid md:grid-cols-1 gap-6">
         <Link 
           to="/assessments" 
@@ -988,7 +1242,7 @@ const handleCreateTopic = async () => {
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <BookOpenIcon size={20} className="text-orange-400"/> Course & Materials Manager
+                <BookOpen size={20} className="text-orange-400"/> Course & Materials Manager
               </h3>
               <button
                 onClick={() => setShowCreateTopic(!showCreateTopic)}
@@ -1249,7 +1503,7 @@ const handleCreateTopic = async () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleAddMaterial}
+                      onClick={handleAddMaterial}
                       disabled={isUploading}
                       className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
@@ -1261,13 +1515,145 @@ const handleCreateTopic = async () => {
                       ) : (
                         <>
                           <Plus size={16} />
-                          Add Material
+                          Add Material & Notify Students
                         </>
                       )}
                     </button>
                   </div>
                 </div>
               </>
+            )}
+          </div>
+
+          {/* Student Performance Viewer */}
+          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Users className="text-green-400"/> Student Performance
+              </h3>
+              <RefreshCw 
+                size={16} 
+                className={`text-white/50 hover:text-white cursor-pointer ${loadingStudent ? 'animate-spin' : ''}`}
+                onClick={() => selectedStudent && loadStudentPerformance(selectedStudent)}
+              />
+            </div>
+            
+            {/* Student Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Select Student
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={selectedStudent}
+                  onChange={(e) => {
+                    setSelectedStudent(e.target.value);
+                    loadStudentPerformance(e.target.value);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                >
+                  <option value="">Select a student...</option>
+                  {allStudents.map(student => (
+                    <option key={student.username} value={student.username}>
+                      {student.username} (Grade {student.gradeLevel})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-white/40 bg-white/5 px-3 py-2 rounded">
+                  {allStudents.length} students
+                </span>
+              </div>
+            </div>
+            
+            {/* Performance Display */}
+            {loadingStudent ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-cyan-500 mx-auto mb-3"></div>
+                <p className="text-white/60">Loading performance data...</p>
+              </div>
+            ) : studentPerformance ? (
+              <div className="space-y-4">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-gray-900/50 p-3 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-cyan-400">
+                      {studentPerformance.checkpointSummary.completedCheckpoints}/{studentPerformance.checkpointSummary.totalCheckpoints}
+                    </div>
+                    <div className="text-xs text-white/60 mt-1">Checkpoints</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-3 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-green-400">
+                      {Math.round(studentPerformance.checkpointSummary.averageScore || 0)}%
+                    </div>
+                    <div className="text-xs text-white/60 mt-1">Avg Score</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-3 rounded-lg text-center">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {studentPerformance.courseHistory.length}
+                    </div>
+                    <div className="text-xs text-white/60 mt-1">Topics Started</div>
+                  </div>
+                </div>
+                
+                {/* Subject Breakdown */}
+                <div>
+                  <h4 className="font-medium text-white mb-3">Performance by Subject</h4>
+                  {Object.keys(studentPerformance.checkpointSummary.bySubject).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(studentPerformance.checkpointSummary.bySubject).map(([subject, data]: [string, any]) => (
+                        <div key={subject} className="bg-black/20 p-3 rounded-lg">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-white">{subject}</span>
+                            <span className="text-cyan-300 font-bold">
+                              {Math.round(data.avgScore || 0)}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs text-white/60">
+                            <span>{data.completedTopics}/{data.topics} topics</span>
+                            <span>{data.checkpoints.completed}/{data.checkpoints.total} checkpoints</span>
+                          </div>
+                          <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+                            <div 
+                              className="h-full bg-cyan-500" 
+                              style={{ width: `${(data.checkpoints.completed / data.checkpoints.total) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-white/40 text-center py-4">No checkpoint data available yet</p>
+                  )}
+                </div>
+                
+                {/* Recent Activity */}
+                <div>
+                  <h4 className="font-medium text-white mb-3">Recent Checkpoint Activity</h4>
+                  {studentPerformance.courseHistory.slice(0, 3).map((course: any, index: number) => (
+                    <div key={index} className="bg-black/20 p-3 rounded-lg mb-2">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-white font-medium text-sm">{course.topicTitle}</p>
+                          <p className="text-xs text-white/60">{course.subject} • Grade {course.gradeLevel}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-sm font-bold ${course.passed ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {course.finalScore || 0}%
+                          </span>
+                          <p className="text-xs text-white/60">
+                            {course.checkpoints.filter((cp: any) => cp.passed).length}/{course.checkpoints.length} CP
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                <p className="text-white/40">Select a student to view their performance</p>
+              </div>
             )}
           </div>
         </div>
@@ -1296,9 +1682,81 @@ const handleCreateTopic = async () => {
                 onClick={handlePostAnnouncement} 
                 className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded-lg text-sm flex justify-center items-center gap-2"
               >
-                <Send size={16}/> Post Update
+                <Send size={16}/> Post Update (48h)
               </button>
             </div>
+          </div>
+
+          {/* Teacher Notifications Section */}
+          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Bell className="text-yellow-400" /> Teacher Alerts
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={loadTeacherNotifications}
+                  className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw size={16} className="text-white" />
+                </button>
+                {teacherUnreadCount > 0 && (
+                  <button
+                    onClick={markAllTeacherNotificationsAsRead}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {teacherNotifications.length === 0 ? (
+                <div className="text-center py-4">
+                  <Bell className="w-8 h-8 text-white/20 mx-auto mb-2" />
+                  <p className="text-white/40">No alerts</p>
+                  <p className="text-white/30 text-xs">You'll see alerts for new submissions and student progress</p>
+                </div>
+              ) : (
+                teacherNotifications.slice(0, 5).map((notification, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleTeacherNotificationClick(notification)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-white/5 ${notification.read ? 'border-white/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded ${notification.type === 'alert' ? 'bg-red-500/20 text-red-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
+                        {notification.type === 'alert' ? <Bell size={14} /> : <Info size={14} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className={`text-sm ${notification.read ? 'text-white/80' : 'text-white font-medium'}`}>
+                          {notification.text}
+                        </p>
+                        <p className="text-xs text-white/40 mt-1">
+                          {new Date(notification.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            {teacherNotifications.length > 5 && (
+              <div className="mt-4 pt-4 border-t border-white/10 text-center">
+                <button
+                  onClick={() => navigate('/teacher-notifications')}
+                  className="text-sm text-cyan-400 hover:text-cyan-300"
+                >
+                  View all {teacherNotifications.length} alerts →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Recent Assessments List */}
@@ -1329,6 +1787,12 @@ const handleCreateTopic = async () => {
             <Trophy className="text-yellow-400"/> Assessment Leaderboard
           </h3>
           <div className="flex gap-2">
+            <button 
+              onClick={handleRefreshLeaderboards}
+              className="text-xs bg-cyan-600 text-white px-3 py-1 rounded flex items-center gap-1"
+            >
+              <RefreshCw size={12} /> Refresh
+            </button>
             {['assessments', 'academic', 'challenge'].map(t => (
               <button 
                 key={t}
@@ -1451,8 +1915,7 @@ const handleCreateTopic = async () => {
   );
 };
 
-// StudentDashboard component - FIXED VERSION
-// COMPLETE StudentDashboard component - UPDATED WITH NEUROSCIENCE FACTS & GRADE HISTORY
+// StudentDashboard component - COMPLETE UPDATED VERSION WITH NOTIFICATIONS
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
   const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
@@ -1470,6 +1933,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [neuroscienceFacts, setNeuroscienceFacts] = useState<string[]>([]);
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
   const [factFade, setFactFade] = useState(true);
+  
+  // Notifications State
+  const [userNotifications, setUserNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Navigation
+  const navigate = useNavigate();
   
   // Stats
   const { activeDays, streak } = calculateUserStats(user);
@@ -1492,6 +1962,37 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   }, []);
 
+  // Load Notifications
+  const loadNotifications = async () => {
+    if (!user?.username) return;
+    
+    try {
+      const notifications = await getUserNotifications(user.username);
+      setUserNotifications(notifications);
+      setUnreadCount(notifications.filter(n => !n.read).length);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Update local state
+      setUserNotifications(prev => 
+        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+      );
+    }
+    
+    // Navigate if action URL exists
+    if (notification.metadata?.actionUrl) {
+      navigate(notification.metadata.actionUrl);
+    }
+  };
+
   // Rotate neuroscience facts
   useEffect(() => {
     if (neuroscienceFacts.length === 0) return;
@@ -1511,6 +2012,9 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     setLoading(true);
     try {
       console.log(` Loading data for student: ${user.username}`);
+      
+      // Load notifications
+      await loadNotifications();
       
       // Refresh pending assessments
       const allAssessments = await getAssessments();
@@ -1532,7 +2036,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       const coursesData = await getCourses();
       setCourses(coursesData);
       
-      // ========== FIXED: Calculate combined subject scores ==========
+      // Calculate combined subject scores
       const courseSubjectScores: Record<string, { total: number, count: number }> = {};
       Object.keys(progressData).forEach(subject => {
         Object.keys(progressData[subject]).forEach(topicId => {
@@ -1635,6 +2139,15 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   useEffect(() => {
     refreshData();
+    
+    // Set up notification refresh every 30 seconds
+    const notificationInterval = setInterval(() => {
+      if (user?.username) {
+        loadNotifications();
+      }
+    }, 30000);
+    
+    return () => clearInterval(notificationInterval);
   }, [user]);
 
   const chartData = {
@@ -1693,6 +2206,20 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         y += 10;
         doc.text(neuroscienceFacts[currentFactIndex], 10, y, { maxWidth: 180 });
         y += 15;
+      }
+      
+      // Add notifications summary
+      if (userNotifications.length > 0) {
+        doc.text('Recent Notifications:', 10, y);
+        y += 10;
+        userNotifications.slice(0, 3).forEach((notification, i) => {
+          if (y > 280) {
+            doc.addPage();
+            y = 20;
+          }
+          doc.text(`${i+1}. ${notification.text.substring(0, 50)}...`, 10, y);
+          y += 8;
+        });
       }
       
       // Add course history if available
@@ -1779,6 +2306,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <p className="text-white/60">
                 {user.gradeLevel ? `Grade ${user.gradeLevel} Science Student` : 'Science Student'}
                 {subjectScores.length > 0 && ` • ${subjectScores.length} Subjects Tracked`}
+                {unreadCount > 0 && ` • ${unreadCount} new notification${unreadCount > 1 ? 's' : ''}`}
               </p>
             </div>
             <div className="flex gap-2">
@@ -1797,7 +2325,110 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Neuroscience Facts Section - ADDED HERE */}
+          {/* Quick Start Guide for Students - UPDATED */}
+          <div className="mb-6">
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-4 rounded-xl">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="bg-white/10 p-2 rounded-lg">
+                  <BookOpen className="text-cyan-300" size={20} />
+                </div>
+                <h4 className="font-bold text-cyan-300 text-lg">Quick Start Guide</h4>
+                <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">New</span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="text-green-400 flex-shrink-0 mt-0.5" size={14} />
+                  <span className="text-white/90">Study course materials</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="text-green-400 flex-shrink-0 mt-0.5" size={14} />
+                  <span className="text-white/90">Complete checkpoints</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="text-green-400 flex-shrink-0 mt-0.5" size={14} />
+                  <span className="text-white/90">Track progress on dashboard</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="text-blue-400 flex-shrink-0 mt-0.5" size={14} />
+                  <span className="text-white/90">Ask Newel AI for help</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Zap className="text-yellow-400 flex-shrink-0 mt-0.5" size={14} />
+                  <span className="text-white/90">Try 222-Sprint challenge</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Trophy className="text-purple-400 flex-shrink-0 mt-0.5" size={14} />
+                  <span className="text-white/90">Climb the leaderboard</span>
+                </div>
+              </div>
+              
+              <div className="mt-3 pt-3 border-t border-white/10 text-xs text-white/60 flex justify-between">
+                <span>Need help? Check course details for full guide</span>
+                <Link to="/courses" className="text-cyan-400 hover:text-cyan-300">
+                  Go to Courses →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Notifications Section - NEW */}
+          {userNotifications.length > 0 && (
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Bell className="text-yellow-400" size={18} /> Recent Updates
+                </h4>
+                <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                  {unreadCount} unread
+                </span>
+              </div>
+              
+              <div className="space-y-2">
+                {userNotifications.slice(0, 3).map((notification, index) => (
+                  <div 
+                    key={index}
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-white/5 ${notification.read ? 'border-white/5 bg-white/2' : 'border-cyan-500/20 bg-cyan-500/5'}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className={`p-1.5 rounded ${notification.type === 'success' ? 'bg-green-500/20 text-green-400' : 
+                                      notification.type === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
+                                      notification.type === 'alert' ? 'bg-red-500/20 text-red-400' :
+                                      'bg-cyan-500/20 text-cyan-400'}`}>
+                        {notification.type === 'success' && <CheckCircle size={12} />}
+                        {notification.type === 'warning' && <AlertCircle size={12} />}
+                        {notification.type === 'alert' && <Bell size={12} />}
+                        {notification.type === 'info' && <Info size={12} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-white/90">{notification.text}</p>
+                        <p className="text-xs text-white/40 mt-1">
+                          {new Date(notification.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-cyan-500 rounded-full mt-1"></div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {userNotifications.length > 3 && (
+                  <div className="text-center pt-2">
+                    <Link 
+                      to="/notifications" 
+                      className="text-xs text-cyan-400 hover:text-cyan-300"
+                    >
+                      View all {userNotifications.length} notifications →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Neuroscience Facts Section */}
           {neuroscienceFacts.length > 0 && (
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
@@ -1857,15 +2488,28 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <Megaphone size={20}/> Important Updates
               </h3>
               <div className="space-y-4">
-                {announcements.slice(0, 2).map(ann => (
-                  <div key={ann.id} className="border-l-4 border-yellow-500 pl-4">
-                    <p className="text-white font-medium">{ann.title}</p>
-                    <p className="text-white/60 text-sm">{ann.content}</p>
-                    <span className="text-white/30 text-xs">
-                      {new Date(ann.timestamp).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
+                {announcements.slice(0, 2).map(ann => {
+                  const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+                  const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
+                  
+                  return (
+                    <div key={ann.id} className="border-l-4 border-yellow-500 pl-4">
+                      <div className="flex justify-between items-start">
+                        <p className="text-white font-medium">{ann.title}</p>
+                        {hoursLeft <= 24 && (
+                          <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
+                            {hoursLeft}h left
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-white/60 text-sm">{ann.content}</p>
+                      <div className="flex justify-between text-white/30 text-xs mt-2">
+                        <span>{new Date(ann.timestamp).toLocaleDateString()}</span>
+                        <span>By: {ann.author}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2082,7 +2726,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
                 <BookOpen className="text-white/20 mx-auto mb-2" size={32} />
                 <p className="text-white/40">No completed courses yet</p>
-                <p className="text-white/30 text-sm mt-1">Complete topics to see your history here</p>
+                        <p className="text-white/30 text-sm mt-1">Complete topics to see your history here</p>
               </div>
             )}
             

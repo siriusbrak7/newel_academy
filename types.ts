@@ -242,6 +242,7 @@ export interface TheorySubmission {
 // =======================
 
 export interface Announcement {
+  expiresAt: number;
   id: string;
   title: string;
   content: string;
@@ -249,12 +250,34 @@ export interface Announcement {
   author: string;
 }
 
+// Update the existing Notification interface:
 export interface Notification {
   id: string;
   text: string;
-  type: 'info' | 'success' | 'warning';
+  type: 'info' | 'success' | 'warning' | 'alert'; // Added 'alert'
   read: boolean;
   timestamp: number;
+  metadata?: {
+    userId?: string;
+    username?: string;
+    courseId?: string;
+    topicId?: string;
+    checkpointId?: string;
+    assessmentId?: string;
+    score?: number;
+    actionUrl?: string; // URL to navigate when clicked
+  };
+  expiresAt?: number; // Auto-expire notifications
+}
+
+// Add a new interface for notification preferences
+export interface NotificationPreferences {
+  userId: string;
+  courseUpdates: boolean;
+  newAssessments: boolean;
+  leaderboardUpdates: boolean;
+  submissionGraded: boolean;
+  topicCompleted: boolean;
 }
 
 // =======================

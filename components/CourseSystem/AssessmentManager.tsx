@@ -3,7 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Assessment, Question, Submission } from '../../types';
 import { getAITutorResponse } from "../../services/geminiService";
-import { getAssessments, getSubmissions, saveAssessment, saveSubmission, getStoredSession } from '../../services/storageService';
+import { 
+  getAssessments, 
+  getSubmissions, 
+  saveAssessment, 
+  saveSubmission, 
+  getStoredSession,
+  notifyNewAssessment 
+} from '../../services/storageService';
 import { 
   Plus, Save, Brain, Eye, Edit, X, CheckCircle, Timer, List, 
   ArrowLeft, Wand2, Loader2, ClipboardList, FileText, PenTool 
@@ -127,8 +134,23 @@ export const AssessmentManager: React.FC = () => {
     createdBy: user.username
   };
   
-  await saveAssessment(newAssessment);
-  alert("Assessment Published! Students can now see this in their 'My Assignments'.");
+  try {
+    await saveAssessment(newAssessment);
+    
+    // Add notification trigger after assessment is created
+    await notifyNewAssessment(
+      user.username, // teacher username
+      newAssessment.title,
+      newAssessment.subject,
+      newAssessment.targetGrade
+    );
+    console.log('📢 Notification sent:', { teacher: user.username, assessment: newAssessment.title });
+
+    alert("Assessment Published! Students can now see this in their 'My Assignments'.");
+  } catch (error) {
+    console.error('Error saving assessment or sending notification:', error);
+    alert("There was an issue publishing the assessment.");
+  }
   
   setForm({ title: '', subject: 'Biology', targetGrade: '9' });
   setQuestions([]);

@@ -1,4 +1,3 @@
-// components/CourseSystem/TopicDetailCheckpoints.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCheckpointQuestions } from '../../services/checkpointService';
@@ -10,7 +9,9 @@ import {
   saveCheckpointProgress,
   getTopicFinalAssessment,
   updateTopicProgress,
-  getCourses
+  getCourses,
+  notifyTopic80PercentComplete,
+  notifyLeaderboardUpdate
 } from '../../services/storageService';
 import { getAITutorResponse } from '../../services/geminiService';
 import { supabase } from '../../services/supabaseClient';
@@ -276,7 +277,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
     }
   };
 
-  // --- UPDATED HANDLERS (With Correct Bracing) ---
+  // --- UPDATED HANDLERS ---
 
   const handleCheckpointComplete = async (
   checkpointId: string, 
@@ -308,6 +309,32 @@ export const TopicDetailCheckpoints: React.FC = () => {
     setCheckpointProgress(progressData);
 
     const completedCheckpoint = checkpoints.find(cp => cp.id === checkpointId);
+    
+    // Add notification for checkpoint completion
+    try {
+      if (passed && completedCheckpoint && completedCheckpoint.checkpoint_number === 4) {
+        // Calculate topic progress
+        const totalCheckpoints = checkpoints.length + 1; // +1 for final assessment
+        const completedCheckpoints = Object.keys(progressData)
+          .filter(id => progressData[id]?.passed)
+          .length; 
+        
+        const progressPercentage = Math.round((completedCheckpoints / totalCheckpoints) * 100);
+        
+        if (progressPercentage >= 80) {
+          await notifyTopic80PercentComplete(
+            user.username,
+            topic.title,
+            subject!,
+            progressPercentage
+          );
+          console.log('📢 Notification sent:', { user: user.username, topic: topic.title, progress: progressPercentage });
+        }
+      }
+    } catch (notifyErr) {
+      console.error('Failed to send checkpoint notification:', notifyErr);
+    }
+
     const isCheckpoint4 = completedCheckpoint?.checkpoint_number === 4;
 
     if (isCheckpoint4 && passed) {
@@ -338,7 +365,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
     console.error('Error saving progress:', error);
     alert('Failed to save progress.');
   }
-}; // <-- ADD THIS CLOSING BRACE
+};
 
   const handleFinalAssessmentComplete = async (score: number, passed: boolean) => {
     if (!user || !subject || !topicId) return;
@@ -361,6 +388,21 @@ export const TopicDetailCheckpoints: React.FC = () => {
         mainAssessmentScore: score,
         mainAssessmentPassed: passed
       });
+
+      // Add notification for topic completion
+      try {
+        if (passed) {
+          await notifyTopic80PercentComplete(
+            user.username,
+            topic.title,
+            subject!,
+            100 // 100% completed
+          );
+          console.log('📢 Notification sent:', { user: user.username, topic: topic.title, progress: 100 });
+        }
+      } catch (notifyErr) {
+        console.error('Failed to send final assessment notification:', notifyErr);
+      }
 
       if (passed) {
         const { data: userData } = await supabase
@@ -558,6 +600,94 @@ export const TopicDetailCheckpoints: React.FC = () => {
           <Wand2 size={16} className="text-purple-400"/> Ask Newel
         </button>
       </div>
+
+            {/* Detailed How-to Guide for Students */}
+            <div className="mb-10 bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-white/10 rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-white/10 p-2 rounded-lg">
+                  <BookOpen className="text-cyan-300" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">How to Complete This Topic</h3>
+                  <p className="text-sm text-white/60">Follow these steps to master this topic</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">Study the Materials</h4>
+                      <p className="text-sm text-white/70">Read/watch all materials provided in the "Materials" section. Use the interactive Biolens if available.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">Complete Checkpoints 1-3</h4>
+                      <p className="text-sm text-white/70">Test your understanding with short MCQs after studying each section.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">Master Checkpoint 4</h4>
+                      <p className="text-sm text-white/70">This comprehensive MCQ test (20 questions, 80% pass) unlocks the Final Assessment.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center text-sm font-bold">4</div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">Final Assessment</h4>
+                      <p className="text-sm text-white/70">Complete the theory-based final assessment (worth 20% of total grade).</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-yellow-500/20 text-yellow-400 rounded-full flex items-center justify-center text-sm font-bold">5</div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">Get Help When Stuck</h4>
+                      <p className="text-sm text-white/70">Use "Ask Newel" button for help with difficult concepts.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-orange-500/20 text-orange-400 rounded-full flex items-center justify-center text-sm font-bold">6</div>
+                    <div>
+                      <h4 className="font-medium text-white mb-1">Track Your Progress</h4>
+                      <p className="text-sm text-white/70">Monitor your completion percentage and checkpoint status on the right panel.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t border-white/10">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-cyan-400">80%</div>
+                    <div className="text-white/60">Checkpoints</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-purple-400">20%</div>
+                    <div className="text-white/60">Final Assessment</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-green-400">80%</div>
+                    <div className="text-white/60">Pass Threshold</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-yellow-400">222s</div>
+                    <div className="text-white/60">Sprint Challenge</div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
       {/* Topic Title Card */}
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-white/10 rounded-3xl p-8 mb-8">

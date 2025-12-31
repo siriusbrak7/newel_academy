@@ -1,5 +1,5 @@
 ﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
-import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material } from '../types';
+import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification } from '../types';
 import { supabase } from './supabaseClient';
 
 // Add caching variables at the TOP of the file (right after imports)
@@ -959,7 +959,7 @@ export const getLeaderboards = async (): Promise<{
       .order('score', { ascending: false });
 
     if (error) {
-      console.error('âŒ Error fetching leaderboards:', error);
+      console.error('â Œ Error fetching leaderboards:', error);
       return { academic: [], challenge: [], assessments: assessmentEntries };
     }
 
@@ -1056,7 +1056,15 @@ export const getLeaderboards = async (): Promise<{
         ...entry,
         type: 'academic' as const  // Convert 'course' type to 'academic'
       })), // Use course scores for academic leaderboard
-      challenge: [], // Placeholder - will be populated below
+      challenge: filteredData
+        .filter((l: any) => l.board_type === 'challenge')
+        .slice(0, 10)
+        .map((item: any) => ({
+          username: item.username || '',
+          score: item.score,
+          grade_level: item.grade_level,
+          type: item.board_type as 'academic' | 'challenge' | 'assessments'
+        })),
       assessments: assessmentEntries
     };
 
@@ -1192,9 +1200,12 @@ export const updateAssessmentLeaderboard = async (username: string, score: numbe
 // =====================================================
 // ANNOUNCEMENTS
 // =====================================================
+// Helper function for 48-hour expiry
+const get48HourExpiry = (): number => {
+  return Date.now() + (48 * 60 * 60 * 1000); // 48 hours from now
+};
+
 export const getAnnouncements = async (): Promise<Announcement[]> => {
-  
-  
   try {
     const { data, error } = await supabase
       .from('announcements')
@@ -1203,14 +1214,37 @@ export const getAnnouncements = async (): Promise<Announcement[]> => {
 
     if (error) throw error;
     
-    const announcements: Announcement[] = (data || []).map(item => ({
-      id: item.id,
-      title: item.title,
-      content: item.content,
-      timestamp: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
-      author: item.author_user?.username || item.author_name || 'System'
-    }));
-
+    const now = Date.now();
+    const announcements: Announcement[] = [];
+    
+    // Process and filter expired announcements
+    for (const item of (data || [])) {
+      const createdTime = item.created_at ? new Date(item.created_at).getTime() : Date.now();
+      const expiresTime = item.expires_at ? new Date(item.expires_at).getTime() : createdTime + (48 * 60 * 60 * 1000);
+      
+      // Only include if not expired
+      if (now <= expiresTime) {
+        announcements.push({
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          timestamp: createdTime,
+          author: item.author_user?.username || item.author_name || 'System',
+          expiresAt: expiresTime
+        });
+      } else {
+        // Delete expired announcement from database
+        try {
+          await supabase
+            .from('announcements')
+            .delete()
+            .eq('id', item.id);
+          console.log(`Deleted expired announcement: ${item.title}`);
+        } catch (deleteError) {
+          console.error('Error deleting expired announcement:', deleteError);
+        }
+      }
+    }
     
     return announcements;
   } catch (error) {
@@ -1220,19 +1254,20 @@ export const getAnnouncements = async (): Promise<Announcement[]> => {
 };
 
 export const saveAnnouncement = async (announcement: Announcement): Promise<void> => {
-  
   try {
+    const expiresAt = announcement.expiresAt || get48HourExpiry();
+    
     const { error } = await supabase
       .from('announcements')
       .insert({
         title: announcement.title,
         content: announcement.content,
         author_name: announcement.author,
+        expires_at: new Date(expiresAt).toISOString(), // ADD EXPIRY DATE
         created_at: new Date().toISOString()
       });
     
     if (error) throw error;
-    
     
   } catch (error) {
     console.error('Save announcement error:', error);
@@ -1357,6 +1392,340 @@ export const getClassOverview = async () => {
     classAverage,
     weakestTopic
   };
+};
+
+// =======================
+// NOTIFICATION FUNCTIONS
+// =======================
+
+// Get notifications for a specific user
+export const getUserNotifications = async (username: string): Promise<Notification[]> => {
+  try {
+    // First try to get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) return [];
+    
+    // Fetch notifications
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userData.id)
+      .order('created_at', { ascending: false })
+      .limit(20); // Limit to 20 most recent
+    
+    if (error) throw error;
+    
+    const now = Date.now();
+    const validNotifications: Notification[] = [];
+    
+    // Process and filter expired notifications
+    for (const item of (data || [])) {
+      const expiresTime = item.expires_at ? new Date(item.expires_at).getTime() : 
+                         (item.created_at ? new Date(item.created_at).getTime() + (7 * 24 * 60 * 60 * 1000) : now + (7 * 24 * 60 * 60 * 1000));
+      
+      // Only include if not expired
+      if (now <= expiresTime) {
+        validNotifications.push({
+          id: item.id,
+          text: item.text,
+          type: item.type,
+          read: item.read,
+          timestamp: item.created_at ? new Date(item.created_at).getTime() : now,
+          metadata: item.metadata,
+          expiresAt: expiresTime
+        });
+      } else {
+        // Delete expired notification
+        await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', item.id);
+      }
+    }
+    
+    return validNotifications;
+    
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+};
+
+// Create a new notification
+export const createNotification = async (
+  username: string, 
+  text: string, 
+  type: Notification['type'] = 'info',
+  metadata?: any
+): Promise<void> => {
+  try {
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) {
+      console.error(`User ${username} not found for notification`);
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userData.id,
+        text,
+        type,
+        read: false,
+        metadata: metadata || {},
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString() // 7 days expiry
+      });
+    
+    if (error) throw error;
+    
+    console.log(`✅ Notification created for ${username}: ${text}`);
+    
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+};
+
+// Create notifications for multiple users (e.g., all students in a grade)
+export const createNotificationsForGrade = async (
+  gradeLevel: string,
+  text: string,
+  type: Notification['type'] = 'info',
+  metadata?: any
+): Promise<void> => {
+  try {
+    // Get all students in this grade
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, username')
+      .eq('role', 'student')
+      .eq('grade_level', gradeLevel)
+      .eq('approved', true);
+    
+    if (usersError) throw usersError;
+    
+    // Create notifications for each student
+    const notificationPromises = (users || []).map(user => 
+      createNotification(user.username, text, type, metadata)
+    );
+    
+    await Promise.all(notificationPromises);
+    console.log(`✅ Created notifications for ${users?.length || 0} students in grade ${gradeLevel}`);
+    
+  } catch (error) {
+    console.error('Error creating grade notifications:', error);
+  }
+};
+
+// Mark notification as read
+export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId);
+    
+    if (error) throw error;
+    
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+};
+
+// Mark all notifications as read for a user
+export const markAllNotificationsAsRead = async (username: string): Promise<void> => {
+  try {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) return;
+    
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', userData.id)
+      .eq('read', false);
+    
+    if (error) throw error;
+    
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+  }
+};
+
+// Get unread notification count
+export const getUnreadNotificationCount = async (username: string): Promise<number> => {
+  try {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) return 0;
+    
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userData.id)
+      .eq('read', false);
+    
+    if (error) throw error;
+    
+    return count || 0;
+    
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    return 0;
+  }
+};
+
+// =======================
+// NOTIFICATION TRIGGERS
+// =======================
+
+// Trigger: Teacher adds new course material
+export const notifyCourseMaterialAdded = async (
+  teacherName: string,
+  subject: string,
+  topicTitle: string,
+  gradeLevel: string,
+  materialTitle: string
+): Promise<void> => {
+  const text = `📚 New material added to ${subject}: ${materialTitle} in "${topicTitle}"`;
+  const metadata = {
+    teacher: teacherName,
+    subject,
+    topic: topicTitle,
+    material: materialTitle,
+    actionUrl: `/courses`
+  };
+  
+  await createNotificationsForGrade(gradeLevel, text, 'info', metadata);
+};
+
+// Trigger: Teacher creates new assessment
+export const notifyNewAssessment = async (
+  teacherName: string,
+  assessmentTitle: string,
+  subject: string,
+  gradeLevel: string
+): Promise<void> => {
+  const text = `📝 New assessment: "${assessmentTitle}" in ${subject}`;
+  const metadata = {
+    teacher: teacherName,
+    assessment: assessmentTitle,
+    subject,
+    actionUrl: `/assessments`
+  };
+  
+  await createNotificationsForGrade(gradeLevel, text, 'alert', metadata);
+};
+
+// Trigger: Student completes 80% of a topic
+export const notifyTopic80PercentComplete = async (
+  studentName: string,
+  topicTitle: string,
+  subject: string,
+  percentage: number
+): Promise<void> => {
+  // Notify the student
+  const studentText = `🎯 Great progress! You've completed ${percentage}% of "${topicTitle}"`;
+  const studentMetadata = {
+    topic: topicTitle,
+    subject,
+    percentage,
+    actionUrl: `/topic/${subject}/${topicTitle}`
+  };
+  
+  await createNotification(studentName, studentText, 'success', studentMetadata);
+  
+  // Also notify teachers (find teachers for this student's grade)
+  try {
+    const { data: studentData } = await supabase
+      .from('users')
+      .select('grade_level')
+      .eq('username', studentName)
+      .single();
+    
+    if (studentData?.grade_level) {
+      const { data: teachers } = await supabase
+        .from('users')
+        .select('username')
+        .eq('role', 'teacher')
+        .eq('approved', true);
+      
+      const teacherText = `📊 ${studentName} has completed ${percentage}% of "${topicTitle}"`;
+      const teacherMetadata = {
+        student: studentName,
+        topic: topicTitle,
+        subject,
+        percentage,
+        actionUrl: `/teacher-dashboard`
+      };
+      
+      const teacherPromises = (teachers || []).map(teacher =>
+        createNotification(teacher.username, teacherText, 'info', teacherMetadata)
+      );
+      
+      await Promise.all(teacherPromises);
+    }
+  } catch (error) {
+    console.error('Error notifying teachers:', error);
+  }
+};
+
+// Trigger: New leaderboard entry
+export const notifyLeaderboardUpdate = async (
+  studentName: string,
+  position: number,
+  boardType: 'academic' | 'challenge' | 'assessments'
+): Promise<void> => {
+  const boardNames = {
+    academic: 'Academic Leaderboard',
+    challenge: '222-Sprint Challenge',
+    assessments: 'Assessment Leaderboard'
+  };
+  
+  const emoji = position <= 3 ? '🏆' : '📈';
+  const text = `${emoji} You're now #${position} on the ${boardNames[boardType]}`;
+  const metadata = {
+    position,
+    boardType,
+    actionUrl: `/leaderboard`
+  };
+  
+  await createNotification(studentName, text, 'success', metadata);
+};
+
+// Trigger: New submission for teacher to grade
+export const notifyNewSubmission = async (
+  studentName: string,
+  assessmentTitle: string,
+  teacherUsername: string
+): Promise<void> => {
+  const text = `📥 New submission from ${studentName}: "${assessmentTitle}"`;
+  const metadata = {
+    student: studentName,
+    assessment: assessmentTitle,
+    actionUrl: `/teacher-assessments`
+  };
+  
+  await createNotification(teacherUsername, text, 'alert', metadata);
 };
 
 // =====================================================
@@ -1542,6 +1911,28 @@ export const refreshAllLeaderboards = async (): Promise<void> => {
       }
     }
 
+    // After calculating leaderboards, add notifications for top 3 positions
+    const leaderboards = await getLeaderboards();
+    const boardTypes: ('academic' | 'challenge' | 'assessments')[] = ['academic', 'challenge', 'assessments'];
+
+    for (const boardType of boardTypes) {
+      const leaderboardData = leaderboards[boardType];
+      const topThree = leaderboardData.slice(0, 3);
+      
+      for (const [index, entry] of topThree.entries()) {
+        try {
+          await notifyLeaderboardUpdate(
+            entry.username,
+            index + 1, // position (1, 2, 3)
+            boardType // 'academic', 'challenge', or 'assessments'
+          );
+          console.log('📢 Notification sent:', { user: entry.username, position: index + 1, board: boardType });
+        } catch (notifyErr) {
+          console.error(`Failed to send ${boardType} notification for ${entry.username}:`, notifyErr);
+        }
+      }
+    }
+
     
   } catch (error) {
     console.error('Refresh leaderboards error:', error);
@@ -1564,7 +1955,7 @@ export const getTopicCheckpoints = async (topicId: string): Promise<any[]> => {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error('âŒ Get checkpoints error:', error);
+    console.error('â Œ Get checkpoints error:', error);
     return [];
   }
 };
@@ -1612,7 +2003,7 @@ export const getStudentCheckpointProgress = async (username: string, topicId: st
 
     return progressDict;
   } catch (error) {
-    console.error('âŒ Get checkpoint progress error:', error);
+    console.error('â Œ Get checkpoint progress error:', error);
     return {};
   }
 };
@@ -1647,7 +2038,7 @@ export const saveCheckpointProgress = async (
     if (error) throw error;
     
   } catch (error) {
-    console.error('âŒ Save checkpoint progress error:', error);
+    console.error('â Œ Save checkpoint progress error:', error);
     throw error;
   }
 };
@@ -1667,7 +2058,7 @@ export const getTopicFinalAssessment = async (topicId: string): Promise<any> => 
     }
     return data;
   } catch (error) {
-    console.error('âŒ Get final assessment error:', error);
+    console.error('â Œ Get final assessment error:', error);
     return null;
   }
 };
