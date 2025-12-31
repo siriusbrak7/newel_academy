@@ -2351,7 +2351,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
                 <div className="flex items-start gap-2">
                   <MessageSquare className="text-blue-400 flex-shrink-0 mt-0.5" size={14} />
-                  <span className="text-white/90">Ask Newel AI for help</span>
+                  <span className="text-white/90">Ask Newel for help</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <Zap className="text-yellow-400 flex-shrink-0 mt-0.5" size={14} />

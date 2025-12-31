@@ -357,7 +357,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
               <div className="flex items-start gap-2">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>4</div>
                 <div>
-                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Ask Newel AI</p>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Ask Newel</p>
                   <p className="text-sm opacity-70">Get instant help with difficult concepts</p>
                 </div>
               </div>
@@ -446,7 +446,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mt-10 ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>
             <div className="text-center">
               <div className="text-2xl font-bold">24/7</div>
-              <div className="text-sm">Personal Learning Assistant</div>
+              <div className="text-sm">Meet Newel, Your Personal Learning Assistant</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">100%</div>
@@ -766,7 +766,7 @@ const App: React.FC = () => {
               <div className={`text-2xl font-bold mb-2 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>
                 The Newel
               </div>
-              <p className="text-sm">Science Learning Platform</p>
+              <p className="text-sm">Next Gen Science Learning Platform</p>
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/" className="hover:underline">Home</Link>
@@ -775,7 +775,7 @@ const App: React.FC = () => {
               <button onClick={() => setShowAuthModal(true)} className="hover:underline">Register</button>
             </div>
           </div>
-          <p className="text-sm">© 2025 The Newel • bbrak1235@gmail.com</p>
+          <p className="text-sm">© 2025 The Newel • Next Gen Science Learning Platform</p>
         </div>
       </footer>
 

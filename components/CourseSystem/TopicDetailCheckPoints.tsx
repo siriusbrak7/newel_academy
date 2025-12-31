@@ -619,7 +619,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                     <div className="flex-shrink-0 w-8 h-8 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-sm font-bold">1</div>
                     <div>
                       <h4 className="font-medium text-white mb-1">Study the Materials</h4>
-                      <p className="text-sm text-white/70">Read/watch all materials provided in the "Materials" section. Use the interactive Biolens if available.</p>
+                      <p className="text-sm text-white/70">Access the links provided in the "Materials" section. Use Biolens for biology topics if available for a quick topic review.</p>
                     </div>
                   </div>
                   
