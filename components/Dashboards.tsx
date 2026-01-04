@@ -78,6 +78,7 @@ import {
 // Fixed Chart.js imports
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { supabase } from '@/services/supabaseClient';
 
 // Register Chart.js components
 ChartJS.register(
@@ -606,127 +607,292 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   // Load Students for Performance Viewer
-  const loadStudents = async () => {
-    try {
-      const statsData = await getAllStudentStats();
-      const studentUsers = statsData.filter(s => 
-        s.username !== 'admin' && 
-        s.username !== 'teacher_demo' && 
-        s.username !== 'student_demo'
-      );
-      
-      // Convert StudentStats to User objects
-      const students: User[] = studentUsers.map(s => ({
-        username: s.username,
-        role: 'student' as Role,
-        approved: true,
-        securityQuestion: '',
-        securityAnswer: '',
-        gradeLevel: s.gradeLevel,
-        lastLogin: Date.now()
-      }));
-      
-      setAllStudents(students);
-      
-      // If there are students, select the first one by default
-      if (students.length > 0 && !selectedStudent) {
-        setSelectedStudent(students[0].username);
-        loadStudentPerformance(students[0].username);
+  // Add this useEffect to load students when the component mounts
+  useEffect(() => {
+    const loadStudentsData = async () => {
+      try {
+        console.log('📋 Loading students list...');
+        
+        // Get REAL students only (not demo accounts)
+        const { data: studentsData, error } = await supabase
+          .from('users')
+          .select('username, grade_level')
+          .eq('role', 'student')
+          .eq('approved', true)
+          .not('username', 'in', '("admin","teacher_demo","student_demo")')
+          .order('username');
+        
+        if (error) {
+          console.error('❌ Error loading students:', error);
+          throw error;
+        }
+        
+        const students: User[] = (studentsData || []).map(s => ({
+          username: s.username,
+          role: 'student' as Role,
+          approved: true,
+          securityQuestion: '',
+          securityAnswer: '',
+          gradeLevel: s.grade_level || 'N/A',
+          lastLogin: Date.now()
+        }));
+        
+        console.log(`✅ Loaded ${students.length} real students`);
+        setAllStudents(students);
+        
+        // If there are students, select the first one by default
+        if (students.length > 0 && !selectedStudent) {
+          setSelectedStudent(students[0].username);
+          // Load performance for this student
+          loadStudentPerformance(students[0].username);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error in loadStudentsData:', error);
+        // Fallback to stats if direct query fails
+        try {
+          const statsData = await getAllStudentStats();
+          const studentUsers = statsData.filter(s => 
+            s.username !== 'admin' && 
+            s.username !== 'teacher_demo' && 
+            s.username !== 'student_demo'
+          );
+          
+          const students: User[] = studentUsers.map(s => ({
+            username: s.username,
+            role: 'student' as Role,
+            approved: true,
+            securityQuestion: '',
+            securityAnswer: '',
+            gradeLevel: s.gradeLevel,
+            lastLogin: Date.now()
+          }));
+          
+          setAllStudents(students);
+          
+          if (students.length > 0 && !selectedStudent) {
+            setSelectedStudent(students[0].username);
+            loadStudentPerformance(students[0].username);
+          }
+        } catch (fallbackError) {
+          console.error('Fallback also failed:', fallbackError);
+        }
       }
-    } catch (error) {
-      console.error('Error loading students:', error);
-    }
-  };
+    };
+    
+    loadStudentsData();
+  }, []); // Empty dependency array means run once on mount
 
-  const loadStudentPerformance = async (username: string) => {
+  // ADD THIS FUNCTION TO Dashboards.tsx (or update the existing loadStudentPerformance)
+    const loadStudentPerformance = async (username: string) => {
     if (!username) return;
     
     setLoadingStudent(true);
     try {
-      // Get student's course history
-      const courseHistory = await getStudentCourseHistory(username);
+      console.log(`📊 Loading performance for student: ${username}`);
       
-      // Get student's checkpoint progress from all topics
-      const courses = await getCourses(true);
+      // 1. Get the student's checkpoint progress directly from database
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
+      
+      if (!userData) {
+        console.error('Student not found:', username);
+        return;
+      }
+      
+      // 2. Get all checkpoint progress for this student
+      const { data: checkpointProgress, error: progressError } = await supabase
+        .from('student_checkpoint_progress')
+        .select(`
+          *,
+          checkpoint:checkpoints (
+            id,
+            checkpoint_number,
+            title,
+            topic_id,
+            required_score
+          )
+        `)
+        .eq('user_id', userData.id);
+      
+      if (progressError) {
+        console.error('Error loading checkpoint progress:', progressError);
+        throw progressError;
+      }
+      
+      // 3. Get topic information for each checkpoint
+      const topicIds = [...new Set(checkpointProgress
+        ?.filter(item => item.checkpoint)
+        .map(item => item.checkpoint?.topic_id)
+        .filter(Boolean) || [])];
+      
+      const { data: topics } = await supabase
+        .from('topics')
+        .select(`
+          id, 
+          title, 
+          subject:subject_id (
+            name
+          )
+        `)
+        .in('id', topicIds);
+      
+      // 4. Organize data by subject
+      const performanceBySubject: Record<string, any> = {};
+      let totalCheckpoints = 0;
+      let completedCheckpoints = 0;
+      let totalScore = 0;
+      let scoredCheckpoints = 0;
+      
+      checkpointProgress?.forEach(progress => {
+        const checkpoint = progress.checkpoint;
+        if (!checkpoint) return;
+        
+        // Find topic for this checkpoint
+        const topic = topics?.find(t => t.id === checkpoint.topic_id);
+        if (!topic) return;
+        
+        // FIXED: Handle subject as array or object
+        let subject = 'General';
+        if (topic.subject) {
+          if (Array.isArray(topic.subject)) {
+            subject = topic.subject[0]?.name || 'General';
+          } else if (typeof topic.subject === 'object' && topic.subject !== null) {
+            subject = (topic.subject as any).name || 'General';
+          }
+        }
+        
+        if (!performanceBySubject[subject]) {
+          performanceBySubject[subject] = {
+            topics: new Set(),
+            checkpoints: { total: 0, completed: 0, totalScore: 0 },
+            avgScore: 0
+          };
+        }
+        
+        // Update subject data
+        performanceBySubject[subject].topics.add(topic.id);
+        performanceBySubject[subject].checkpoints.total++;
+        totalCheckpoints++;
+        
+        if (progress.passed) {
+          performanceBySubject[subject].checkpoints.completed++;
+          completedCheckpoints++;
+        }
+        
+        if (progress.score) {
+          performanceBySubject[subject].checkpoints.totalScore += progress.score;
+          totalScore += progress.score;
+          scoredCheckpoints++;
+        }
+      });
+      
+      // Calculate averages
       const studentPerformanceData: any = {
         username,
-        courseHistory: [],
         checkpointSummary: {
-          totalCheckpoints: 0,
-          completedCheckpoints: 0,
-          averageScore: 0,
+          totalCheckpoints,
+          completedCheckpoints,
+          averageScore: scoredCheckpoints > 0 ? Math.round(totalScore / scoredCheckpoints) : 0,
           bySubject: {}
         }
       };
-
-      // Analyze performance by subject
-      Object.keys(courses).forEach(subject => {
-        Object.keys(courses[subject]).forEach(topicId => {
-          const topic = courses[subject][topicId];
-          if (topic.checkpoints && topic.checkpoints.length > 0) {
-            // Find this topic in course history
-            const topicHistory = courseHistory.find(ch => 
-              ch.topicId === topicId || ch.topicTitle === topic.title
-            );
-
-            if (topicHistory) {
-              studentPerformanceData.checkpointSummary.totalCheckpoints += topic.checkpoints.length;
-              studentPerformanceData.checkpointSummary.completedCheckpoints += 
-                topicHistory.checkpoints.filter((cp: any) => cp.passed).length;
-              
-              // Calculate average score for this topic
-              const topicScores = topicHistory.checkpoints
-                .filter((cp: any) => cp.passed && cp.score)
-                .map((cp: any) => cp.score);
-              
-              if (topicScores.length > 0) {
-                const avgScore = topicScores.reduce((a: number, b: number) => a + b, 0) / topicScores.length;
-                
-                if (!studentPerformanceData.checkpointSummary.bySubject[subject]) {
-                  studentPerformanceData.checkpointSummary.bySubject[subject] = {
-                    topics: 0,
-                    completedTopics: 0,
-                    avgScore: 0,
-                    checkpoints: {
-                      total: 0,
-                      completed: 0
-                    }
-                  };
-                }
-                
-                studentPerformanceData.checkpointSummary.bySubject[subject].topics++;
-                studentPerformanceData.checkpointSummary.bySubject[subject].completedTopics++;
-                studentPerformanceData.checkpointSummary.bySubject[subject].avgScore = 
-                  (studentPerformanceData.checkpointSummary.bySubject[subject].avgScore + avgScore) / 2;
-                studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.total += topic.checkpoints.length;
-                studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.completed += 
-                  topicHistory.checkpoints.filter((cp: any) => cp.passed).length;
-              }
-            }
-          }
-        });
-      });
-
-      // Calculate overall average
-      if (studentPerformanceData.checkpointSummary.completedCheckpoints > 0) {
-        const allScores: number[] = [];
-        courseHistory.forEach((ch: any) => {
-          ch.checkpoints.forEach((cp: any) => {
-            if (cp.passed && cp.score) allScores.push(cp.score);
-          });
-        });
+      
+      // Format subject data
+      Object.keys(performanceBySubject).forEach(subject => {
+        const subjectData = performanceBySubject[subject];
+        const subjectScore = subjectData.checkpoints.totalScore;
+        const subjectCompleted = subjectData.checkpoints.completed;
         
-        if (allScores.length > 0) {
-          studentPerformanceData.checkpointSummary.averageScore = 
-            allScores.reduce((a, b) => a + b, 0) / allScores.length;
-        }
-      }
-
-      studentPerformanceData.courseHistory = courseHistory;
+        studentPerformanceData.checkpointSummary.bySubject[subject] = {
+          topics: subjectData.topics.size,
+          completedTopics: subjectData.topics.size,
+          avgScore: subjectCompleted > 0 ? Math.round(subjectScore / subjectCompleted) : 0,
+          checkpoints: {
+            total: subjectData.checkpoints.total,
+            completed: subjectData.checkpoints.completed
+          }
+        };
+      });
+      
+      console.log(`✅ Loaded performance for ${username}:`, {
+        checkpoints: `${completedCheckpoints}/${totalCheckpoints}`,
+        avgScore: studentPerformanceData.checkpointSummary.averageScore,
+        subjects: Object.keys(performanceBySubject)
+      });
+      
       setStudentPerformance(studentPerformanceData);
       
     } catch (error) {
-      console.error('Error loading student performance:', error);
+      console.error('❌ Error loading student performance:', error);
+      // Fallback method
+      try {
+        console.log('🔄 Trying fallback method...');
+        const courseHistory = await getStudentCourseHistory(username);
+        const courses = await getCourses(true);
+        
+        const studentPerformanceData: any = {
+          username,
+          checkpointSummary: {
+            totalCheckpoints: 0,
+            completedCheckpoints: 0,
+            averageScore: 0,
+            bySubject: {}
+          },
+          courseHistory: courseHistory
+        };
+        
+        // Simple analysis from course history
+        courseHistory.forEach((course: any) => {
+          const subject = course.subject || 'General';
+          if (!studentPerformanceData.checkpointSummary.bySubject[subject]) {
+            studentPerformanceData.checkpointSummary.bySubject[subject] = {
+              topics: 0,
+              completedTopics: 0,
+              avgScore: 0,
+              checkpoints: { total: 0, completed: 0 }
+            };
+          }
+          
+          studentPerformanceData.checkpointSummary.bySubject[subject].topics++;
+          studentPerformanceData.checkpointSummary.bySubject[subject].completedTopics++;
+          
+          if (course.finalScore) {
+            studentPerformanceData.checkpointSummary.bySubject[subject].avgScore = 
+              (studentPerformanceData.checkpointSummary.bySubject[subject].avgScore + course.finalScore) / 2;
+          }
+          
+          const completed = course.checkpoints?.filter((cp: any) => cp.passed).length || 0;
+          const total = course.checkpoints?.length || 0;
+          
+          studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.total += total;
+          studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.completed += completed;
+          
+          studentPerformanceData.checkpointSummary.totalCheckpoints += total;
+          studentPerformanceData.checkpointSummary.completedCheckpoints += completed;
+        });
+        
+        // Calculate overall average
+        if (studentPerformanceData.checkpointSummary.completedCheckpoints > 0) {
+          const allScores: number[] = [];
+          Object.values(studentPerformanceData.checkpointSummary.bySubject).forEach((subject: any) => {
+            if (subject.avgScore > 0) allScores.push(subject.avgScore);
+          });
+          
+          if (allScores.length > 0) {
+            studentPerformanceData.checkpointSummary.averageScore = 
+              Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
+          }
+        }
+        
+        setStudentPerformance(studentPerformanceData);
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        setStudentPerformance(null);
+      }
     } finally {
       setLoadingStudent(false);
     }
@@ -744,9 +910,34 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     return () => clearInterval(notificationInterval);
   }, [dashboardVersion]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (stats.length > 0) {
-      loadStudents();
+      const loadFromStats = async () => {
+        const studentUsers = stats.filter(s => 
+          s.username !== 'admin' && 
+          s.username !== 'teacher_demo' && 
+          s.username !== 'student_demo'
+        );
+        
+        const students: User[] = studentUsers.map(s => ({
+          username: s.username,
+          role: 'student' as Role,
+          approved: true,
+          securityQuestion: '',
+          securityAnswer: '',
+          gradeLevel: s.gradeLevel,
+          lastLogin: Date.now()
+        }));
+        
+        setAllStudents(students);
+        
+        if (students.length > 0 && !selectedStudent) {
+          setSelectedStudent(students[0].username);
+          loadStudentPerformance(students[0].username);
+        }
+      };
+      
+      loadFromStats();
     }
   }, [stats]);
 

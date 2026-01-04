@@ -135,7 +135,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
     {
       icon: <Users className="w-10 h-10" />,
       title: "Expert Support",
-      description: "24/7 tutor access, your personal learning assistants",
+      description: "24/7 tutor access from your personal learning assistants",
       gradient: "from-red-500/20 to-rose-500/20",
       iconColor: "text-red-400"
     },
@@ -446,7 +446,7 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
           <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mt-10 ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>
             <div className="text-center">
               <div className="text-2xl font-bold">24/7</div>
-              <div className="text-sm">Meet Newel, Your Personal Learning Assistant</div>
+              <div className="text-sm">Personal Learning Assistants Available</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">100%</div>
