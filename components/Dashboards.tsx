@@ -521,7 +521,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     description: ''
   });
 
-  // Student Performance State
+  // Student Performance State - FIXED
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [studentPerformance, setStudentPerformance] = useState<any>(null);
   const [loadingStudent, setLoadingStudent] = useState(false);
@@ -535,7 +535,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
 
   const loadData = async () => {
-    console.log("Refreshing Teacher Dashboard Data...");
+    console.log("🔄 Refreshing Teacher Dashboard Data...");
     setLoading(true);
     try {
       const statsData = await getAllStudentStats();
@@ -557,7 +557,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         setSelSubject(Object.keys(courseData)[0]);
       }
     } catch (error) {
-      console.error('Error loading teacher dashboard:', error);
+      console.error('❌ Error loading teacher dashboard:', error);
     } finally {
       setLoading(false);
     }
@@ -572,7 +572,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       setTeacherNotifications(notifications);
       setTeacherUnreadCount(notifications.filter(n => !n.read).length);
     } catch (error) {
-      console.error('Error loading teacher notifications:', error);
+      console.error('❌ Error loading teacher notifications:', error);
     }
   };
 
@@ -602,104 +602,108 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       setTeacherNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setTeacherUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      console.error('❌ Error marking all as read:', error);
     }
   };
 
-  // Load Students for Performance Viewer
-  // Add this useEffect to load students when the component mounts
-  useEffect(() => {
-    const loadStudentsData = async () => {
+  // Load Students for Performance Viewer - FIXED VERSION
+  const loadStudents = async () => {
+    try {
+      console.log('📋 Loading students list...');
+      
+      // Get REAL students only (not demo accounts)
+      const { data: studentsData, error } = await supabase
+        .from('users')
+        .select('username, grade_level')
+        .eq('role', 'student')
+        .eq('approved', true)
+        .order('username');
+      
+      if (error) {
+        console.error('❌ Error loading students:', error);
+        throw error;
+      }
+      
+      // Filter out demo accounts
+      const realStudents = (studentsData || []).filter(s => 
+        !['admin', 'teacher_demo', 'student_demo'].includes(s.username)
+      );
+      
+      const students: User[] = realStudents.map(s => ({
+        username: s.username,
+        role: 'student' as Role,
+        approved: true,
+        securityQuestion: '',
+        securityAnswer: '',
+        gradeLevel: s.grade_level || 'N/A',
+        lastLogin: Date.now()
+      }));
+      
+      console.log(`✅ Loaded ${students.length} real students`);
+      setAllStudents(students);
+      
+      // If there are students, select the first one by default
+      if (students.length > 0 && !selectedStudent) {
+        setSelectedStudent(students[0].username);
+        // Load performance for this student
+        loadStudentPerformance(students[0].username);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in loadStudents:', error);
+      // Fallback to stats if direct query fails
       try {
-        console.log('📋 Loading students list...');
+        const statsData = await getAllStudentStats();
+        const studentUsers = statsData.filter(s => 
+          s.username !== 'admin' && 
+          s.username !== 'teacher_demo' && 
+          s.username !== 'student_demo'
+        );
         
-        // Get REAL students only (not demo accounts)
-        const { data: studentsData, error } = await supabase
-          .from('users')
-          .select('username, grade_level')
-          .eq('role', 'student')
-          .eq('approved', true)
-          .not('username', 'in', '("admin","teacher_demo","student_demo")')
-          .order('username');
-        
-        if (error) {
-          console.error('❌ Error loading students:', error);
-          throw error;
-        }
-        
-        const students: User[] = (studentsData || []).map(s => ({
+        const students: User[] = studentUsers.map(s => ({
           username: s.username,
           role: 'student' as Role,
           approved: true,
           securityQuestion: '',
           securityAnswer: '',
-          gradeLevel: s.grade_level || 'N/A',
+          gradeLevel: s.gradeLevel,
           lastLogin: Date.now()
         }));
         
-        console.log(`✅ Loaded ${students.length} real students`);
         setAllStudents(students);
         
-        // If there are students, select the first one by default
         if (students.length > 0 && !selectedStudent) {
           setSelectedStudent(students[0].username);
-          // Load performance for this student
           loadStudentPerformance(students[0].username);
         }
-        
-      } catch (error) {
-        console.error('❌ Error in loadStudentsData:', error);
-        // Fallback to stats if direct query fails
-        try {
-          const statsData = await getAllStudentStats();
-          const studentUsers = statsData.filter(s => 
-            s.username !== 'admin' && 
-            s.username !== 'teacher_demo' && 
-            s.username !== 'student_demo'
-          );
-          
-          const students: User[] = studentUsers.map(s => ({
-            username: s.username,
-            role: 'student' as Role,
-            approved: true,
-            securityQuestion: '',
-            securityAnswer: '',
-            gradeLevel: s.gradeLevel,
-            lastLogin: Date.now()
-          }));
-          
-          setAllStudents(students);
-          
-          if (students.length > 0 && !selectedStudent) {
-            setSelectedStudent(students[0].username);
-            loadStudentPerformance(students[0].username);
-          }
-        } catch (fallbackError) {
-          console.error('Fallback also failed:', fallbackError);
-        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        setAllStudents([]);
       }
-    };
-    
-    loadStudentsData();
-  }, []); // Empty dependency array means run once on mount
+    }
+  };
 
-  // ADD THIS FUNCTION TO Dashboards.tsx (or update the existing loadStudentPerformance)
-    const loadStudentPerformance = async (username: string) => {
-    if (!username) return;
+  // FIXED: loadStudentPerformance function
+  const loadStudentPerformance = async (username: string) => {
+    if (!username) {
+      console.error('❌ No username provided for performance loading');
+      return;
+    }
     
     setLoadingStudent(true);
     try {
       console.log(`📊 Loading performance for student: ${username}`);
       
-      // 1. Get the student's checkpoint progress directly from database
-      const { data: userData } = await supabase
+      // 1. Get the student's ID
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id')
         .eq('username', username)
         .single();
       
-      if (!userData) {
-        console.error('Student not found:', username);
+      if (userError || !userData) {
+        console.error('❌ Student not found:', username, userError?.message);
+        setStudentPerformance(null);
         return;
       }
       
@@ -719,26 +723,52 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         .eq('user_id', userData.id);
       
       if (progressError) {
-        console.error('Error loading checkpoint progress:', progressError);
-        throw progressError;
+        console.error('❌ Error loading checkpoint progress:', progressError);
+        // Continue with fallback instead of throwing
+      }
+      
+      // SAFETY CHECK: Ensure checkpointProgress is an array
+      const progressArray = Array.isArray(checkpointProgress) ? checkpointProgress : [];
+      
+      // If no checkpoint progress, show empty data
+      if (progressArray.length === 0) {
+        console.log(`📭 No checkpoint progress found for ${username}`);
+        const emptyPerformanceData = {
+          username,
+          checkpointSummary: {
+            totalCheckpoints: 0,
+            completedCheckpoints: 0,
+            averageScore: 0,
+            bySubject: {}
+          },
+          courseHistory: []
+        };
+        setStudentPerformance(emptyPerformanceData);
+        return;
       }
       
       // 3. Get topic information for each checkpoint
-      const topicIds = [...new Set(checkpointProgress
-        ?.filter(item => item.checkpoint)
+      const topicIds = [...new Set(progressArray
+        .filter(item => item?.checkpoint)
         .map(item => item.checkpoint?.topic_id)
         .filter(Boolean) || [])];
       
-      const { data: topics } = await supabase
-        .from('topics')
-        .select(`
-          id, 
-          title, 
-          subject:subject_id (
-            name
-          )
-        `)
-        .in('id', topicIds);
+      // SAFETY CHECK: Only query topics if we have IDs
+      let topics: any[] = [];
+      if (topicIds.length > 0) {
+        const { data: topicsData } = await supabase
+          .from('topics')
+          .select(`
+            id, 
+            title, 
+            subject:subject_id (
+              name
+            )
+          `)
+          .in('id', topicIds);
+        
+        topics = topicsData || [];
+      }
       
       // 4. Organize data by subject
       const performanceBySubject: Record<string, any> = {};
@@ -747,18 +777,20 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       let totalScore = 0;
       let scoredCheckpoints = 0;
       
-      checkpointProgress?.forEach(progress => {
+      // SAFETY CHECK: Use forEach safely
+      progressArray.forEach(progress => {
+        if (!progress || !progress.checkpoint) return;
+        
         const checkpoint = progress.checkpoint;
-        if (!checkpoint) return;
         
         // Find topic for this checkpoint
-        const topic = topics?.find(t => t.id === checkpoint.topic_id);
+        const topic = topics.find(t => t?.id === checkpoint.topic_id);
         if (!topic) return;
         
         // FIXED: Handle subject as array or object
         let subject = 'General';
         if (topic.subject) {
-          if (Array.isArray(topic.subject)) {
+          if (Array.isArray(topic.subject) && topic.subject.length > 0) {
             subject = topic.subject[0]?.name || 'General';
           } else if (typeof topic.subject === 'object' && topic.subject !== null) {
             subject = (topic.subject as any).name || 'General';
@@ -827,80 +859,73 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       setStudentPerformance(studentPerformanceData);
       
     } catch (error) {
-      console.error('❌ Error loading student performance:', error);
-      // Fallback method
-      try {
-        console.log('🔄 Trying fallback method...');
-        const courseHistory = await getStudentCourseHistory(username);
-        const courses = await getCourses(true);
-        
-        const studentPerformanceData: any = {
-          username,
-          checkpointSummary: {
-            totalCheckpoints: 0,
-            completedCheckpoints: 0,
-            averageScore: 0,
-            bySubject: {}
-          },
-          courseHistory: courseHistory
-        };
-        
-        // Simple analysis from course history
-        courseHistory.forEach((course: any) => {
-          const subject = course.subject || 'General';
-          if (!studentPerformanceData.checkpointSummary.bySubject[subject]) {
-            studentPerformanceData.checkpointSummary.bySubject[subject] = {
-              topics: 0,
-              completedTopics: 0,
-              avgScore: 0,
-              checkpoints: { total: 0, completed: 0 }
-            };
-          }
-          
-          studentPerformanceData.checkpointSummary.bySubject[subject].topics++;
-          studentPerformanceData.checkpointSummary.bySubject[subject].completedTopics++;
-          
-          if (course.finalScore) {
-            studentPerformanceData.checkpointSummary.bySubject[subject].avgScore = 
-              (studentPerformanceData.checkpointSummary.bySubject[subject].avgScore + course.finalScore) / 2;
-          }
-          
-          const completed = course.checkpoints?.filter((cp: any) => cp.passed).length || 0;
-          const total = course.checkpoints?.length || 0;
-          
-          studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.total += total;
-          studentPerformanceData.checkpointSummary.bySubject[subject].checkpoints.completed += completed;
-          
-          studentPerformanceData.checkpointSummary.totalCheckpoints += total;
-          studentPerformanceData.checkpointSummary.completedCheckpoints += completed;
-        });
-        
-        // Calculate overall average
-        if (studentPerformanceData.checkpointSummary.completedCheckpoints > 0) {
-          const allScores: number[] = [];
-          Object.values(studentPerformanceData.checkpointSummary.bySubject).forEach((subject: any) => {
-            if (subject.avgScore > 0) allScores.push(subject.avgScore);
-          });
-          
-          if (allScores.length > 0) {
-            studentPerformanceData.checkpointSummary.averageScore = 
-              Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
-          }
-        }
-        
-        setStudentPerformance(studentPerformanceData);
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-        setStudentPerformance(null);
-      }
+      console.error('❌ Unexpected error in loadStudentPerformance:', error);
+      
+      // Create empty data to prevent UI crashes
+      const errorPerformanceData = {
+        username,
+        checkpointSummary: {
+          totalCheckpoints: 0,
+          completedCheckpoints: 0,
+          averageScore: 0,
+          bySubject: {}
+        },
+        courseHistory: []
+      };
+      
+      setStudentPerformance(errorPerformanceData);
     } finally {
       setLoadingStudent(false);
     }
   };
 
+  // Add debug function
+  const debugCheckpointData = async (username: string) => {
+    console.log(`🔍 DEBUG: Checking checkpoint data for ${username}`);
+    
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) {
+      console.log('❌ User not found in database');
+      return;
+    }
+    
+    // Check checkpoint progress
+    const { data: progress } = await supabase
+      .from('student_checkpoint_progress')
+      .select('*')
+      .eq('user_id', userData.id);
+    
+    console.log(`📊 Checkpoint progress found: ${progress?.length || 0} records`);
+    if (progress && progress.length > 0) {
+      progress.forEach((p, i) => {
+        console.log(`  ${i+1}. Checkpoint ID: ${p.checkpoint_id}, Score: ${p.score}, Passed: ${p.passed}`);
+      });
+    }
+    
+    // Check checkpoints table
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('count');
+    
+    console.log(`🎯 Total checkpoints in system: ${checkpoints?.[0]?.count || 0}`);
+    
+    // Check topics
+    const { data: topics } = await supabase
+      .from('topics')
+      .select('count');
+    
+    console.log(`📚 Total topics in system: ${topics?.[0]?.count || 0}`);
+  };
+
   useEffect(() => {
     loadData();
     loadTeacherNotifications();
+    loadStudents(); // Load students on mount
     
     // Set up notification refresh every 30 seconds
     const notificationInterval = setInterval(() => {
@@ -909,37 +934,6 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     
     return () => clearInterval(notificationInterval);
   }, [dashboardVersion]);
-
-    useEffect(() => {
-    if (stats.length > 0) {
-      const loadFromStats = async () => {
-        const studentUsers = stats.filter(s => 
-          s.username !== 'admin' && 
-          s.username !== 'teacher_demo' && 
-          s.username !== 'student_demo'
-        );
-        
-        const students: User[] = studentUsers.map(s => ({
-          username: s.username,
-          role: 'student' as Role,
-          approved: true,
-          securityQuestion: '',
-          securityAnswer: '',
-          gradeLevel: s.gradeLevel,
-          lastLogin: Date.now()
-        }));
-        
-        setAllStudents(students);
-        
-        if (students.length > 0 && !selectedStudent) {
-          setSelectedStudent(students[0].username);
-          loadStudentPerformance(students[0].username);
-        }
-      };
-      
-      loadFromStats();
-    }
-  }, [stats]);
 
   useEffect(() => {
     if (selSubject && selTopic && courses[selSubject]?.[selTopic]) {
@@ -968,7 +962,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       alert("✅ Announcement Posted! (Will auto-remove in 48 hours)");
       forceRefresh();
     } catch (error) {
-      console.error('Error posting announcement:', error);
+      console.error('❌ Error posting announcement:', error);
       alert("❌ Failed to post announcement");
     }
   };
@@ -998,7 +992,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       alert("✅ Instructions Saved & Students Notified!");
       forceRefresh(); 
     } catch (error) {
-      console.error('Error saving instructions:', error);
+      console.error('❌ Error saving instructions:', error);
       alert("❌ Failed to save instructions");
     }
   };
@@ -1035,7 +1029,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
         content = url;
       } catch (error) {
-        console.error('Upload error:', error);
+        console.error('❌ Upload error:', error);
         alert("Upload failed");
         setIsUploading(false);
         return;
@@ -1091,7 +1085,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       }, 500);
       
     } catch (error) {
-      console.error('Error adding material:', error);
+      console.error('❌ Error adding material:', error);
       alert("❌ Failed to add material");
       
       // Revert local state on error
@@ -1140,7 +1134,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       forceRefresh();
       alert('✅ Material deleted!');
     } catch (error) {
-      console.error('Error deleting material:', error);
+      console.error('❌ Error deleting material:', error);
       alert('❌ Failed to delete material');
     }
   };
@@ -1206,7 +1200,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       setShowCreateTopic(false);
       forceRefresh();
     } catch (error) {
-      console.error('Error creating topic:', error);
+      console.error('❌ Error creating topic:', error);
       alert("❌ Failed to create topic");
       
       // Remove temp topic on error
@@ -1259,7 +1253,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       doc.save(`${user.username}_class_report.pdf`);
     } catch (error) {
-      console.error('Error exporting report:', error);
+      console.error('❌ Error exporting report:', error);
       alert("❌ Failed to export report");
     }
   };
@@ -1271,7 +1265,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       setLeaderboardData(leaderboards);
       alert('✅ Leaderboards refreshed successfully!');
     } catch (error) {
-      console.error('Error refreshing leaderboards:', error);
+      console.error('❌ Error refreshing leaderboards:', error);
       alert('❌ Failed to refresh leaderboards');
     }
   };
@@ -1716,7 +1710,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             )}
           </div>
 
-          {/* Student Performance Viewer */}
+          {/* Student Performance Viewer - FIXED */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1780,9 +1774,9 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   <div className="bg-gray-900/50 p-3 rounded-lg text-center">
                     <div className="text-2xl font-bold text-purple-400">
-                      {studentPerformance.courseHistory.length}
+                      {Object.keys(studentPerformance.checkpointSummary.bySubject).length}
                     </div>
-                    <div className="text-xs text-white/60 mt-1">Topics Started</div>
+                    <div className="text-xs text-white/60 mt-1">Subjects</div>
                   </div>
                 </div>
                 
@@ -1817,33 +1811,23 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                   )}
                 </div>
                 
-                {/* Recent Activity */}
-                <div>
-                  <h4 className="font-medium text-white mb-3">Recent Checkpoint Activity</h4>
-                  {studentPerformance.courseHistory.slice(0, 3).map((course: any, index: number) => (
-                    <div key={index} className="bg-black/20 p-3 rounded-lg mb-2">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-white font-medium text-sm">{course.topicTitle}</p>
-                          <p className="text-xs text-white/60">{course.subject} • Grade {course.gradeLevel}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-sm font-bold ${course.passed ? 'text-green-400' : 'text-yellow-400'}`}>
-                            {course.finalScore || 0}%
-                          </span>
-                          <p className="text-xs text-white/60">
-                            {course.checkpoints.filter((cp: any) => cp.passed).length}/{course.checkpoints.length} CP
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                {/* Debug Button */}
+                <div className="pt-4 border-t border-white/10">
+                  <button
+                    onClick={() => selectedStudent && debugCheckpointData(selectedStudent)}
+                    className="text-xs text-gray-400 hover:text-gray-300 bg-black/30 px-3 py-1 rounded"
+                  >
+                    Debug Data
+                  </button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-8">
                 <Users className="w-12 h-12 text-white/20 mx-auto mb-3" />
                 <p className="text-white/40">Select a student to view their performance</p>
+                {allStudents.length === 0 && (
+                  <p className="text-white/30 text-xs mt-2">No students found in database</p>
+                )}
               </div>
             )}
           </div>
@@ -2107,6 +2091,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
 };
 
 // StudentDashboard component - COMPLETE UPDATED VERSION WITH NOTIFICATIONS
+// StudentDashboard component - COMPLETE FIXED VERSION WITH NOTIFICATIONS
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
   const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
@@ -2199,10 +2184,11 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     return () => clearInterval(interval);
   }, [neuroscienceFacts]);
 
+  // UPDATED AND FIXED refreshData function
   const refreshData = async () => {
     setLoading(true);
     try {
-      console.log(` Loading data for student: ${user.username}`);
+      console.log(`📊 Loading data for student: ${user.username}`);
       
       // Load notifications
       await loadNotifications();
@@ -2218,35 +2204,55 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       );
       setPendingAssessments(pending.slice(0, 3));
       
+      // Get announcements
       const announcementsData = await getAnnouncements();
       setAnnouncements(announcementsData);
       
-      const progressData = await getProgress(user.username);
-      setProgress(progressData);
+      // Get progress - with error handling
+      try {
+        const progressData = await getProgress(user.username);
+        setProgress(progressData);
+      } catch (progressError) {
+        console.error('Error loading progress:', progressError);
+        setProgress({});
+      }
       
-      const coursesData = await getCourses();
-      setCourses(coursesData);
+      // Get courses - with error handling
+      try {
+        const coursesData = await getCourses();
+        setCourses(coursesData);
+      } catch (coursesError) {
+        console.error('Error loading courses:', coursesError);
+        setCourses({});
+      }
       
       // Calculate combined subject scores
       const courseSubjectScores: Record<string, { total: number, count: number }> = {};
-      Object.keys(progressData).forEach(subject => {
-        Object.keys(progressData[subject]).forEach(topicId => {
-          const score = progressData[subject][topicId]?.mainAssessmentScore;
-          if (score && score > 0) {
-            if (!courseSubjectScores[subject]) {
-              courseSubjectScores[subject] = { total: 0, count: 0 };
-            }
-            courseSubjectScores[subject].total += score;
-            courseSubjectScores[subject].count++;
+      
+      // Safely iterate through progress data
+      if (progress && typeof progress === 'object') {
+        Object.keys(progress).forEach(subject => {
+          if (progress[subject] && typeof progress[subject] === 'object') {
+            Object.keys(progress[subject]).forEach(topicId => {
+              const score = progress[subject][topicId]?.mainAssessmentScore;
+              if (score && score > 0) {
+                if (!courseSubjectScores[subject]) {
+                  courseSubjectScores[subject] = { total: 0, count: 0 };
+                }
+                courseSubjectScores[subject].total += score;
+                courseSubjectScores[subject].count++;
+              }
+            });
           }
         });
-      });
+      }
       
+      // Get student submissions
       const studentSubmissions = allSubmissions.filter(
         s => s.username === user.username && s.graded && s.score !== undefined && s.score > 0
       );
       
-      console.log(`Found ${studentSubmissions.length} graded submissions for ${user.username}`);
+      console.log(`📝 Found ${studentSubmissions.length} graded submissions for ${user.username}`);
       
       const assessmentSubjectScores: Record<string, { total: number, count: number }> = {};
       
@@ -2263,6 +2269,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       const combinedScores: Record<string, number> = {};
       
+      // Combine course and assessment scores
       Object.keys(assessmentSubjectScores).forEach(subject => {
         const data = assessmentSubjectScores[subject];
         if (data.count > 0) {
@@ -2277,6 +2284,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
       });
       
+      // Prepare chart data
       const newLabels: string[] = [];
       const newScores: number[] = [];
       
@@ -2285,10 +2293,24 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         newScores.push(combinedScores[subject]);
       });
       
+      // If no scores from submissions/courses, check for checkpoint scores
+      if (newLabels.length === 0) {
+        try {
+          // Get checkpoint scores as fallback
+          const checkpointScores = await getStudentCheckpointScores(user.username);
+          Object.keys(checkpointScores).forEach(subject => {
+            newLabels.push(subject);
+            newScores.push(checkpointScores[subject]);
+          });
+        } catch (checkpointError) {
+          console.log('No checkpoint scores available');
+        }
+      }
+      
       setSubjectLabels(newLabels);
       setSubjectScores(newScores);
       
-      console.log(' Final chart data:', { labels: newLabels, scores: newScores });
+      console.log('📈 Final chart data:', { labels: newLabels, scores: newScores });
       
       // Generate advice based on combined scores
       if (newLabels.length === 0) {
@@ -2311,20 +2333,103 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
       }
       
-      // Load grade history
-      const history = await getStudentCourseHistory(user.username);
-      setCourseHistory(history);
+      // Load grade history - with error handling
+      try {
+        const history = await getStudentCourseHistory(user.username);
+        setCourseHistory(history);
+      } catch (historyError) {
+        console.error('Error loading course history:', historyError);
+        setCourseHistory([]);
+      }
       
-      // Load assessment feedback
-      const feedback = await getStudentAssessmentFeedback(user.username);
-      setAssessmentFeedback(feedback);
+      // Load assessment feedback - with error handling
+      try {
+        const feedback = await getStudentAssessmentFeedback(user.username);
+        setAssessmentFeedback(feedback);
+      } catch (feedbackError) {
+        console.error('Error loading assessment feedback:', feedbackError);
+        setAssessmentFeedback([]);
+      }
       
-      console.log(`✅ Loaded ${history.length} completed courses, ${feedback.length} assessments with feedback`);
+      console.log(`✅ Loaded ${courseHistory.length} completed courses, ${assessmentFeedback.length} assessments with feedback`);
       
     } catch (error) {
-      console.error('Error refreshing student dashboard:', error);
+      console.error('❌ Error refreshing student dashboard:', error);
+      // Set empty states to prevent crashes
+      setSubjectLabels([]);
+      setSubjectScores([]);
+      setCourseHistory([]);
+      setAssessmentFeedback([]);
+      setAdvice("Welcome! Start learning to see your progress.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to get student checkpoint scores
+  const getStudentCheckpointScores = async (username: string): Promise<Record<string, number>> => {
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
+      
+      if (!userData) return {};
+      
+      const { data: checkpointProgress, error } = await supabase
+        .from('student_checkpoint_progress')
+        .select(`
+          score,
+          checkpoint:checkpoints(
+            topic:topics(
+              subject:subject_id(name)
+            )
+          )
+        `)
+        .eq('user_id', userData.id)
+        .not('score', 'is', null);
+      
+      if (error) throw error;
+      
+      const scoresBySubject: Record<string, { total: number, count: number }> = {};
+      
+      checkpointProgress?.forEach(item => {
+        // FIXED: Handle nested array structure
+let subject = 'General';
+if (item.checkpoint && Array.isArray(item.checkpoint) && item.checkpoint.length > 0) {
+  const checkpoint = item.checkpoint[0];
+  if (checkpoint.topic && Array.isArray(checkpoint.topic) && checkpoint.topic.length > 0) {
+    const topic = checkpoint.topic[0];
+    if (topic.subject && Array.isArray(topic.subject) && topic.subject.length > 0) {
+      subject = topic.subject[0]?.name || 'General';
+    }
+  }
+}
+        const score = item.score;
+        
+        if (score && score > 0) {
+          if (!scoresBySubject[subject]) {
+            scoresBySubject[subject] = { total: 0, count: 0 };
+          }
+          scoresBySubject[subject].total += score;
+          scoresBySubject[subject].count++;
+        }
+      });
+      
+      // Calculate averages
+      const averages: Record<string, number> = {};
+      Object.keys(scoresBySubject).forEach(subject => {
+        const data = scoresBySubject[subject];
+        if (data.count > 0) {
+          averages[subject] = Math.round(data.total / data.count);
+        }
+      });
+      
+      return averages;
+    } catch (error) {
+      console.error('Error getting checkpoint scores:', error);
+      return {};
     }
   };
 
@@ -2496,7 +2601,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <h2 className="text-4xl font-bold text-white mb-2">Welcome Back, {user.username}</h2>
               <p className="text-white/60">
                 {user.gradeLevel ? `Grade ${user.gradeLevel} Science Student` : 'Science Student'}
-                {subjectScores.length > 0 && ` • ${subjectScores.length} Subjects Tracked`}
+                {subjectLabels.length > 0 && ` • ${subjectLabels.length} Subjects Tracked`}
                 {unreadCount > 0 && ` • ${unreadCount} new notification${unreadCount > 1 ? 's' : ''}`}
               </p>
             </div>
