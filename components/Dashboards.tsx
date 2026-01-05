@@ -685,184 +685,59 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   // FIXED: loadStudentPerformance function
   const loadStudentPerformance = async (username: string) => {
-    if (!username) {
-      console.error('❌ No username provided for performance loading');
+  if (!username) {
+    console.error('❌ No username provided for performance loading');
+    return;
+  }
+  
+  setLoadingStudent(true);
+  try {
+    console.log(`📊 Loading performance for student: ${username}`);
+    
+    // 1. Get the student's ID
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (userError || !userData) {
+      console.error('❌ Student not found:', username, userError?.message);
+      setStudentPerformance(null);
       return;
     }
     
-    setLoadingStudent(true);
-    try {
-      console.log(`📊 Loading performance for student: ${username}`);
-      
-      // 1. Get the student's ID
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', username)
-        .single();
-      
-      if (userError || !userData) {
-        console.error('❌ Student not found:', username, userError?.message);
-        setStudentPerformance(null);
-        return;
-      }
-      
-      // 2. Get all checkpoint progress for this student
-      const { data: checkpointProgress, error: progressError } = await supabase
-        .from('student_checkpoint_progress')
-        .select(`
-          *,
-          checkpoint:checkpoints (
-            id,
-            checkpoint_number,
-            title,
-            topic_id,
-            required_score
-          )
-        `)
-        .eq('user_id', userData.id);
-      
-      if (progressError) {
-        console.error('❌ Error loading checkpoint progress:', progressError);
-        // Continue with fallback instead of throwing
-      }
-      
-      // SAFETY CHECK: Ensure checkpointProgress is an array
-      const progressArray = Array.isArray(checkpointProgress) ? checkpointProgress : [];
-      
-      // If no checkpoint progress, show empty data
-      if (progressArray.length === 0) {
-        console.log(`📭 No checkpoint progress found for ${username}`);
-        const emptyPerformanceData = {
-          username,
-          checkpointSummary: {
-            totalCheckpoints: 0,
-            completedCheckpoints: 0,
-            averageScore: 0,
-            bySubject: {}
-          },
-          courseHistory: []
-        };
-        setStudentPerformance(emptyPerformanceData);
-        return;
-      }
-      
-      // 3. Get topic information for each checkpoint
-      const topicIds = [...new Set(progressArray
-        .filter(item => item?.checkpoint)
-        .map(item => item.checkpoint?.topic_id)
-        .filter(Boolean) || [])];
-      
-      // SAFETY CHECK: Only query topics if we have IDs
-      let topics: any[] = [];
-      if (topicIds.length > 0) {
-        const { data: topicsData } = await supabase
-          .from('topics')
-          .select(`
-            id, 
-            title, 
-            subject:subject_id (
-              name
-            )
-          `)
-          .in('id', topicIds);
-        
-        topics = topicsData || [];
-      }
-      
-      // 4. Organize data by subject
-      const performanceBySubject: Record<string, any> = {};
-      let totalCheckpoints = 0;
-      let completedCheckpoints = 0;
-      let totalScore = 0;
-      let scoredCheckpoints = 0;
-      
-      // SAFETY CHECK: Use forEach safely
-      progressArray.forEach(progress => {
-        if (!progress || !progress.checkpoint) return;
-        
-        const checkpoint = progress.checkpoint;
-        
-        // Find topic for this checkpoint
-        const topic = topics.find(t => t?.id === checkpoint.topic_id);
-        if (!topic) return;
-        
-        // FIXED: Handle subject as array or object
-        let subject = 'General';
-        if (topic.subject) {
-          if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-            subject = topic.subject[0]?.name || 'General';
-          } else if (typeof topic.subject === 'object' && topic.subject !== null) {
-            subject = (topic.subject as any).name || 'General';
-          }
-        }
-        
-        if (!performanceBySubject[subject]) {
-          performanceBySubject[subject] = {
-            topics: new Set(),
-            checkpoints: { total: 0, completed: 0, totalScore: 0 },
-            avgScore: 0
-          };
-        }
-        
-        // Update subject data
-        performanceBySubject[subject].topics.add(topic.id);
-        performanceBySubject[subject].checkpoints.total++;
-        totalCheckpoints++;
-        
-        if (progress.passed) {
-          performanceBySubject[subject].checkpoints.completed++;
-          completedCheckpoints++;
-        }
-        
-        if (progress.score) {
-          performanceBySubject[subject].checkpoints.totalScore += progress.score;
-          totalScore += progress.score;
-          scoredCheckpoints++;
-        }
-      });
-      
-      // Calculate averages
-      const studentPerformanceData: any = {
-        username,
-        checkpointSummary: {
-          totalCheckpoints,
-          completedCheckpoints,
-          averageScore: scoredCheckpoints > 0 ? Math.round(totalScore / scoredCheckpoints) : 0,
-          bySubject: {}
-        }
-      };
-      
-      // Format subject data
-      Object.keys(performanceBySubject).forEach(subject => {
-        const subjectData = performanceBySubject[subject];
-        const subjectScore = subjectData.checkpoints.totalScore;
-        const subjectCompleted = subjectData.checkpoints.completed;
-        
-        studentPerformanceData.checkpointSummary.bySubject[subject] = {
-          topics: subjectData.topics.size,
-          completedTopics: subjectData.topics.size,
-          avgScore: subjectCompleted > 0 ? Math.round(subjectScore / subjectCompleted) : 0,
-          checkpoints: {
-            total: subjectData.checkpoints.total,
-            completed: subjectData.checkpoints.completed
-          }
-        };
-      });
-      
-      console.log(`✅ Loaded performance for ${username}:`, {
-        checkpoints: `${completedCheckpoints}/${totalCheckpoints}`,
-        avgScore: studentPerformanceData.checkpointSummary.averageScore,
-        subjects: Object.keys(performanceBySubject)
-      });
-      
-      setStudentPerformance(studentPerformanceData);
-      
-    } catch (error) {
-      console.error('❌ Unexpected error in loadStudentPerformance:', error);
-      
-      // Create empty data to prevent UI crashes
-      const errorPerformanceData = {
+    // 2. Get all checkpoint progress for this student - SIMPLIFIED QUERY
+    const { data: checkpointProgress, error: progressError } = await supabase
+      .from('student_checkpoint_progress')
+      .select(`
+        id,
+        checkpoint_id,
+        score,
+        passed,
+        completed_at,
+        checkpoint:checkpoints (
+          id,
+          checkpoint_number,
+          title,
+          topic_id
+        )
+      `)
+      .eq('user_id', userData.id);
+    
+    if (progressError) {
+      console.error('❌ Error loading checkpoint progress:', progressError);
+    }
+    
+    // SAFETY CHECK: Ensure checkpointProgress is an array
+    const progressArray = Array.isArray(checkpointProgress) ? checkpointProgress : [];
+    
+    console.log(`📊 Found ${progressArray.length} checkpoint records for ${username}`);
+    
+    // If no checkpoint progress, show empty data
+    if (progressArray.length === 0) {
+      console.log(`📭 No checkpoint progress found for ${username}`);
+      const emptyPerformanceData = {
         username,
         checkpointSummary: {
           totalCheckpoints: 0,
@@ -872,55 +747,161 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         },
         courseHistory: []
       };
-      
-      setStudentPerformance(errorPerformanceData);
-    } finally {
-      setLoadingStudent(false);
-    }
-  };
-
-  // Add debug function
-  const debugCheckpointData = async (username: string) => {
-    console.log(`🔍 DEBUG: Checking checkpoint data for ${username}`);
-    
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
-    
-    if (!userData) {
-      console.log('❌ User not found in database');
+      setStudentPerformance(emptyPerformanceData);
       return;
     }
     
-    // Check checkpoint progress
-    const { data: progress } = await supabase
-      .from('student_checkpoint_progress')
-      .select('*')
-      .eq('user_id', userData.id);
+    // 3. Extract checkpoint IDs and get topic/subject info separately
+    const checkpointIds = progressArray
+      .map(item => {
+        // Handle nested array structure
+        if (item.checkpoint && Array.isArray(item.checkpoint) && item.checkpoint.length > 0) {
+          return item.checkpoint[0]?.topic_id;
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
     
-    console.log(`📊 Checkpoint progress found: ${progress?.length || 0} records`);
-    if (progress && progress.length > 0) {
-      progress.forEach((p, i) => {
-        console.log(`  ${i+1}. Checkpoint ID: ${p.checkpoint_id}, Score: ${p.score}, Passed: ${p.passed}`);
-      });
+    console.log(`📍 Found ${checkpointIds.length} unique topic IDs`);
+    
+    // 4. Get topics with subjects
+    let topics: any[] = [];
+    if (checkpointIds.length > 0) {
+      const { data: topicsData } = await supabase
+        .from('topics')
+        .select(`
+          id, 
+          title, 
+          subject:subject_id (
+            name
+          )
+        `)
+        .in('id', [...new Set(checkpointIds)]); // Remove duplicates
+      
+      topics = topicsData || [];
+      console.log(`📚 Loaded ${topics.length} topics with subject info`);
     }
     
-    // Check checkpoints table
-    const { data: checkpoints } = await supabase
-      .from('checkpoints')
-      .select('count');
+    // 5. Organize data by subject - SIMPLIFIED LOGIC
+    const performanceBySubject: Record<string, any> = {};
+    let totalCheckpoints = 0;
+    let completedCheckpoints = 0;
+    let totalScore = 0;
+    let scoredCheckpoints = 0;
     
-    console.log(`🎯 Total checkpoints in system: ${checkpoints?.[0]?.count || 0}`);
+    progressArray.forEach(progress => {
+      if (!progress) return;
+      
+      // Get checkpoint data from nested array
+      let checkpoint: any = null;
+      if (progress.checkpoint && Array.isArray(progress.checkpoint) && progress.checkpoint.length > 0) {
+        checkpoint = progress.checkpoint[0];
+      }
+      
+      if (!checkpoint || !checkpoint.topic_id) return;
+      
+      // Find topic for this checkpoint
+      const topic = topics.find(t => t?.id === checkpoint.topic_id);
+      if (!topic) {
+        console.log(`⚠️ Topic not found for checkpoint ${checkpoint.id}, topic_id: ${checkpoint.topic_id}`);
+        return;
+      }
+      
+      // Extract subject name safely
+      let subject = 'General';
+      if (topic.subject) {
+        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+          subject = topic.subject[0]?.name || 'General';
+        } else if (typeof topic.subject === 'object' && topic.subject !== null) {
+          subject = (topic.subject as any).name || 'General';
+        }
+      }
+      
+      // Initialize subject data if needed
+      if (!performanceBySubject[subject]) {
+        performanceBySubject[subject] = {
+          topics: new Set(),
+          checkpoints: { total: 0, completed: 0, totalScore: 0 },
+          avgScore: 0
+        };
+      }
+      
+      // Update subject data
+      performanceBySubject[subject].topics.add(topic.id);
+      performanceBySubject[subject].checkpoints.total++;
+      totalCheckpoints++;
+      
+      if (progress.passed) {
+        performanceBySubject[subject].checkpoints.completed++;
+        completedCheckpoints++;
+      }
+      
+      if (progress.score) {
+        performanceBySubject[subject].checkpoints.totalScore += progress.score;
+        totalScore += progress.score;
+        scoredCheckpoints++;
+      }
+    });
     
-    // Check topics
-    const { data: topics } = await supabase
-      .from('topics')
-      .select('count');
+    console.log(`📈 Processed data: ${totalCheckpoints} checkpoints, ${completedCheckpoints} completed, ${scoredCheckpoints} scored`);
     
-    console.log(`📚 Total topics in system: ${topics?.[0]?.count || 0}`);
-  };
+    // Calculate averages
+    const studentPerformanceData: any = {
+      username,
+      checkpointSummary: {
+        totalCheckpoints,
+        completedCheckpoints,
+        averageScore: scoredCheckpoints > 0 ? Math.round(totalScore / scoredCheckpoints) : 0,
+        bySubject: {}
+      }
+    };
+    
+    // Format subject data
+    Object.keys(performanceBySubject).forEach(subject => {
+      const subjectData = performanceBySubject[subject];
+      const subjectScore = subjectData.checkpoints.totalScore;
+      const subjectCompleted = subjectData.checkpoints.completed;
+      
+      studentPerformanceData.checkpointSummary.bySubject[subject] = {
+        topics: subjectData.topics.size,
+        completedTopics: subjectData.topics.size,
+        avgScore: subjectCompleted > 0 ? Math.round(subjectScore / subjectCompleted) : 0,
+        checkpoints: {
+          total: subjectData.checkpoints.total,
+          completed: subjectData.checkpoints.completed
+        }
+      };
+    });
+    
+    console.log(`✅ Loaded performance for ${username}:`, {
+      checkpoints: `${completedCheckpoints}/${totalCheckpoints}`,
+      avgScore: studentPerformanceData.checkpointSummary.averageScore,
+      subjects: Object.keys(performanceBySubject),
+      subjectData: studentPerformanceData.checkpointSummary.bySubject
+    });
+    
+    setStudentPerformance(studentPerformanceData);
+    
+  } catch (error) {
+    console.error('❌ Unexpected error in loadStudentPerformance:', error);
+    
+    // Create empty data to prevent UI crashes
+    const errorPerformanceData = {
+      username,
+      checkpointSummary: {
+        totalCheckpoints: 0,
+        completedCheckpoints: 0,
+        averageScore: 0,
+        bySubject: {}
+      },
+      courseHistory: []
+    };
+    
+    setStudentPerformance(errorPerformanceData);
+  } finally {
+    setLoadingStudent(false);
+  }
+};
 
   useEffect(() => {
     loadData();
@@ -1281,6 +1262,60 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     }]
   };
 
+  const debugStudentPerformance = async (username: string) => {
+  console.log(`🔍 DEEP DEBUG for ${username}:`);
+  
+  const { data: userData } = await supabase
+    .from('users')
+    .select('id')
+    .eq('username', username)
+    .single();
+  
+  if (!userData) {
+    console.log('❌ User not found');
+    return;
+  }
+  
+  // Get raw checkpoint progress
+  const { data: progress } = await supabase
+    .from('student_checkpoint_progress')
+    .select('*')
+    .eq('user_id', userData.id)
+    .limit(3); // Just first 3 for debugging
+  
+  console.log('📊 Raw progress data (first 3):', progress);
+  
+  // Get checkpoint details
+  const checkpointIds = progress?.map(p => p.checkpoint_id).filter(Boolean) || [];
+  if (checkpointIds.length > 0) {
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('id, topic_id, title')
+      .in('id', checkpointIds.slice(0, 3));
+    
+    console.log('🎯 Checkpoint details:', checkpoints);
+    
+    // Get topic details
+    const topicIds = checkpoints?.map(c => c.topic_id).filter(Boolean) || [];
+    if (topicIds.length > 0) {
+      const { data: topics } = await supabase
+        .from('topics')
+        .select('id, title, subject:subject_id(name)')
+        .in('id', topicIds.slice(0, 3));
+      
+      console.log('📚 Topic details with subjects:', topics);
+      
+      // Show how to access subject name
+      topics?.forEach(topic => {
+        console.log(`Topic: ${topic.title}, Subject structure:`, topic.subject);
+        if (topic.subject && Array.isArray(topic.subject)) {
+          console.log(`  -> Subject name: ${topic.subject[0]?.name}`);
+        }
+      });
+    }
+  }
+};
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto p-8 text-center">
@@ -1297,6 +1332,10 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const availableSubjects = Object.keys(courses).filter(subject => 
     Object.keys(courses[subject] || {}).length > 0
   );
+
+  function debugCheckpointData(selectedStudent: string): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-20">
@@ -1748,6 +1787,22 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                   {allStudents.length} students
                 </span>
               </div>
+            </div>
+
+            {/* In the Student Performance Viewer section, add this: */}
+            <div className="pt-4 border-t border-white/10 flex gap-2">
+              <button
+                onClick={() => selectedStudent && debugStudentPerformance(selectedStudent)}
+                className="text-xs text-gray-400 hover:text-gray-300 bg-black/30 px-3 py-1 rounded"
+              >
+                Deep Debug
+              </button>
+              <button
+                onClick={() => selectedStudent && debugCheckpointData(selectedStudent)}
+                className="text-xs text-gray-400 hover:text-gray-300 bg-black/30 px-3 py-1 rounded"
+              >
+                Simple Debug
+              </button>
             </div>
             
             {/* Performance Display */}
