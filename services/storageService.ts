@@ -1463,37 +1463,102 @@ export const createNotification = async (
   type: Notification['type'] = 'info',
   metadata?: any
 ): Promise<void> => {
+  console.log(`🔔 Creating notification for ${username}:`, { text, type });
+  
   try {
     // Get user ID
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id')
       .eq('username', username)
       .single();
     
-    if (!userData) {
-      console.error(`User ${username} not found for notification`);
+    if (userError || !userData) {
+      console.error(`❌ User ${username} not found:`, userError?.message);
       return;
     }
     
-    const { error } = await supabase
+    console.log(`✅ Found user ${username} with ID: ${userData.id}`);
+    
+    // Check if notifications table exists
+    const { error: tableCheck } = await supabase
       .from('notifications')
-      .insert({
-        user_id: userData.id,
-        text,
-        type,
-        read: false,
-        metadata: metadata || {},
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString() // 7 days expiry
-      });
+      .select('count')
+      .limit(1);
     
-    if (error) throw error;
+    if (tableCheck) {
+      console.error('❌ Notifications table error:', tableCheck.message);
+      // Create table if it doesn't exist (you might need to do this in Supabase dashboard)
+      return;
+    }
     
-    console.log(`✅ Notification created for ${username}: ${text}`);
+    const notificationData = {
+      user_id: userData.id,
+      text,
+      type,
+      read: false,
+      metadata: metadata || {},
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString() // 7 days
+    };
+    
+    console.log('📝 Inserting notification:', notificationData);
+    
+    const { error: insertError } = await supabase
+      .from('notifications')
+      .insert([notificationData]);
+    
+    if (insertError) {
+      console.error('❌ Error inserting notification:', insertError);
+      throw insertError;
+    }
+    
+    console.log(`✅ Notification created successfully for ${username}`);
     
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ Error in createNotification:', error);
+  }
+};
+
+export const setupNotifications = async (): Promise<boolean> => {
+  console.log('🔔 Setting up notification system...');
+  
+  try {
+    // Check if notifications table exists and has data
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      console.error('❌ Notifications table check failed:', error.message);
+      console.log('⚠️ You may need to create the notifications table in Supabase:');
+      console.log(`
+        CREATE TABLE notifications (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          user_id UUID REFERENCES users(id),
+          text TEXT NOT NULL,
+          type TEXT CHECK (type IN ('info', 'success', 'warning', 'alert')),
+          read BOOLEAN DEFAULT false,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          expires_at TIMESTAMP WITH TIME ZONE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        
+        CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+        CREATE INDEX idx_notifications_read ON notifications(read);
+        CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+      `);
+      return false;
+    }
+    
+    console.log(`✅ Notifications table exists, has ${data?.[0]?.count || 0} records`);
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Notification setup error:', error);
+    return false;
   }
 };
 

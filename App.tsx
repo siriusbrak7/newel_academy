@@ -34,6 +34,7 @@ import {
   X,
   User as UserIcon // Aliased to avoid conflict with User type
 } from 'lucide-react';
+import { setupNotifications } from './services/storageService';
 
 // Declare ThemeManager from index.html
 declare global {
@@ -480,30 +481,39 @@ const App: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        await initializeSupabase();
-        const storedUser = sessionService.getSession();
+  const init = async () => {
+    try {
+      await initializeSupabase();
+      const storedUser = sessionService.getSession();
 
-        if (storedUser) {
-          try {
-            const validated = await sessionService.validateSession();
-            if (validated) setAuth({ loggedIn: true, user: validated });
-            else sessionService.clearSession();
-          } catch {
-            setAuth({ loggedIn: true, user: storedUser });
-          }
+      if (storedUser) {
+        try {
+          const validated = await sessionService.validateSession();
+          if (validated) setAuth({ loggedIn: true, user: validated });
+          else sessionService.clearSession();
+        } catch {
+          setAuth({ loggedIn: true, user: storedUser });
         }
-
-        setTheme(DEFAULT_THEME);
-      } finally {
-        setInitializing(false);
       }
-    };
 
-    init();
-    document.title = 'The Newel • Ace Scientific Concepts....';
-  }, []);
+      setTheme(DEFAULT_THEME);
+      
+      // ADD THIS: Setup notification system
+      try {
+        await setupNotifications();
+        console.log('✅ Notification system ready');
+      } catch (notifError) {
+        console.warn('⚠️ Notification setup failed:', notifError);
+      }
+      
+    } finally {
+      setInitializing(false);
+    }
+  };
+
+  init();
+  document.title = 'The Newel • Ace Scientific Concepts....';
+}, []);
 
   // Theme sync with index.html ThemeManager
   useEffect(() => {

@@ -859,6 +859,42 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  const testNotifications = async () => {
+  console.log('🔔 Testing notification system...');
+  
+  try {
+    // Test 1: Create a test notification
+    await createNotification(
+      user.username,
+      '🔔 Test notification from teacher dashboard',
+      'info',
+      { actionUrl: '/teacher-dashboard', test: true }
+    );
+    console.log('✅ Test notification created');
+    
+    // Test 2: Check if notifications load
+    await loadTeacherNotifications();
+    console.log('✅ Notifications loaded');
+    
+    // Test 3: Create notification for a student
+    if (allStudents.length > 0) {
+      await createNotification(
+        allStudents[0].username,
+        '📚 Test: New material added to Biology',
+        'info',
+        { actionUrl: '/courses' }
+      );
+      console.log(`✅ Student notification created for ${allStudents[0].username}`);
+    }
+    
+    alert('✅ Notification test complete! Check console for results.');
+    
+  } catch (error) {
+    console.error('❌ Notification test failed:', error);
+    alert('❌ Notification test failed. Check console.');
+  }
+};
+
   const handleAddMaterial = async () => {
     if (!selSubject || !selTopic) {
       alert("Please select a topic first");
@@ -1247,6 +1283,13 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
               >
                 <Bell size={16}/>
                 <span>{teacherUnreadCount} alert{teacherUnreadCount !== 1 ? 's' : ''}</span>
+              </button>
+              {/* In the header buttons section, add: */}
+              <button 
+                onClick={testNotifications}
+                className="flex items-center gap-2 bg-green-600/20 hover:bg-green-600/40 text-green-200 border border-green-500/30 px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                <Bell size={16}/> Test Notifications
               </button>
             </div>
           )}
@@ -1798,11 +1841,16 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Teacher Notifications Section */}
+          {/* Teacher Notifications Section - IMPROVED */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <Bell className="text-yellow-400" /> Teacher Alerts
+                {teacherUnreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                    {teacherUnreadCount} new
+                  </span>
+                )}
               </h3>
               <div className="flex gap-2">
                 <button
@@ -1812,45 +1860,74 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 >
                   <RefreshCw size={16} className="text-white" />
                 </button>
-                {teacherUnreadCount > 0 && (
-                  <button
-                    onClick={markAllTeacherNotificationsAsRead}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded"
-                  >
-                    Mark all read
-                  </button>
-                )}
+                <button
+                  onClick={() => setTeacherNotifications([])}
+                  className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors"
+                  title="Clear All"
+                >
+                  <X size={16} className="text-red-400" />
+                </button>
               </div>
             </div>
             
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {teacherNotifications.length === 0 ? (
-                <div className="text-center py-4">
-                  <Bell className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                  <p className="text-white/40">No alerts</p>
-                  <p className="text-white/30 text-xs">You'll see alerts for new submissions and student progress</p>
+                <div className="text-center py-8">
+                  <Bell className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                  <p className="text-white/60">No alerts yet</p>
+                  <p className="text-white/40 text-sm mt-1">
+                    You'll see notifications for:<br/>
+                    • New student submissions<br/>
+                    • Student progress<br/>
+                    • System updates
+                  </p>
+                  <button
+                    onClick={testNotifications}
+                    className="mt-4 text-sm text-cyan-400 hover:text-cyan-300"
+                  >
+                    Test notification system
+                  </button>
                 </div>
               ) : (
                 teacherNotifications.slice(0, 5).map((notification, index) => (
                   <div
-                    key={index}
+                    key={notification.id || index}
                     onClick={() => handleTeacherNotificationClick(notification)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-white/5 ${notification.read ? 'border-white/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}
+                    className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
+                      notification.read 
+                        ? 'border-white/5 bg-white/2' 
+                        : 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-transparent'
+                    }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded ${notification.type === 'alert' ? 'bg-red-500/20 text-red-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
-                        {notification.type === 'alert' ? <Bell size={14} /> : <Info size={14} />}
+                      <div className={`p-2 rounded-lg ${
+                        notification.type === 'success' ? 'bg-green-500/20 text-green-400' :
+                        notification.type === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
+                        notification.type === 'alert' ? 'bg-red-500/20 text-red-400' :
+                        'bg-cyan-500/20 text-cyan-400'
+                      }`}>
+                        {notification.type === 'success' && <CheckCircle size={16} />}
+                        {notification.type === 'warning' && <AlertCircle size={16} />}
+                        {notification.type === 'alert' && <Bell size={16} />}
+                        {notification.type === 'info' && <Info size={16} />}
                       </div>
-                      <div className="flex-1">
-                        <p className={`text-sm ${notification.read ? 'text-white/80' : 'text-white font-medium'}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${
+                          notification.read ? 'text-white/80' : 'text-white'
+                        }`}>
                           {notification.text}
                         </p>
-                        <p className="text-xs text-white/40 mt-1">
+                        {notification.metadata?.actionUrl && (
+                          <p className="text-xs text-cyan-400 mt-1">
+                            Click to view →
+                          </p>
+                        )}
+                        <p className="text-xs text-white/40 mt-2">
                           {new Date(notification.timestamp).toLocaleString()}
                         </p>
                       </div>
                       {!notification.read && (
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 animate-pulse"></div>
                       )}
                     </div>
                   </div>
@@ -1861,7 +1938,10 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             {teacherNotifications.length > 5 && (
               <div className="mt-4 pt-4 border-t border-white/10 text-center">
                 <button
-                  onClick={() => navigate('/teacher-notifications')}
+                  onClick={() => {
+                    // Create a notifications page or show all in modal
+                    alert(`Showing all ${teacherNotifications.length} notifications`);
+                  }}
                   className="text-sm text-cyan-400 hover:text-cyan-300"
                 >
                   View all {teacherNotifications.length} alerts →
