@@ -273,133 +273,280 @@ export const deleteUser = async (username: string): Promise<void> => {
 // =====================================================
 // COURSE MANAGEMENT - OPTIMIZED WITH CACHING
 // =====================================================
-  export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
-    // Return cached data if valid
-    if (!forceRefresh && coursesCache && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
-      console.log('📦 Returning cached courses (fast!)');
-      return coursesCache;
+  // storageService.ts - OPTIMIZED getCourses function
+export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
+  // Return cached data if valid (5 minutes)
+  if (!forceRefresh && coursesCache && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+    console.log('📦 Returning cached courses');
+    return coursesCache;
+  }
+  
+  console.time('getCourses');
+  console.log('🚀 Fetching courses (OPTIMIZED)...');
+  
+  try {
+    // OPTIMIZATION 1: Fetch only basic topic data first
+    const { data: topicsData, error: topicsError } = await supabase
+      .from('topics')
+      .select(`
+        id,
+        title,
+        description,
+        grade_level,
+        sort_order,
+        subject:subject_id (name),
+        checkpoints_required,
+        checkpoint_pass_percentage,
+        final_assessment_required
+      `)
+      .order('sort_order', { ascending: true })
+      .order('title', { ascending: true });
+
+    if (topicsError) throw topicsError;
+
+    if (!topicsData || topicsData.length === 0) {
+      console.log('📊 No topics found');
+      console.timeEnd('getCourses');
+      return {};
     }
+
+    console.log(`📚 Found ${topicsData.length} topics`);
+
+    const courses: CourseStructure = {};
+    const topicIds = topicsData.map(topic => topic.id);
     
-    console.time('getCourses');
-    console.log('🚀 Fetching courses (optimized with caching)...');
-    
-    try {
-      // Fetch topics with ONLY essential data - no materials, no subtopics initially
-      const { data: topicsData, error: topicsError } = await supabase
-        .from('topics')
-        .select(`
-          id,
-          title,
-          description,
-          grade_level,
-          sort_order,
-          subject:subject_id (name),
-          checkpoints_required,
-          checkpoint_pass_percentage,
-          final_assessment_required
-        `)
-        .order('sort_order', { ascending: true })
-        .order('title', { ascending: true });
-
-      if (topicsError) throw topicsError;
-
-      const courses: CourseStructure = {};
-      
-      if (!topicsData || topicsData.length === 0) {
-        console.log('📊 No topics found in database');
-        console.timeEnd('getCourses');
-        return {};
-      }
-
-      // Get topic IDs for batch fetching
-      const topicIds = topicsData.map(topic => topic.id);
-      
-      // Batch fetch materials for ALL topics at once
-      const { data: materialsData } = await supabase
+    // OPTIMIZATION 2: Parallelize database queries
+    const [materialsPromise, subtopicsPromise] = await Promise.all([
+      // Get materials for all topics
+      supabase
         .from('materials')
         .select('*')
         .in('topic_id', topicIds)
-        .order('sort_order', { ascending: true });
-
-      // Batch fetch subtopics for ALL topics at once
-      const { data: subtopicsData } = await supabase
+        .order('sort_order', { ascending: true }),
+      
+      // Get subtopics for all topics  
+      supabase
         .from('subtopics')
         .select('*')
         .in('topic_id', topicIds)
-        .order('sort_order', { ascending: true });
+        .order('sort_order', { ascending: true })
+    ]);
 
-      // Organize materials by topic_id for quick lookup
-      const materialsByTopic: Record<string, Material[]> = {};
-      if (materialsData) {
-        materialsData.forEach((m: any) => {
-          if (!materialsByTopic[m.topic_id]) {
-            materialsByTopic[m.topic_id] = [];
-          }
-          materialsByTopic[m.topic_id].push({
-            id: m.id,
-            title: m.title,
-            type: m.type as 'text' | 'link' | 'file',
-            content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
-          });
-        });
-      }
+    const { data: materialsData } = materialsPromise;
+    const { data: subtopicsData } = subtopicsPromise;
 
-      // Organize subtopics by topic_id for quick lookup
-      const subtopicsByTopic: Record<string, string[]> = {};
-      if (subtopicsData) {
-        subtopicsData.forEach((s: any) => {
-          if (!subtopicsByTopic[s.topic_id]) {
-            subtopicsByTopic[s.topic_id] = [];
-          }
-          subtopicsByTopic[s.topic_id].push(s.name);
-        });
-      }
-
-      // Process topics
-      topicsData.forEach(topic => {
-        // SAFELY extract subject name from joined data
-        let subjectName = 'Uncategorized';
-        
-        if (topic.subject) {
-          if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-            subjectName = topic.subject[0]?.name || 'Uncategorized';
-          } else if (typeof topic.subject === 'object') {
-            subjectName = (topic.subject as any)?.name || 'Uncategorized';
-          }
+    // OPTIMIZATION 3: Create lookup maps for O(1) access
+    const materialsByTopic: Record<string, Material[]> = {};
+    if (materialsData) {
+      materialsData.forEach((m: any) => {
+        if (!materialsByTopic[m.topic_id]) {
+          materialsByTopic[m.topic_id] = [];
         }
-        
-        if (!courses[subjectName]) {
-          courses[subjectName] = {};
-        }
-
-        courses[subjectName][topic.id] = {
-          id: topic.id,
-          title: topic.title,
-          gradeLevel: topic.grade_level || '9',
-          description: topic.description || '',
-          subtopics: subtopicsByTopic[topic.id] || [],
-          materials: materialsByTopic[topic.id] || [],
-          subtopicQuestions: {}, // Don't load questions here - load on demand
-          checkpoints_required: topic.checkpoints_required || 3,
-          checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
-          final_assessment_required: topic.final_assessment_required !== false
-        };
+        materialsByTopic[m.topic_id].push({
+          id: m.id,
+          title: m.title,
+          type: m.type as 'text' | 'link' | 'file',
+          content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
+        });
       });
-
-      console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects, ${topicsData.length} topics`);
-      
-      // Cache the result
-      coursesCache = courses;
-      cacheTimestamp = Date.now();
-      console.timeEnd('getCourses');
-      
-      return courses;
-    } catch (error) {
-      console.error('❌ Get courses error:', error);
-      console.timeEnd('getCourses');
-      return coursesCache || {}; // Return cache if available, even on error
     }
-  }; // <-- This closes the getCourses function
+
+    const subtopicsByTopic: Record<string, string[]> = {};
+    if (subtopicsData) {
+      subtopicsData.forEach((s: any) => {
+        if (!subtopicsByTopic[s.topic_id]) {
+          subtopicsByTopic[s.topic_id] = [];
+        }
+        subtopicsByTopic[s.topic_id].push(s.name);
+      });
+    }
+
+    // OPTIMIZATION 4: Process topics efficiently
+    topicsData.forEach(topic => {
+      let subjectName = 'General';
+      
+      if (topic.subject) {
+        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+          subjectName = topic.subject[0]?.name || 'General';
+        } else if (typeof topic.subject === 'object') {
+          subjectName = (topic.subject as any)?.name || 'General';
+        }
+      }
+      
+      if (!courses[subjectName]) {
+        courses[subjectName] = {};
+      }
+
+      // Build topic object with only essential data
+      courses[subjectName][topic.id] = {
+        id: topic.id,
+        title: topic.title,
+        gradeLevel: topic.grade_level || '9',
+        description: topic.description || '',
+        subtopics: subtopicsByTopic[topic.id] || [],
+        materials: materialsByTopic[topic.id] || [],
+        subtopicQuestions: {}, // Load on demand only
+        checkpoints_required: topic.checkpoints_required || 3,
+        checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
+        final_assessment_required: topic.final_assessment_required !== false
+      };
+    });
+
+    console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects, ${topicsData.length} topics`);
+    
+    // Cache the result
+    coursesCache = courses;
+    cacheTimestamp = Date.now();
+    
+    console.timeEnd('getCourses');
+    console.log(`⏱️ Load time: ${(Date.now() - cacheTimestamp)/1000}s`);
+    
+    return courses;
+  } catch (error) {
+    console.error('❌ Get courses error:', error);
+    console.timeEnd('getCourses');
+    return coursesCache || {};
+  }
+};
+
+// storageService.ts - Add this function
+export const getCoursesLight = async (): Promise<CourseStructure> => {
+  console.time('getCoursesLight');
+  console.log('🚀 Fetching light courses (no materials)...');
+  
+  try {
+    // Fetch only basic topic info, NO materials
+    const { data: topicsData, error } = await supabase
+      .from('topics')
+      .select(`
+        id,
+        title,
+        description,
+        grade_level,
+        subject:subject_id (name),
+        checkpoints_required
+      `)
+      .order('title', { ascending: true });
+
+    if (error) throw error;
+
+    const courses: CourseStructure = {};
+    
+    topicsData?.forEach(topic => {
+      let subjectName = 'General';
+      if (topic.subject) {
+        if (Array.isArray(topic.subject)) {
+          subjectName = topic.subject[0]?.name || 'General';
+        } else {
+          subjectName = (topic.subject as any)?.name || 'General';
+        }
+      }
+      
+      if (!courses[subjectName]) {
+        courses[subjectName] = {};
+      }
+
+      courses[subjectName][topic.id] = {
+        id: topic.id,
+        title: topic.title,
+        gradeLevel: topic.grade_level || '9',
+        description: topic.description || '',
+        subtopics: [], // Empty for light version
+        materials: [], // Empty for light version
+        checkpoints_required: topic.checkpoints_required || 3
+      };
+    });
+
+    console.log(`✅ Light courses: ${Object.keys(courses).length} subjects, ${topicsData?.length || 0} topics`);
+    console.timeEnd('getCoursesLight');
+    
+    return courses;
+  } catch (error) {
+    console.error('❌ Get light courses error:', error);
+    return {};
+  }
+};
+
+// Function to load materials for a specific topic on demand
+export const getTopicMaterials = async (topicId: string): Promise<Material[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('materials')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map((m: any) => ({
+      id: m.id,
+      title: m.title,
+      type: m.type as 'text' | 'link' | 'file',
+      content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
+    }));
+  } catch (error) {
+    console.error('Error loading topic materials:', error);
+    return [];
+  }
+};
+
+export const getCoursesPaginated = async (page = 1, limit = 20): Promise<{ 
+  courses: CourseStructure, 
+  hasMore: boolean, 
+  total: number 
+}> => {
+  const start = (page - 1) * limit;
+  const end = start + limit - 1;
+  
+  try {
+    const { data: topicsData, count, error } = await supabase
+      .from('topics')
+      .select(`
+        id,
+        title,
+        description,
+        grade_level,
+        subject:subject_id (name)
+      `, { count: 'exact' })
+      .range(start, end)
+      .order('title', { ascending: true });
+
+    if (error) throw error;
+
+    const courses: CourseStructure = {};
+    
+    topicsData?.forEach(topic => {
+      let subjectName = 'General';
+      if (topic.subject) {
+        subjectName = Array.isArray(topic.subject) 
+          ? topic.subject[0]?.name || 'General'
+          : (topic.subject as any)?.name || 'General';
+      }
+      
+      if (!courses[subjectName]) {
+        courses[subjectName] = {};
+      }
+
+      courses[subjectName][topic.id] = {
+        id: topic.id,
+        title: topic.title,
+        gradeLevel: topic.grade_level || '9',
+        description: topic.description || '',
+        subtopics: [],
+        materials: []
+      };
+    });
+
+    return {
+      courses,
+      hasMore: end < (count || 0),
+      total: count || 0
+    };
+  } catch (error) {
+    console.error('Error getting paginated courses:', error);
+    return { courses: {}, hasMore: false, total: 0 };
+  }
+};
 
   // =====================================================
   // PERFORMANCE MONITORING HELPER

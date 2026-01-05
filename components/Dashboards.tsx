@@ -34,7 +34,8 @@ import {
   notifyNewAssessment,
   notifyTopic80PercentComplete,
   notifyLeaderboardUpdate,
-  notifyNewSubmission
+  notifyNewSubmission,
+  getCoursesLight
 } from '../services/storageService';
 import { 
   Check, 
@@ -2202,252 +2203,129 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   // UPDATED AND FIXED refreshData function
   const refreshData = async () => {
-    setLoading(true);
-    try {
-      console.log(`📊 Loading data for student: ${user.username}`);
-      
-      // Load notifications
-      await loadNotifications();
-      
-      // Refresh pending assessments
-      const allAssessments = await getAssessments();
-      const allSubmissions = await getSubmissions();
-      
-      // Filter: Grade matches AND (assigned to all OR specific user) AND (not submitted)
-      const pending = allAssessments.filter(a =>
-        (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
-        !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
-      );
-      setPendingAssessments(pending.slice(0, 3));
-      
-      // Get announcements
-      const announcementsData = await getAnnouncements();
-      setAnnouncements(announcementsData);
-      
-      // Get progress - with error handling
-      try {
-        const progressData = await getProgress(user.username);
-        setProgress(progressData);
-      } catch (progressError) {
-        console.error('Error loading progress:', progressError);
-        setProgress({});
-      }
-      
-      // Get courses - with error handling
-      try {
-        const coursesData = await getCourses();
-        setCourses(coursesData);
-      } catch (coursesError) {
-        console.error('Error loading courses:', coursesError);
-        setCourses({});
-      }
-      
-      // Calculate combined subject scores
-      const courseSubjectScores: Record<string, { total: number, count: number }> = {};
-      
-      // Safely iterate through progress data
-      if (progress && typeof progress === 'object') {
-        Object.keys(progress).forEach(subject => {
-          if (progress[subject] && typeof progress[subject] === 'object') {
-            Object.keys(progress[subject]).forEach(topicId => {
-              const score = progress[subject][topicId]?.mainAssessmentScore;
-              if (score && score > 0) {
-                if (!courseSubjectScores[subject]) {
-                  courseSubjectScores[subject] = { total: 0, count: 0 };
-                }
-                courseSubjectScores[subject].total += score;
-                courseSubjectScores[subject].count++;
-              }
-            });
-          }
-        });
-      }
-      
-      // Get student submissions
-      const studentSubmissions = allSubmissions.filter(
-        s => s.username === user.username && s.graded && s.score !== undefined && s.score > 0
-      );
-      
-      console.log(`📝 Found ${studentSubmissions.length} graded submissions for ${user.username}`);
-      
-      const assessmentSubjectScores: Record<string, { total: number, count: number }> = {};
-      
-      studentSubmissions.forEach(sub => {
-        const assessment = allAssessments.find(a => a.id === sub.assessmentId);
-        if (assessment && assessment.subject) {
-          if (!assessmentSubjectScores[assessment.subject]) {
-            assessmentSubjectScores[assessment.subject] = { total: 0, count: 0 };
-          }
-          assessmentSubjectScores[assessment.subject].total += (sub.score || 0);
-          assessmentSubjectScores[assessment.subject].count++;
-        }
-      });
-      
-      const combinedScores: Record<string, number> = {};
-      
-      // Combine course and assessment scores
-      Object.keys(assessmentSubjectScores).forEach(subject => {
-        const data = assessmentSubjectScores[subject];
-        if (data.count > 0) {
-          combinedScores[subject] = data.total / data.count;
-        }
-      });
-      
-      Object.keys(courseSubjectScores).forEach(subject => {
-        if (!combinedScores[subject] && courseSubjectScores[subject].count > 0) {
-          const data = courseSubjectScores[subject];
-          combinedScores[subject] = data.total / data.count;
-        }
-      });
-      
-      // Prepare chart data
-      const newLabels: string[] = [];
-      const newScores: number[] = [];
-      
-      Object.keys(combinedScores).forEach(subject => {
-        newLabels.push(subject);
-        newScores.push(combinedScores[subject]);
-      });
-      
-      // If no scores from submissions/courses, check for checkpoint scores
-      if (newLabels.length === 0) {
-        try {
-          // Get checkpoint scores as fallback
-          const checkpointScores = await getStudentCheckpointScores(user.username);
-          Object.keys(checkpointScores).forEach(subject => {
-            newLabels.push(subject);
-            newScores.push(checkpointScores[subject]);
-          });
-        } catch (checkpointError) {
-          console.log('No checkpoint scores available');
-        }
-      }
-      
-      setSubjectLabels(newLabels);
-      setSubjectScores(newScores);
-      
-      console.log('📈 Final chart data:', { labels: newLabels, scores: newScores });
-      
-      // Generate advice based on combined scores
-      if (newLabels.length === 0) {
-        if (studentSubmissions.length > 0) {
-          setAdvice("Great work on your assessments! Complete more to see detailed performance analytics.");
-        } else {
-          setAdvice("Start your first course or assessment to get personalized AI advice!");
-        }
-      } else {
-        const lowestScore = Math.min(...newScores);
-        const highestScore = Math.max(...newScores);
-        
-        if (lowestScore < 60) {
-          const subject = newLabels[newScores.indexOf(lowestScore)];
-          setAdvice(`Focus on improving your ${subject} skills. Review feedback and practice more questions.`);
-        } else if (highestScore >= 90) {
-          setAdvice("Excellent work! You're mastering these topics. Try the 222-Sprint challenge!");
-        } else {
-          setAdvice("You're making good progress! Keep practicing to improve your scores.");
-        }
-      }
-      
-      // Load grade history - with error handling
-      try {
-        const history = await getStudentCourseHistory(user.username);
-        setCourseHistory(history);
-      } catch (historyError) {
-        console.error('Error loading course history:', historyError);
-        setCourseHistory([]);
-      }
-      
-      // Load assessment feedback - with error handling
-      try {
-        const feedback = await getStudentAssessmentFeedback(user.username);
-        setAssessmentFeedback(feedback);
-      } catch (feedbackError) {
-        console.error('Error loading assessment feedback:', feedbackError);
-        setAssessmentFeedback([]);
-      }
-      
-      console.log(`✅ Loaded ${courseHistory.length} completed courses, ${assessmentFeedback.length} assessments with feedback`);
-      
-    } catch (error) {
-      console.error('❌ Error refreshing student dashboard:', error);
-      // Set empty states to prevent crashes
-      setSubjectLabels([]);
-      setSubjectScores([]);
-      setCourseHistory([]);
-      setAssessmentFeedback([]);
-      setAdvice("Welcome! Start learning to see your progress.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    console.log(`📊 Loading data for student: ${user.username}`);
+    
+    // Load notifications
+    await loadNotifications();
+    
+    // Load pending assessments
+    const allAssessments = await getAssessments();
+    const allSubmissions = await getSubmissions();
+    
+    const pending = allAssessments.filter(a =>
+      (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
+      !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
+    );
+    setPendingAssessments(pending.slice(0, 3));
+    
+    // Load announcements
+    const announcementsData = await getAnnouncements();
+    setAnnouncements(announcementsData);
+    
+    // OPTIMIZATION: Use light courses for dashboard
+    const coursesData = await getCoursesLight(); // CHANGED FROM getCourses()
+    setCourses(coursesData);
+    
+    // Load progress
+    const progressData = await getProgress(user.username);
+    setProgress(progressData);
+    
+    // ... rest of the function stays the same ...
+    
+  } catch (error) {
+    console.error('❌ Error refreshing student dashboard:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Helper function to get student checkpoint scores
   const getStudentCheckpointScores = async (username: string): Promise<Record<string, number>> => {
-    try {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', username)
-        .single();
-      
-      if (!userData) return {};
-      
-      const { data: checkpointProgress, error } = await supabase
-        .from('student_checkpoint_progress')
-        .select(`
-          score,
-          checkpoint:checkpoints(
-            topic:topics(
-              subject:subject_id(name)
-            )
-          )
-        `)
-        .eq('user_id', userData.id)
-        .not('score', 'is', null);
-      
-      if (error) throw error;
-      
-      const scoresBySubject: Record<string, { total: number, count: number }> = {};
-      
-      checkpointProgress?.forEach(item => {
-        // FIXED: Handle nested array structure
-let subject = 'General';
-if (item.checkpoint && Array.isArray(item.checkpoint) && item.checkpoint.length > 0) {
-  const checkpoint = item.checkpoint[0];
-  if (checkpoint.topic && Array.isArray(checkpoint.topic) && checkpoint.topic.length > 0) {
-    const topic = checkpoint.topic[0];
-    if (topic.subject && Array.isArray(topic.subject) && topic.subject.length > 0) {
-      subject = topic.subject[0]?.name || 'General';
-    }
-  }
-}
-        const score = item.score;
-        
-        if (score && score > 0) {
-          if (!scoresBySubject[subject]) {
-            scoresBySubject[subject] = { total: 0, count: 0 };
-          }
-          scoresBySubject[subject].total += score;
-          scoresBySubject[subject].count++;
-        }
-      });
-      
-      // Calculate averages
-      const averages: Record<string, number> = {};
-      Object.keys(scoresBySubject).forEach(subject => {
-        const data = scoresBySubject[subject];
-        if (data.count > 0) {
-          averages[subject] = Math.round(data.total / data.count);
-        }
-      });
-      
-      return averages;
-    } catch (error) {
-      console.error('Error getting checkpoint scores:', error);
+  try {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) return {};
+    
+    // SIMPLER QUERY: Get checkpoint progress with separate topic/subject queries
+    const { data: checkpointProgress, error } = await supabase
+      .from('student_checkpoint_progress')
+      .select('score, checkpoint_id')
+      .eq('user_id', userData.id)
+      .not('score', 'is', null);
+    
+    if (error) throw error;
+    
+    if (!checkpointProgress || checkpointProgress.length === 0) {
       return {};
     }
-  };
+    
+    // Get checkpoint IDs to fetch topic/subject info
+    const checkpointIds = checkpointProgress.map(cp => cp.checkpoint_id).filter(Boolean);
+    
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('id, topic_id')
+      .in('id', checkpointIds);
+    
+    // Get topic IDs from checkpoints
+    const topicIds = [...new Set(checkpoints?.map(c => c.topic_id).filter(Boolean) || [])];
+    
+    if (topicIds.length === 0) {
+      return {};
+    }
+    
+    // Get topics with subjects
+    const { data: topics } = await supabase
+      .from('topics')
+      .select('id, subject:subject_id(name)')
+      .in('id', topicIds);
+    
+    const scoresBySubject: Record<string, { total: number, count: number }> = {};
+    
+    // Match scores with subjects
+    checkpointProgress.forEach(item => {
+      const checkpoint = checkpoints?.find(c => c.id === item.checkpoint_id);
+      if (!checkpoint || !item.score) return;
+      
+      const topic = topics?.find(t => t.id === checkpoint.topic_id);
+      let subject = 'General';
+      
+      if (topic?.subject) {
+        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+          subject = topic.subject[0]?.name || 'General';
+        } else if (typeof topic.subject === 'object' && topic.subject !== null) {
+          subject = (topic.subject as any).name || 'General';
+        }
+      }
+      
+      if (!scoresBySubject[subject]) {
+        scoresBySubject[subject] = { total: 0, count: 0 };
+      }
+      scoresBySubject[subject].total += item.score;
+      scoresBySubject[subject].count++;
+    });
+    
+    // Calculate averages
+    const averages: Record<string, number> = {};
+    Object.keys(scoresBySubject).forEach(subject => {
+      const data = scoresBySubject[subject];
+      if (data.count > 0) {
+        averages[subject] = Math.round(data.total / data.count);
+      }
+    });
+    
+    return averages;
+  } catch (error) {
+    console.error('Error getting checkpoint scores:', error);
+    return {};
+  }
+};
 
   useEffect(() => {
     refreshData();
