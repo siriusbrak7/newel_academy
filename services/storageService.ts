@@ -1653,9 +1653,10 @@ export const getStudentCheckpointScores = async (username: string): Promise<Reco
 };
 
 // Add to storageService.ts (after getStudentTopicPerformance function)
+// In storageService.ts, REPLACE the getStudentSubjectPerformance function with:
 export const getStudentSubjectPerformance = async (username: string): Promise<Record<string, number>> => {
   try {
-    console.log(`📊 Getting subject performance for ${username}`);
+    console.log(`📊 Getting comprehensive subject performance for ${username}`);
     
     // Get user ID
     const { data: userData } = await supabase
@@ -1666,29 +1667,30 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
 
     if (!userData) return {};
 
-    // Get ALL submissions (assessments)
+    // Get all submissions (assessments)
     const allSubmissions = await getSubmissions();
     const userSubmissions = allSubmissions.filter(s => 
       s.username === username && s.graded && s.score !== undefined
     );
 
-    // Get ALL assessments to map submissions to subjects
+    // Get all assessments
     const allAssessments = await getAssessments();
     
-    // Get checkpoint progress
-    const { data: checkpointProgress } = await supabase
+    // Get ALL checkpoint progress for this user
+    const { data: checkpointProgress, error } = await supabase
       .from('student_checkpoint_progress')
       .select(`
         score,
-        checkpoint:checkpoints (
-          topic_id,
-          topic:topics (
-            subject:subject_id (name)
-          )
-        )
+        checkpoint_id
       `)
       .eq('user_id', userData.id)
       .not('score', 'is', null);
+
+    if (error) {
+      console.error('❌ Error fetching checkpoint progress:', error);
+    }
+
+    console.log(`📊 Found ${userSubmissions.length} graded submissions and ${checkpointProgress?.length || 0} checkpoint scores`);
 
     // Combine scores from both sources
     const subjectScores: Record<string, { total: number; count: number }> = {};
@@ -1703,36 +1705,72 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
         }
         subjectScores[subject].total += submission.score;
         subjectScores[subject].count++;
+        console.log(`➕ Added assessment score for ${subject}: ${submission.score}%`);
       }
     });
 
-    // Process checkpoint progress
-    if (checkpointProgress) {
-      checkpointProgress.forEach(item => {
-        if (!item.score) return;
+    // Process checkpoint progress if we have it
+    if (checkpointProgress && checkpointProgress.length > 0) {
+      // Get checkpoint IDs
+      const checkpointIds = checkpointProgress.map(cp => cp.checkpoint_id);
+      
+      // Get checkpoints with their topic and subject info
+      const { data: checkpoints } = await supabase
+        .from('checkpoints')
+        .select(`
+          id,
+          topic_id
+        `)
+        .in('id', checkpointIds);
+
+      if (checkpoints && checkpoints.length > 0) {
+        // Get topic IDs
+        const topicIds = [...new Set(checkpoints.map(c => c.topic_id).filter(Boolean))];
         
-        let subject = 'General';
-        
-        // Extract subject from nested structure
-        try {
-          const checkpoint = Array.isArray(item.checkpoint) ? item.checkpoint[0] : item.checkpoint;
-          if (checkpoint?.topic) {
-            const topic = Array.isArray(checkpoint.topic) ? checkpoint.topic[0] : checkpoint.topic;
-            if (topic?.subject) {
-              const subjectObj = Array.isArray(topic.subject) ? topic.subject[0] : topic.subject;
-              subject = subjectObj?.name || 'General';
+        // Get topics with subjects
+        const { data: topics } = await supabase
+          .from('topics')
+          .select(`
+            id,
+            subject:subject_id (name)
+          `)
+          .in('id', topicIds);
+
+        console.log(`📚 Found ${topics?.length || 0} topics with subjects`);
+
+        // Process each checkpoint score
+        checkpointProgress.forEach(item => {
+          if (!item.score) return;
+          
+          // Find which topic this checkpoint belongs to
+          const checkpoint = checkpoints.find(c => c.id === item.checkpoint_id);
+          if (!checkpoint) return;
+          
+          // Find the topic
+          const topic = topics?.find(t => t.id === checkpoint.topic_id);
+          let subjectName = 'General';
+          
+          if (topic?.subject) {
+            try {
+              if (Array.isArray(topic.subject)) {
+                subjectName = topic.subject[0]?.name || 'General';
+              } else if (typeof topic.subject === 'object') {
+                subjectName = (topic.subject as any).name || 'General';
+              }
+            } catch (err) {
+              console.warn('Error extracting subject name:', err);
             }
           }
-        } catch (error) {
-          console.warn('Could not extract subject from checkpoint:', error);
-        }
-        
-        if (!subjectScores[subject]) {
-          subjectScores[subject] = { total: 0, count: 0 };
-        }
-        subjectScores[subject].total += item.score;
-        subjectScores[subject].count++;
-      });
+          
+          if (!subjectScores[subjectName]) {
+            subjectScores[subjectName] = { total: 0, count: 0 };
+          }
+          subjectScores[subjectName].total += item.score;
+          subjectScores[subjectName].count++;
+          
+          console.log(`➕ Added checkpoint score for ${subjectName}: ${item.score}%`);
+        });
+      }
     }
 
     // Calculate averages
@@ -2504,11 +2542,10 @@ export const canAccessTopic = async (username: string, topicId: string): Promise
 
 
 // Add to storageService.ts
+// In storageService.ts, REPLACE the getStudentCourseHistory function with:
 export const getStudentCourseHistory = async (username: string): Promise<any[]> => {
   console.log(`📚 Getting course history for ${username}`);
   try {
-   
-    
     // Get user ID
     const { data: userData } = await supabase
       .from('users')
@@ -2516,9 +2553,12 @@ export const getStudentCourseHistory = async (username: string): Promise<any[]> 
       .eq('username', username)
       .single();
 
-    if (!userData) return [];
+    if (!userData) {
+      console.log('❌ User not found');
+      return [];
+    }
 
-    // Get all topics the student has accessed
+    // Get ALL topics the student has ANY progress on (not just those with main_assessment_score)
     const { data: topicsProgress } = await supabase
       .from('user_progress')
       .select(`
@@ -2531,35 +2571,51 @@ export const getStudentCourseHistory = async (username: string): Promise<any[]> 
         )
       `)
       .eq('user_id', userData.id)
-      .not('main_assessment_score', 'is', null);
+      .order('last_accessed', { ascending: false }); // Get most recent first
 
-    if (!topicsProgress) return [];
+    console.log(`📊 Found ${topicsProgress?.length || 0} topics with progress`);
 
-    // Get checkpoint progress for each topic
+    if (!topicsProgress || topicsProgress.length === 0) {
+      return [];
+    }
+
+    // Get checkpoint progress for all topics
     const courseHistory = await Promise.all(
       topicsProgress.map(async (progress) => {
-        // Get checkpoint progress for this topic
+        // Get all checkpoints for this topic (including checkpoint 4)
         const { data: checkpoints } = await supabase
           .from('checkpoints')
-          .select('id, checkpoint_number, title')
-          .eq('topic_id', progress.topic_id);
+          .select('id, checkpoint_number, title, required_score')
+          .eq('topic_id', progress.topic_id)
+          .order('checkpoint_number', { ascending: true });
 
         const checkpointIds = checkpoints?.map(c => c.id) || [];
         
+        // Get student's progress on these checkpoints
         const { data: checkpointProgress } = await supabase
           .from('student_checkpoint_progress')
           .select('checkpoint_id, score, passed, completed_at')
           .eq('user_id', userData.id)
           .in('checkpoint_id', checkpointIds);
 
+        // Check if student has passed checkpoint 4 (the key completion indicator)
+        const checkpoint4 = checkpoints?.find(c => c.checkpoint_number === 4);
+        const checkpoint4Progress = checkpointProgress?.find(cp => cp.checkpoint_id === checkpoint4?.id);
+        
+        // A topic is considered "completed" if:
+        // 1. Main assessment is passed (traditional), OR
+        // 2. Checkpoint 4 is passed with ≥80% (new system)
+        const isCompleted = progress.main_assessment_passed || 
+                           (checkpoint4Progress?.passed && checkpoint4Progress?.score >= 80);
+
         return {
           topicId: progress.topic_id,
           topicTitle: progress.topic?.title || 'Unknown Topic',
           subject: progress.topic?.subject?.name || 'General',
           gradeLevel: progress.topic?.grade_level || 'N/A',
-          finalScore: progress.main_assessment_score,
-          passed: progress.main_assessment_passed,
-          completedDate: progress.last_accessed,
+          finalScore: progress.main_assessment_score || checkpoint4Progress?.score || 0,
+          passed: isCompleted,
+          completedDate: progress.last_accessed || new Date().toISOString(),
           checkpoints: checkpoints?.map(checkpoint => {
             const cpProgress = checkpointProgress?.find(cp => cp.checkpoint_id === checkpoint.id);
             return {
@@ -2567,14 +2623,19 @@ export const getStudentCourseHistory = async (username: string): Promise<any[]> 
               title: checkpoint.title,
               score: cpProgress?.score || 0,
               passed: cpProgress?.passed || false,
-              completedAt: cpProgress?.completed_at
+              completedAt: cpProgress?.completed_at,
+              requiredScore: checkpoint.required_score
             };
           }) || []
         };
       })
     );
 
-    return courseHistory.sort((a, b) => 
+    // Filter to only completed topics for the history display
+    const completedHistory = courseHistory.filter(course => course.passed);
+    console.log(`✅ Found ${completedHistory.length} completed topics out of ${courseHistory.length} total`);
+
+    return completedHistory.sort((a, b) => 
       new Date(b.completedDate || 0).getTime() - new Date(a.completedDate || 0).getTime()
     );
   } catch (error) {

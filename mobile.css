@@ -6,155 +6,139 @@
 :root {
   --safe-area-inset-top: env(safe-area-inset-top, 20px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 20px);
-  --nav-height: 64px;
+  --nav-height: 56px; /* Standard mobile nav height */
 }
 
 /* =========================================
-   2. MOBILE NAVIGATION CONTAINER (Slide-in)
+   2. BODY SCROLL LOCK - CRITICAL FIX
+   ========================================= */
+body.mobile-menu-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none !important;
+}
+
+/* =========================================
+   3. MOBILE NAVIGATION CONTAINER
    ========================================= */
 .mobile-nav-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 100vh;      /* Fallback */
-  height: 100dvh;     /* Modern mobile height */
-  
-  /* Theme-aware background */
-  background: rgba(15, 23, 42, 0.98); /* Default Dark */
+  height: 100vh;
+  height: 100dvh;
+  background: rgba(15, 23, 42, 0.98);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  
-  z-index: 10000; /* Must be > 50 (Navbar) and > 9999 */
-  
-  /* Layout & Spacing */
+  z-index: 10050; /* Higher than everything */
   display: flex;
   flex-direction: column;
   padding-top: var(--safe-area-inset-top);
   padding-bottom: var(--safe-area-inset-bottom);
-  
-  /* ANIMATION LOGIC */
-  transform: translateX(100%); /* Start hidden (off-screen right) */
+  transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
 
-/* Slide in when active */
 .mobile-nav-container.active {
   transform: translateX(0);
 }
 
-/* Cyber Theme Background Override */
-.mobile-nav-container.cyber-bg {
-  background: rgba(0, 0, 0, 0.96);
-  border-left: 1px solid rgba(0, 255, 65, 0.3);
-  box-shadow: -10px 0 30px rgba(0, 255, 65, 0.1);
-}
-
 /* =========================================
-   3. NAVIGATION ITEMS
-   ========================================= */
-.mobile-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 24px;
-  width: 100%;
-  text-align: left;
-  
-  /* Typography */
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  
-  /* Visuals */
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: background 0.2s ease, padding-left 0.2s ease;
-}
-
-.mobile-nav-item:active {
-  background: rgba(255, 255, 255, 0.1);
-  padding-left: 28px; /* Slight movement on tap */
-}
-
-/* Cyber Theme Items */
-.mobile-nav-container.cyber-bg .mobile-nav-item {
-  font-family: 'Share Tech Mono', monospace;
-  color: #00ff41;
-  border-bottom: 1px solid rgba(0, 255, 65, 0.15);
-}
-
-.mobile-nav-container.cyber-bg .mobile-nav-item:active {
-  background: rgba(0, 255, 65, 0.1);
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
-}
-
-/* Close Button Area */
-.mobile-nav-container > div:first-child {
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.close-mobile-menu {
-  padding: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  transition: transform 0.2s;
-}
-
-.close-mobile-menu:active {
-  transform: scale(0.9);
-}
-
-/* =========================================
-   4. MOBILE UTILITY OVERRIDES
+   4. NAVBAR FIXES FOR MOBILE
    ========================================= */
 @media (max-width: 768px) {
+  /* Navbar height and positioning */
+  nav {
+    height: var(--nav-height) !important;
+    padding: 0 1rem !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+    background: rgba(0, 0, 0, 0.95) !important;
+    backdrop-filter: none !important; /* Disable for performance */
+  }
   
-  /* Prevent horizontal scroll */
-  body {
-    overflow-x: hidden;
-    width: 100%;
+  /* Hide text in navbar buttons but NOT the logo */
+  nav button:not([aria-label="Open mobile menu"]) span:not(.sr-only):not(.notification-badge) {
+    display: none !important;
   }
-
-  /* FIXED: Lock body scroll when menu is open */
-  body.mobile-menu-open {
-    overflow: hidden !important;
-    position: fixed;
-    width: 100%;
-    height: 100%;
+  
+  /* Show mobile menu button, hide desktop sidebar toggle */
+  nav button[aria-label="Open mobile menu"] {
+    display: flex !important;
   }
-
-  /* FIXED: Don't hide the logo! 
-     Only hide text inside BUTTONS that aren't the logo */
-  nav button span:not(.sr-only):not(.notification-badge) {
-    display: none; 
+  
+  nav button[aria-label="Open sidebar"] {
+    display: none !important;
   }
-
-  /* Make header text slightly smaller but readable */
+  
+  /* Ensure touch targets */
+  nav button, nav a {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  
+  /* Typography fixes */
   h1 {
-    font-size: 2rem !important; /* Was 1.75rem, too small */
+    font-size: 2rem !important;
     line-height: 1.2 !important;
   }
   
-  /* Fix Grid smashing - Only force col-1 on larger grids */
+  /* Grid fixes - don't break everything */
   .grid-cols-3, .grid-cols-4 {
     grid-template-columns: 1fr !important;
   }
-  /* Let grid-cols-2 stay 2 columns for small items, or auto-fit */
   
-  /* Touch Targets */
-  button, a {
-    min-height: 44px;
-    min-width: 44px;
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   
-  /* Hiding heavy theme elements */
-  .star-field, .constellation, .rocket, .rocket-exhaust, .asteroid, .saturn, 
-  .cyber-grid, .cyber-scanline, .matrix-column {
+  /* Student dashboard specific fixes */
+  .student-dashboard-grid .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Subject performance chart fix */
+  .w-48 {
+    width: 100% !important;
+    max-width: 280px !important;
+    margin: 0 auto !important;
+  }
+  
+  /* Hide heavy theme elements */
+  .star-field,
+  .constellation,
+  .rocket,
+  .rocket-exhaust,
+  .asteroid,
+  .saturn,
+  .cyber-grid,
+  .cyber-scanline,
+  .matrix-column {
     display: none !important;
   }
+}
+
+/* =========================================
+   5. APP.TSX SPECIFIC FIXES
+   ========================================= */
+/* Make sure App.tsx content is above theme elements */
+#root {
+  position: relative;
+  z-index: 100;
+}
+
+/* Mobile menu close button */
+.close-mobile-menu {
+  position: absolute;
+  top: calc(var(--safe-area-inset-top, 20px) + 1rem);
+  right: 1rem;
+  z-index: 10051;
 }
