@@ -554,3 +554,192 @@ body.mobile-menu-open {
     color: black !important;
   }
 }
+/* Add these device-specific optimizations to the top of mobile.css */
+
+/* ===== 2026 DEVICE UPDATES ===== */
+
+/* iPhone 16 Series (expected: 393px, 430px, 475px viewports) */
+@media (min-width: 390px) and (max-width: 480px) {
+  .mobile-nav-container {
+    width: 82%; /* Slightly wider for larger screens */
+    max-width: 340px;
+  }
+  
+  /* Dynamic Island & Pill area avoidance */
+  .safe-area-dynamic-island {
+    padding-top: max(20px, env(safe-area-inset-top) + 10px) !important;
+  }
+  
+  /* Larger touch targets for gesture navigation */
+  .bottom-gesture-area {
+    padding-bottom: max(34px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Foldable & Dual-Screen Devices (2026) */
+@media (screen-spanning: single-fold-vertical) {
+  .mobile-nav-container {
+    width: 50vw; /* Half of foldable screen */
+    right: -50vw;
+  }
+  
+  .mobile-nav-container.active {
+    right: 0;
+  }
+}
+
+/* High Refresh Rate Displays (120Hz+) */
+@media (update: fast) {
+  .mobile-nav-container {
+    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .mobile-nav-item:active {
+    transition: transform 0.15s ease;
+  }
+}
+
+/* ===== 2026 INTERACTION PATTERNS ===== */
+
+/* Swipe-to-go-back gesture area (common in 2026) */
+.swipe-back-gesture-area {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 100%;
+  z-index: 9990;
+  background: transparent;
+}
+
+/* Haptic feedback preparation */
+@media (hover: none) and (pointer: coarse) {
+  .haptic-button:active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, 
+      rgba(255, 255, 255, 0.1) 0%, 
+      transparent 70%);
+    animation: haptic-pulse 0.3s ease-out;
+  }
+  
+  @keyframes haptic-pulse {
+    0% { opacity: 0.5; transform: scale(0.8); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+}
+
+/* Always-on Display safe zones (for PWA) */
+@media (display-mode: standalone) {
+  .aod-safe {
+    margin-top: env(safe-area-inset-top);
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ===== 2026 FEATURE DETECTION ===== */
+
+/* Satellite connectivity (low bandwidth) */
+@media (prefers-reduced-data: reduce) {
+  .mobile-nav-container {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  
+  .cosmic-bg .mobile-nav-container,
+  .cyber-bg .mobile-nav-container {
+    background: rgba(15, 23, 42, 0.95) !important; /* Solid color fallback */
+  }
+}
+
+/* Neural/EEG input devices */
+@media (pointer: fine) and (hover: hover) and (scripting: enabled) {
+  .neural-input-optimized {
+    outline: 2px solid transparent;
+    transition: outline-color 0.2s;
+  }
+  
+  .neural-input-optimized:focus-visible {
+    outline-color: rgba(59, 130, 246, 0.5);
+  }
+}
+
+/* ===== AI ASSISTANT INTEGRATION (2026) ===== */
+
+/* Voice command active state */
+@media (speech: enabled) {
+  .voice-command-active {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    animation: voice-pulse 2s infinite;
+  }
+  
+  @keyframes voice-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.1); }
+  }
+}
+
+/* ===== QUANTUM-SAFE (POST-QUANTUM ERA 2026) ===== */
+
+/* Enhanced security UI indicators */
+.quantum-safe-indicator::before {
+  content: '🔒';
+  font-size: 12px;
+  margin-right: 4px;
+  filter: hue-rotate(180deg); /* Quantum blue */
+}
+
+/* Update the existing safe area section for 2026 */
+@supports (padding: max(0px)) {
+  .safe-area-top-2026 {
+    padding-top: max(20px, env(safe-area-inset-top, 20px) + 5px) !important;
+  }
+  
+  .safe-area-bottom-2026 {
+    padding-bottom: max(30px, env(safe-area-inset-bottom, 30px) + 10px) !important;
+  }
+  
+  /* Rounded corner compensation */
+  .safe-area-rounded {
+    border-radius: env(safe-area-inset-top) env(safe-area-inset-top) 
+                   env(safe-area-inset-bottom) env(safe-area-inset-bottom) !important;
+  }
+}
+
+/* ===== HOLOGRAPHIC/AR MODE (EMERGING 2026) ===== */
+@media (environment: ar) or (environment: vr) {
+  .mobile-nav-container {
+    background: rgba(0, 0, 0, 0.95) !important;
+    backdrop-filter: blur(40px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  }
+  
+  .mobile-nav-item {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  }
+}
+
+/* ===== BIOMETRIC AUTH UI (2026 STANDARD) ===== */
+.biometric-auth-prompt {
+  min-height: 180px !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.biometric-icon {
+  width: 64px !important;
+  height: 64px !important;
+  animation: biometric-scan 2s ease-in-out infinite;
+}
+
+@keyframes biometric-scan {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* Add to the existing iPhone 16 media query section */
