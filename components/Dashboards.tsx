@@ -2202,7 +2202,8 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   }, [neuroscienceFacts]);
 
   // UPDATED AND FIXED refreshData function
-  const refreshData = async () => {
+  // In the refreshData function of StudentDashboard, UPDATE THIS:
+const refreshData = async () => {
   setLoading(true);
   try {
     console.log(`📊 Loading data for student: ${user.username}`);
@@ -2225,14 +2226,52 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     setAnnouncements(announcementsData);
     
     // OPTIMIZATION: Use light courses for dashboard
-    const coursesData = await getCoursesLight(); // CHANGED FROM getCourses()
+    const coursesData = await getCoursesLight();
     setCourses(coursesData);
     
     // Load progress
     const progressData = await getProgress(user.username);
     setProgress(progressData);
     
-    // ... rest of the function stays the same ...
+    // ===== FIX: Load subject performance data =====
+    const subjectScores = await getStudentCheckpointScores(user.username);
+    
+    if (Object.keys(subjectScores).length > 0) {
+      const labels = Object.keys(subjectScores);
+      const scores = Object.values(subjectScores);
+      setSubjectLabels(labels);
+      setSubjectScores(scores);
+      
+      // Generate advice based on performance
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      if (avgScore < 50) {
+        setAdvice("Focus on mastering fundamentals before moving to advanced topics.");
+      } else if (avgScore < 70) {
+        setAdvice("Good progress! Try to strengthen your weak areas.");
+      } else if (avgScore < 85) {
+        setAdvice("Excellent work! Consider tackling more challenging topics.");
+      } else {
+        setAdvice("Outstanding performance! You're ready for advanced material.");
+      }
+    } else {
+      // If no checkpoint scores, try to get assessment scores
+      const userSubmissions = allSubmissions.filter(s => 
+        s.username === user.username && s.graded && s.score !== undefined
+      );
+      
+      if (userSubmissions.length > 0) {
+        const avgScore = userSubmissions.reduce((sum, sub) => sum + (sub.score || 0), 0) / userSubmissions.length;
+        setAdvice(`Your average assessment score is ${Math.round(avgScore)}%. Keep up the good work!`);
+      }
+    }
+    
+    // Load course history
+    const history = await getStudentCourseHistory(user.username);
+    setCourseHistory(history);
+    
+    // Load assessment feedback
+    const feedback = await getStudentAssessmentFeedback(user.username);
+    setAssessmentFeedback(feedback);
     
   } catch (error) {
     console.error('❌ Error refreshing student dashboard:', error);
@@ -2340,11 +2379,27 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     return () => clearInterval(notificationInterval);
   }, [user]);
 
-  const chartData = {
-    labels: subjectLabels.length > 0 ? subjectLabels : ['No Scores Yet'],
+  // In the StudentDashboard component, update the chartData:
+const chartData = useMemo(() => {
+  if (subjectLabels.length === 0 || subjectScores.length === 0) {
+    return {
+      labels: ['No Data'],
+      datasets: [{
+        label: 'Average Score (%)',
+        data: [0],
+        backgroundColor: ['rgba(100, 100, 100, 0.6)'],
+        borderColor: 'transparent',
+        hoverOffset: 12,
+        borderWidth: 0
+      }]
+    };
+  }
+  
+  return {
+    labels: subjectLabels,
     datasets: [{
       label: 'Average Score (%)',
-      data: subjectScores.length > 0 ? subjectScores : [0],
+      data: subjectScores,
       backgroundColor: [
         'rgba(6, 182, 212, 0.6)',
         'rgba(168, 85, 247, 0.6)',
@@ -2358,6 +2413,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       borderWidth: 0
     }]
   };
+}, [subjectLabels, subjectScores]);
 
   const exportPDF = async () => {
     try {

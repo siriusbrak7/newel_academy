@@ -1541,6 +1541,116 @@ export const getClassOverview = async () => {
   };
 };
 
+
+// Add this function to storageService.ts
+export const getStudentCheckpointScores = async (username: string): Promise<Record<string, number>> => {
+  try {
+    console.log(`📊 Getting checkpoint scores for ${username}`);
+    
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (!userData) {
+      console.log('❌ User not found');
+      return {};
+    }
+    
+    // Get checkpoint progress with subject information
+    const { data: checkpointProgress, error } = await supabase
+      .from('student_checkpoint_progress')
+      .select(`
+        score,
+        checkpoint_id
+      `)
+      .eq('user_id', userData.id)
+      .not('score', 'is', null);
+    
+    if (error) {
+      console.error('❌ Error fetching checkpoint progress:', error);
+      return {};
+    }
+    
+    if (!checkpointProgress || checkpointProgress.length === 0) {
+      console.log('📭 No checkpoint progress found');
+      return {};
+    }
+    
+    console.log(`✅ Found ${checkpointProgress.length} checkpoint records`);
+    
+    // Get topic IDs from checkpoints
+    const checkpointIds = checkpointProgress.map(cp => cp.checkpoint_id).filter(Boolean);
+    
+    const { data: checkpoints } = await supabase
+      .from('checkpoints')
+      .select('id, topic_id')
+      .in('id', checkpointIds);
+    
+    if (!checkpoints || checkpoints.length === 0) {
+      return {};
+    }
+    
+    // Get topic IDs
+    const topicIds = [...new Set(checkpoints.map(c => c.topic_id).filter(Boolean))];
+    
+    // Get topics with subjects
+    const { data: topics } = await supabase
+      .from('topics')
+      .select(`
+        id,
+        subject:subject_id (name)
+      `)
+      .in('id', topicIds);
+    
+    // Group scores by subject
+    const scoresBySubject: Record<string, { total: number; count: number }> = {};
+    
+    checkpointProgress.forEach(item => {
+      if (!item.score) return;
+      
+      // Find which topic this checkpoint belongs to
+      const checkpoint = checkpoints.find(c => c.id === item.checkpoint_id);
+      if (!checkpoint) return;
+      
+      // Find the topic
+      const topic = topics?.find(t => t.id === checkpoint.topic_id);
+      let subjectName = 'General';
+      
+      if (topic?.subject) {
+        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+          subjectName = topic.subject[0]?.name || 'General';
+        } else if (typeof topic.subject === 'object' && topic.subject !== null) {
+          subjectName = (topic.subject as any).name || 'General';
+        }
+      }
+      
+      if (!scoresBySubject[subjectName]) {
+        scoresBySubject[subjectName] = { total: 0, count: 0 };
+      }
+      scoresBySubject[subjectName].total += item.score;
+      scoresBySubject[subjectName].count++;
+    });
+    
+    // Calculate averages
+    const averages: Record<string, number> = {};
+    Object.keys(scoresBySubject).forEach(subject => {
+      const data = scoresBySubject[subject];
+      if (data.count > 0) {
+        averages[subject] = Math.round(data.total / data.count);
+      }
+    });
+    
+    console.log('📈 Subject averages:', averages);
+    return averages;
+    
+  } catch (error) {
+    console.error('❌ Error in getStudentCheckpointScores:', error);
+    return {};
+  }
+};
 // =======================
 // NOTIFICATION FUNCTIONS
 // =======================
