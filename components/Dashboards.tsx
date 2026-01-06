@@ -35,7 +35,8 @@ import {
   notifyTopic80PercentComplete,
   notifyLeaderboardUpdate,
   notifyNewSubmission,
-  getCoursesLight
+  getCoursesLight,
+  getStudentSubjectPerformance
 } from '../services/storageService';
 import { 
   Check, 
@@ -2203,6 +2204,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   // UPDATED AND FIXED refreshData function
   // In the refreshData function of StudentDashboard, UPDATE THIS:
+// In Dashboards.tsx, StudentDashboard component, update the refreshData function:
 const refreshData = async () => {
   setLoading(true);
   try {
@@ -2225,7 +2227,7 @@ const refreshData = async () => {
     const announcementsData = await getAnnouncements();
     setAnnouncements(announcementsData);
     
-    // OPTIMIZATION: Use light courses for dashboard
+    // Load courses
     const coursesData = await getCoursesLight();
     setCourses(coursesData);
     
@@ -2233,8 +2235,8 @@ const refreshData = async () => {
     const progressData = await getProgress(user.username);
     setProgress(progressData);
     
-    // ===== FIX: Load subject performance data =====
-    const subjectScores = await getStudentCheckpointScores(user.username);
+    // ===== FIXED: Get subject performance =====
+    const subjectScores = await getStudentSubjectPerformance(user.username);
     
     if (Object.keys(subjectScores).length > 0) {
       const labels = Object.keys(subjectScores);
@@ -2245,24 +2247,19 @@ const refreshData = async () => {
       // Generate advice based on performance
       const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
       if (avgScore < 50) {
-        setAdvice("Focus on mastering fundamentals before moving to advanced topics.");
+        setAdvice("Focus on mastering fundamentals. Review materials and retry checkpoints.");
       } else if (avgScore < 70) {
-        setAdvice("Good progress! Try to strengthen your weak areas.");
+        setAdvice("Good progress! Focus on improving weak areas identified in checkpoints.");
       } else if (avgScore < 85) {
-        setAdvice("Excellent work! Consider tackling more challenging topics.");
+        setAdvice("Excellent work! You're mastering concepts. Try the 222-Sprint challenge!");
       } else {
-        setAdvice("Outstanding performance! You're ready for advanced material.");
+        setAdvice("Outstanding performance! Consider helping classmates or exploring advanced topics.");
       }
     } else {
-      // If no checkpoint scores, try to get assessment scores
-      const userSubmissions = allSubmissions.filter(s => 
-        s.username === user.username && s.graded && s.score !== undefined
-      );
-      
-      if (userSubmissions.length > 0) {
-        const avgScore = userSubmissions.reduce((sum, sub) => sum + (sub.score || 0), 0) / userSubmissions.length;
-        setAdvice(`Your average assessment score is ${Math.round(avgScore)}%. Keep up the good work!`);
-      }
+      // If no scores yet
+      setSubjectLabels([]);
+      setSubjectScores([]);
+      setAdvice("Start by exploring courses and completing your first checkpoint or assessment!");
     }
     
     // Load course history

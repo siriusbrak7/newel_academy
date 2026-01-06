@@ -277,7 +277,7 @@ export const isTopicCompleted = async (
       .single();
 
     const isPassed = progress?.passed || false;
-    const hasHighScore = progress?.score >= 85;
+    const hasHighScore = progress?.score >= 80;
     
     console.log(`📊 Topic ${topicId} completion check: passed=${isPassed}, score=${progress?.score}%, completed=${isPassed && hasHighScore}`);
     

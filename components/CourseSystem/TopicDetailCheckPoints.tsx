@@ -692,7 +692,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                     <div className="flex-shrink-0 w-8 h-8 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center text-sm font-bold">4</div>
                     <div>
                       <h4 className="font-medium text-white mb-1">Final Assessment</h4>
-                      <p className="text-sm text-white/70">Complete the theory-based final assessment (worth 20% of total grade).</p>
+                      <p className="text-sm text-white/70">Complete the theory-based final assessment.</p>
                     </div>
                   </div>
                   

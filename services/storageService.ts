@@ -1651,6 +1651,107 @@ export const getStudentCheckpointScores = async (username: string): Promise<Reco
     return {};
   }
 };
+
+// Add to storageService.ts (after getStudentTopicPerformance function)
+export const getStudentSubjectPerformance = async (username: string): Promise<Record<string, number>> => {
+  try {
+    console.log(`📊 Getting subject performance for ${username}`);
+    
+    // Get user ID
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return {};
+
+    // Get ALL submissions (assessments)
+    const allSubmissions = await getSubmissions();
+    const userSubmissions = allSubmissions.filter(s => 
+      s.username === username && s.graded && s.score !== undefined
+    );
+
+    // Get ALL assessments to map submissions to subjects
+    const allAssessments = await getAssessments();
+    
+    // Get checkpoint progress
+    const { data: checkpointProgress } = await supabase
+      .from('student_checkpoint_progress')
+      .select(`
+        score,
+        checkpoint:checkpoints (
+          topic_id,
+          topic:topics (
+            subject:subject_id (name)
+          )
+        )
+      `)
+      .eq('user_id', userData.id)
+      .not('score', 'is', null);
+
+    // Combine scores from both sources
+    const subjectScores: Record<string, { total: number; count: number }> = {};
+
+    // Process assessment submissions
+    userSubmissions.forEach(submission => {
+      const assessment = allAssessments.find(a => a.id === submission.assessmentId);
+      if (assessment?.subject && submission.score !== undefined) {
+        const subject = assessment.subject;
+        if (!subjectScores[subject]) {
+          subjectScores[subject] = { total: 0, count: 0 };
+        }
+        subjectScores[subject].total += submission.score;
+        subjectScores[subject].count++;
+      }
+    });
+
+    // Process checkpoint progress
+    if (checkpointProgress) {
+      checkpointProgress.forEach(item => {
+        if (!item.score) return;
+        
+        let subject = 'General';
+        
+        // Extract subject from nested structure
+        try {
+          const checkpoint = Array.isArray(item.checkpoint) ? item.checkpoint[0] : item.checkpoint;
+          if (checkpoint?.topic) {
+            const topic = Array.isArray(checkpoint.topic) ? checkpoint.topic[0] : checkpoint.topic;
+            if (topic?.subject) {
+              const subjectObj = Array.isArray(topic.subject) ? topic.subject[0] : topic.subject;
+              subject = subjectObj?.name || 'General';
+            }
+          }
+        } catch (error) {
+          console.warn('Could not extract subject from checkpoint:', error);
+        }
+        
+        if (!subjectScores[subject]) {
+          subjectScores[subject] = { total: 0, count: 0 };
+        }
+        subjectScores[subject].total += item.score;
+        subjectScores[subject].count++;
+      });
+    }
+
+    // Calculate averages
+    const averages: Record<string, number> = {};
+    Object.keys(subjectScores).forEach(subject => {
+      const data = subjectScores[subject];
+      if (data.count > 0) {
+        averages[subject] = Math.round(data.total / data.count);
+      }
+    });
+
+    console.log(`✅ Subject performance for ${username}:`, averages);
+    return averages;
+    
+  } catch (error) {
+    console.error('❌ Error getting subject performance:', error);
+    return {};
+  }
+};
 // =======================
 // NOTIFICATION FUNCTIONS
 // =======================
@@ -2404,6 +2505,7 @@ export const canAccessTopic = async (username: string, topicId: string): Promise
 
 // Add to storageService.ts
 export const getStudentCourseHistory = async (username: string): Promise<any[]> => {
+  console.log(`📚 Getting course history for ${username}`);
   try {
    
     
