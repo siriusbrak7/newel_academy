@@ -103,6 +103,19 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
     }
   }, [theme]);
 
+  // Add to your existing App.tsx useEffect
+useEffect(() => {
+  const handleResize = () => {
+    // Close mobile menu on desktop
+    if (window.innerWidth >= 768 && setMobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+  };
+
+  window.addEventListener('resize', handleResize);
+  return () => window.removeEventListener('resize', handleResize);
+}, [setMobileMenuOpen]);
+
   // App features with icons
   const appFeatures = [
     {
@@ -800,3 +813,7 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+function setMobileMenuOpen(arg0: boolean) {
+  throw new Error('Function not implemented.');
+}
