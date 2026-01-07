@@ -1682,48 +1682,41 @@ export const getStudentCheckpointScores = async (username: string): Promise<Reco
 
 // Add to storageService.ts (after getStudentTopicPerformance function)
 // In storageService.ts, REPLACE the getStudentSubjectPerformance function with:
+// storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
+// storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
+// storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
 export const getStudentSubjectPerformance = async (username: string): Promise<Record<string, number>> => {
   try {
-    console.log(`📊 Getting comprehensive subject performance for ${username}`);
+    console.log(`📊 Getting subject performance for ${username}`);
     
-    // Get user ID
+    // 1. Get user ID
     const { data: userData } = await supabase
       .from('users')
       .select('id')
       .eq('username', username)
       .single();
 
-    if (!userData) return {};
-
-    // Get all submissions (assessments)
-    const allSubmissions = await getSubmissions();
-    const userSubmissions = allSubmissions.filter(s => 
-      s.username === username && s.graded && s.score !== undefined
-    );
-
-    // Get all assessments
-    const allAssessments = await getAssessments();
-    
-    // Get ALL checkpoint progress for this user
-    const { data: checkpointProgress, error } = await supabase
-      .from('student_checkpoint_progress')
-      .select(`
-        score,
-        checkpoint_id
-      `)
-      .eq('user_id', userData.id)
-      .not('score', 'is', null);
-
-    if (error) {
-      console.error('❌ Error fetching checkpoint progress:', error);
+    if (!userData) {
+      console.log(`❌ User ${username} not found`);
+      return {};
     }
 
-    console.log(`📊 Found ${userSubmissions.length} graded submissions and ${checkpointProgress?.length || 0} checkpoint scores`);
-
-    // Combine scores from both sources
+    // 2. SIMPLIFIED APPROACH: Get all checkpoints and assessments separately
     const subjectScores: Record<string, { total: number; count: number }> = {};
 
-    // Process assessment submissions
+    // Get graded assessments first
+    const allSubmissions = await getSubmissions();
+    const userSubmissions = allSubmissions.filter(s => 
+      s.username === username && 
+      s.graded === true && 
+      s.score !== undefined &&
+      s.score > 0
+    );
+
+    // Get assessments to map to subjects
+    const allAssessments = await getAssessments();
+
+    // Process assessments
     userSubmissions.forEach(submission => {
       const assessment = allAssessments.find(a => a.id === submission.assessmentId);
       if (assessment?.subject && submission.score !== undefined) {
@@ -1732,76 +1725,21 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
           subjectScores[subject] = { total: 0, count: 0 };
         }
         subjectScores[subject].total += submission.score;
-        subjectScores[subject].count++;
-        console.log(`➕ Added assessment score for ${subject}: ${submission.score}%`);
+        subjectScores[subject].count += 1;
       }
     });
 
-    // Process checkpoint progress if we have it
-    if (checkpointProgress && checkpointProgress.length > 0) {
-      // Get checkpoint IDs
-      const checkpointIds = checkpointProgress.map(cp => cp.checkpoint_id);
-      
-      // Get checkpoints with their topic and subject info
-      const { data: checkpoints } = await supabase
-        .from('checkpoints')
-        .select(`
-          id,
-          topic_id
-        `)
-        .in('id', checkpointIds);
-
-      if (checkpoints && checkpoints.length > 0) {
-        // Get topic IDs
-        const topicIds = [...new Set(checkpoints.map(c => c.topic_id).filter(Boolean))];
-        
-        // Get topics with subjects
-        const { data: topics } = await supabase
-          .from('topics')
-          .select(`
-            id,
-            subject:subject_id (name)
-          `)
-          .in('id', topicIds);
-
-        console.log(`📚 Found ${topics?.length || 0} topics with subjects`);
-
-        // Process each checkpoint score
-        checkpointProgress.forEach(item => {
-          if (!item.score) return;
-          
-          // Find which topic this checkpoint belongs to
-          const checkpoint = checkpoints.find(c => c.id === item.checkpoint_id);
-          if (!checkpoint) return;
-          
-          // Find the topic
-          const topic = topics?.find(t => t.id === checkpoint.topic_id);
-          let subjectName = 'General';
-          
-          if (topic?.subject) {
-            try {
-              if (Array.isArray(topic.subject)) {
-                subjectName = topic.subject[0]?.name || 'General';
-              } else if (typeof topic.subject === 'object') {
-                subjectName = (topic.subject as any).name || 'General';
-              }
-            } catch (err) {
-              console.warn('Error extracting subject name:', err);
-            }
-          }
-          
-          if (!subjectScores[subjectName]) {
-            subjectScores[subjectName] = { total: 0, count: 0 };
-          }
-          subjectScores[subjectName].total += item.score;
-          subjectScores[subjectName].count++;
-          
-          console.log(`➕ Added checkpoint score for ${subjectName}: ${item.score}%`);
-        });
+    // 3. Get checkpoint scores via simplified function
+    const checkpointScores = await getStudentCheckpointScores(username);
+    Object.entries(checkpointScores).forEach(([subject, score]) => {
+      if (!subjectScores[subject]) {
+        subjectScores[subject] = { total: 0, count: 0 };
       }
-    }
+      subjectScores[subject].total += score;
+      subjectScores[subject].count += 1;
+    });
 
-    // Calculate averages
+    // 4. Calculate averages
     const averages: Record<string, number> = {};
     Object.keys(subjectScores).forEach(subject => {
       const data = subjectScores[subject];
@@ -1810,11 +1748,24 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
       }
     });
 
-    console.log(`✅ Subject performance for ${username}:`, averages);
+    console.log(`✅ FINAL subject averages for ${username}:`, averages);
+    
+    // Debug log
+    console.log('📊 Score breakdown:', {
+      assessmentsCount: userSubmissions.length,
+      checkpointSubjects: Object.keys(checkpointScores),
+      subjects: Object.keys(averages).map(subject => ({
+        subject,
+        average: averages[subject],
+        totalScore: subjectScores[subject]?.total || 0,
+        count: subjectScores[subject]?.count || 0
+      }))
+    });
+
     return averages;
     
   } catch (error) {
-    console.error('❌ Error getting subject performance:', error);
+    console.error('❌ CRITICAL ERROR in getStudentSubjectPerformance:', error);
     return {};
   }
 };

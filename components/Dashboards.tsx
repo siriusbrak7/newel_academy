@@ -1,8 +1,17 @@
-﻿// Dashboards.tsx - COMPLETE FIXED VERSION FOR DEPLOYMENT
-// dashboard.tsx - UPDATED IMPORTS SECTION
+﻿// Dashboards.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // ADD useNavigate
-import { User, StudentStats, Assessment, Announcement, CourseStructure, LeaderboardEntry, Notification, Role } from '../types';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  User, 
+  StudentStats, 
+  Assessment, 
+  Announcement, 
+  CourseStructure, 
+  LeaderboardEntry, 
+  // FIX: Rename Notification to avoid conflict
+  Notification as NotificationType,
+  Role 
+} from '../types';
 import {
   getUsers,
   saveUser,
@@ -23,14 +32,15 @@ import {
   refreshAllLeaderboards,
   uploadFileToSupabase,
   deleteMaterial,
-  // ADD THESE NOTIFICATION FUNCTIONS:
+  // Notification functions
   getUserNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
   createNotification,
   notifyCourseMaterialAdded,
   getCoursesLight,
-  getStudentSubjectPerformance
+  getStudentSubjectPerformance,
+  getStudentCheckpointScores // ADD THIS IMPORT
 } from '../services/storageService';
 import { 
   Check, 
@@ -50,7 +60,7 @@ import {
   Brain,
   Atom,
   Clock,
-  Users,
+  Users as UsersIcon,
   BarChart3,
   Target,
   MessageSquare,
@@ -60,15 +70,15 @@ import {
   Link as LinkIcon,
   File as FileIcon,
   Trash2, 
+  Bug,
   Plus,
-  // ADD THESE NOTIFICATION ICONS:
   Bell,
-  Info} from 'lucide-react';
+  Info
+} from 'lucide-react';
 
 // Fixed Chart.js imports
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
-import { supabase } from '@/services/supabaseClient';
 
 // Register Chart.js components
 ChartJS.register(
@@ -96,2059 +106,10 @@ try {
     save() { console.log('PDF export disabled - install jspdf') }
   };
 }
-export const AdminDashboard: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<StudentStats[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'teachers'>('pending');
-  const [loading, setLoading] = useState(true);
-  const [leaderboardData, setLeaderboardData] = useState<{ academic: LeaderboardEntry[], challenge: LeaderboardEntry[], assessments: LeaderboardEntry[] }>({ 
-    academic: [], 
-    challenge: [], 
-    assessments: [] 
-  });
 
-  // Then create helper functions in the component:
-const notifyCourseMaterialAdded = async (
-  teacherName: string,
-  subject: string,
-  topicTitle: string,
-  gradeLevel: string,
-  materialTitle: string
-) => {
-  const text = `📚 New material added to ${subject}: ${materialTitle} in "${topicTitle}"`;
-  const metadata = {
-    teacher: teacherName,
-    subject,
-    topic: topicTitle,
-    material: materialTitle,
-    actionUrl: `/courses`
-  };
-  // You'll need to get student usernames for this grade
-  // await createNotification(studentUsername, text, 'info', metadata);
-};
-
-const notifyNewAssessment = async (
-  teacherName: string,
-  assessmentTitle: string,
-  subject: string,
-  gradeLevel: string
-) => {
-  const text = `📝 New assessment: "${assessmentTitle}" in ${subject}`;
-  const metadata = {
-    teacher: teacherName,
-    assessment: assessmentTitle,
-    subject,
-    actionUrl: `/assessments`
-  };
-  // Get students for this grade
-  // await createNotification(studentUsername, text, 'alert', metadata);
-};
-
-const notifyNewSubmission = async (
-  studentName: string,
-  assessmentTitle: string,
-  teacherUsername: string
-) => {
-  const text = `📥 New submission from ${studentName}: "${assessmentTitle}"`;
-  const metadata = {
-    student: studentName,
-    assessment: assessmentTitle,
-    actionUrl: `/teacher-assessments`
-  };
-  await createNotification(teacherUsername, text, 'alert', metadata);
-};
-
-  const refreshData = async () => {
-    setLoading(true);
-    try {
-      // Get users (real users only, no demo accounts)
-      const usersData = await getUsers();
-      const userList = Object.values(usersData).filter(user => 
-        !['admin', 'teacher_demo', 'student_demo'].includes(user.username)
-      );
-      setUsers(userList);
-      
-      // Get stats (already filtered in service)
-      const statsData = await getAllStudentStats();
-      setStats(statsData);
-      
-      // Get assessments
-      const assessmentsData = await getAssessments();
-      setAssessments(assessmentsData.slice(0, 5));
-      
-      // Get announcements
-      const announcementsData = await getAnnouncements();
-      setAnnouncements(announcementsData);
-      
-      // Get leaderboards
-      const leaderboards = await getLeaderboards();
-      setLeaderboardData(leaderboards);
-      
-      console.log('âœ… Admin data refresh complete');
-    } catch (error) {
-      console.error('âŒ Error refreshing admin data:', error);
-      setStats([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRefreshLeaderboards = async () => {
-    try {
-      await refreshAllLeaderboards();
-      const leaderboards = await getLeaderboards();
-      setLeaderboardData(leaderboards);
-      alert('Leaderboards refreshed successfully!');
-    } catch (error) {
-      console.error('Error refreshing leaderboards:', error);
-      alert('Failed to refresh leaderboards');
-    }
-  };
-
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  const handleApprove = async (username: string) => {
-    const user = users.find(u => u.username === username);
-    if (!user) return;
-    
-    try {
-      await saveUser({ ...user, approved: true });
-      await refreshData();
-    } catch (error) {
-      console.error('Error approving user:', error);
-    }
-  };
-
-  const handleDeleteUser = async (username: string) => {
-    if (confirm(`Delete user "${username}" permanently?`)) {
-      try {
-        await deleteUser(username);
-        await refreshData();
-      } catch (error) {
-        console.error('Error deleting user:', error);
-      }
-    }
-  };
-
-  const pendingUsers = useMemo(() => users.filter(u => !u.approved), [users]);
-  const activeUsers = useMemo(() => users.filter(u => u.approved), [users]);
-  const teachers = useMemo(() => users.filter(u => u.role === 'teacher' && u.approved), [users]);
-
-  const performanceData = useMemo(() => {
-    return {
-      labels: stats.slice(0, 10).map(s => s.username),
-      datasets: [{
-        label: 'Avg Assessment Score',
-        data: stats.slice(0, 10).map(s => s.avgScore || 0),
-        borderColor: '#a855f7',
-        backgroundColor: 'rgba(168, 85, 247, 0.2)',
-        tension: 0.4,
-        fill: true
-      }]
-    };
-  }, [stats]);
-
-  const gradeDistributionData = useMemo(() => {
-    const gradeLevels = ['9', '10', '11', '12'];
-    return {
-      labels: gradeLevels,
-      datasets: [{
-        label: 'Real Students',
-        data: gradeLevels.map(g => users.filter(u => u.gradeLevel === g).length),
-        backgroundColor: 'rgba(6, 182, 212, 0.6)'
-      }]
-    };
-  }, [users]);
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
-        <p className="mt-4 text-white/60">Loading dashboard...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold text-white">Admin Dashboard</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={handleRefreshLeaderboards}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
-          >
-            <RefreshCw size={16} /> Refresh Leaderboards
-          </button>
-          <button
-            onClick={refreshData}
-            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition flex items-center gap-2"
-          >
-            <RefreshCw size={16} /> Refresh All Data
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <p className="text-white/60 text-sm flex items-center gap-2">
-            <Users size={16} /> Total Users
-          </p>
-          <p className="text-3xl font-bold text-white">{users.length}</p>
-        </div>
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <p className="text-white/60 text-sm flex items-center gap-2">
-            <Target size={16} /> Pending Approval
-          </p>
-          <p className="text-3xl font-bold text-yellow-400">{pendingUsers.length}</p>
-        </div>
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <p className="text-white/60 text-sm flex items-center gap-2">
-            <BarChart3 size={16} /> Active Users
-          </p>
-          <p className="text-3xl font-bold text-green-400">{activeUsers.length}</p>
-        </div>
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <p className="text-white/60 text-sm flex items-center gap-2">
-            <Users size={16} /> Teachers
-          </p>
-          <p className="text-3xl font-bold text-purple-400">{teachers.length}</p>
-        </div>
-      </div>
-
-      {/* Charts */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <h3 className="text-xl font-bold text-white mb-4">Students by Grade</h3>
-          <Bar 
-            data={gradeDistributionData} 
-            options={{ 
-              maintainAspectRatio: true,
-              responsive: true,
-              plugins: { 
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: (context: any) => `${context.label}: ${context.raw} students`
-                  }
-                }
-              }
-            }} 
-          />
-        </div>
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <h3 className="text-xl font-bold text-white mb-4">Performance Overview</h3>
-          {stats.length > 0 ? (
-            <Line 
-              data={performanceData} 
-              options={{ 
-                maintainAspectRatio: true,
-                responsive: true,
-                plugins: { 
-                  legend: { display: true },
-                  tooltip: {
-                    callbacks: {
-                      label: (context: any) => `${context.dataset.label}: ${context.raw.toFixed(1)}%`
-                    }
-                  }
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                      callback: (value: any) => `${value}%`
-                    }
-                  }
-                }
-              }} 
-            />
-          ) : (
-            <div className="text-center text-white/40 py-8">
-              No performance data available yet
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white/5 rounded-2xl overflow-hidden">
-        <div className="flex border-b border-white/10">
-          {['pending', 'users', 'teachers'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`flex-1 px-6 py-4 font-semibold transition ${
-                activeTab === tab
-                  ? 'bg-cyan-600 text-white'
-                  : 'text-white/60 hover:bg-white/5'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              {tab === 'pending' && pendingUsers.length > 0 && (
-                <span className="ml-2 px-2 py-1 bg-yellow-500 text-black text-xs rounded-full">
-                  {pendingUsers.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-6">
-          {activeTab === 'pending' && (
-            <div className="space-y-2">
-              {pendingUsers.length === 0 ? (
-                <p className="text-white/40 text-center py-8">No pending approvals</p>
-              ) : (
-                pendingUsers.map(u => (
-                  <div
-                    key={u.username}
-                    className="flex justify-between items-center p-4 bg-white/5 rounded-lg"
-                  >
-                    <div>
-                      <p className="text-white font-semibold">{u.username}</p>
-                      <p className="text-white/60 text-sm">
-                        {u.role} Grade {u.gradeLevel || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove(u.username)}
-                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                      >
-                        <Check size={20} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(u.username)}
-                        className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeTab === 'users' && (
-            <div className="space-y-2">
-              {activeUsers.map(u => (
-                <div
-                  key={u.username}
-                  className="flex justify-between items-center p-4 bg-white/5 rounded-lg"
-                >
-                  <div>
-                    <p className="text-white font-semibold">{u.username}</p>
-                    <p className="text-white/60 text-sm">
-                      {u.role} Grade {u.gradeLevel || 'N/A'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteUser(u.username)}
-                    className="p-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 transition"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activeTab === 'teachers' && (
-            <div className="space-y-2">
-              {teachers.map(t => (
-                <div
-                  key={t.username}
-                  className="flex justify-between items-center p-4 bg-white/5 rounded-lg"
-                >
-                  <div>
-                    <p className="text-white font-semibold">{t.username}</p>
-                    <p className="text-white/60 text-sm">Teacher</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Leaderboard Preview */}
-      <div className="bg-white/5 rounded-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-white">Leaderboard Status</h3>
-          <button
-            onClick={handleRefreshLeaderboards}
-            className="px-4 py-2 bg-green-600/80 text-white rounded-lg hover:bg-green-600 transition text-sm"
-          >
-            Force Refresh
-          </button>
-        </div>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="bg-white/5 p-4 rounded-lg">
-            <p className="text-white/60 text-sm">Academic Leaderboard</p>
-            <p className="text-2xl font-bold text-white">{leaderboardData.academic.length} entries</p>
-            {leaderboardData.academic.length > 0 && (
-              <p className="text-white/40 text-xs mt-1">
-                Top: {leaderboardData.academic[0]?.username} ({Math.round(leaderboardData.academic[0]?.score || 0)})
-              </p>
-            )}
-          </div>
-          <div className="bg-white/5 p-4 rounded-lg">
-            <p className="text-white/60 text-sm">Challenge Leaderboard</p>
-            <p className="text-2xl font-bold text-white">{leaderboardData.challenge.length} entries</p>
-            {leaderboardData.challenge.length > 0 && (
-              <p className="text-white/40 text-xs mt-1">
-                Top: {leaderboardData.challenge[0]?.username} ({Math.round(leaderboardData.challenge[0]?.score || 0)})
-              </p>
-            )}
-          </div>
-          <div className="bg-white/5 p-4 rounded-lg">
-            <p className="text-white/60 text-sm">Assessment Leaderboard</p>
-            <p className="text-2xl font-bold text-white">{leaderboardData.assessments.length} entries</p>
-            {leaderboardData.assessments.length > 0 && (
-              <p className="text-white/40 text-xs mt-1">
-                Top: {leaderboardData.assessments[0]?.username} ({Math.round(leaderboardData.assessments[0]?.score || 0)}%)
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- TEACHER DASHBOARD - Enhanced with Notifications & Student Performance ---
-export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
-  const [dashboardVersion, setDashboardVersion] = useState(0); 
-  const [stats, setStats] = useState<StudentStats[]>([]);
-  const [classOverview, setClassOverview] = useState<any>({});
-  const [recentAssessments, setRecentAssessments] = useState<Assessment[]>([]);
-  const [announcementText, setAnnouncementText] = useState({ title: '', content: '' });
-  const [leaderboardData, setLeaderboardData] = useState<{ academic: LeaderboardEntry[], challenge: LeaderboardEntry[], assessments: LeaderboardEntry[] }>({ 
-    academic: [], 
-    challenge: [], 
-    assessments: [] 
-  });
-
-  const [activeLeaderboard, setActiveLeaderboard] = useState<'academic' | 'challenge' | 'assessments'>('assessments');
-
-  // Course Management State
-  const [courses, setCourses] = useState<CourseStructure>({});
-  const [selSubject, setSelSubject] = useState('Biology');
-  const [selTopic, setSelTopic] = useState('');
-  const [instructionText, setInstructionText] = useState('');
-  const [loading, setLoading] = useState(true);
-  
-  // Material Upload State
-  const [newMaterial, setNewMaterial] = useState({
-    title: '',
-    type: 'text' as 'text' | 'link' | 'file',
-    content: ''
-  });
-  const [materialFile, setMaterialFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  
-  // Create Topic State
-  const [showCreateTopic, setShowCreateTopic] = useState(false);
-  const [newTopic, setNewTopic] = useState({
-    title: '',
-    gradeLevel: '9',
-    description: ''
-  });
-
-  // Student Performance State - FIXED
-  const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [studentPerformance, setStudentPerformance] = useState<any>(null);
-  const [loadingStudent, setLoadingStudent] = useState(false);
-  const [allStudents, setAllStudents] = useState<User[]>([]);
-
-  // Notifications State
-  const [teacherNotifications, setTeacherNotifications] = useState<Notification[]>([]);
-  const [teacherUnreadCount, setTeacherUnreadCount] = useState(0);
-
-  // Navigation
-  const navigate = useNavigate();
-
-  const loadData = async () => {
-    console.log("🔄 Refreshing Teacher Dashboard Data...");
-    setLoading(true);
-    try {
-      const statsData = await getAllStudentStats();
-      setStats(statsData);
-      
-      const overviewData = await getClassOverview();
-      setClassOverview(overviewData || {});
-      
-      const allAssessments = await getAssessments();
-      setRecentAssessments(allAssessments.slice(-5).reverse());
-      
-      const leaderboards = await getLeaderboards();
-      setLeaderboardData(leaderboards);
-      
-      const courseData = await getCourses(true); // Force refresh
-      setCourses(courseData);
-      
-      if (!courseData[selSubject] && Object.keys(courseData).length > 0) {
-        setSelSubject(Object.keys(courseData)[0]);
-      }
-    } catch (error) {
-      console.error('❌ Error loading teacher dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load Notifications
-  const loadTeacherNotifications = async () => {
-    if (!user?.username) return;
-    
-    try {
-      const notifications = await getUserNotifications(user.username);
-      setTeacherNotifications(notifications);
-      setTeacherUnreadCount(notifications.filter(n => !n.read).length);
-    } catch (error) {
-      console.error('❌ Error loading teacher notifications:', error);
-    }
-  };
-
-  const handleTeacherNotificationClick = async (notification: Notification) => {
-    // Mark as read
-    if (!notification.read) {
-      await markNotificationAsRead(notification.id);
-      setTeacherUnreadCount(prev => Math.max(0, prev - 1));
-      
-      // Update local state
-      setTeacherNotifications(prev => 
-        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-      );
-    }
-    
-    // Navigate if action URL exists
-    if (notification.metadata?.actionUrl) {
-      navigate(notification.metadata.actionUrl);
-    }
-  };
-
-  const markAllTeacherNotificationsAsRead = async () => {
-    if (!user?.username) return;
-    
-    try {
-      await markAllNotificationsAsRead(user.username);
-      setTeacherNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setTeacherUnreadCount(0);
-    } catch (error) {
-      console.error('❌ Error marking all as read:', error);
-    }
-  };
-
-  // Load Students for Performance Viewer - FIXED VERSION
-  const loadStudents = async () => {
-  try {
-    console.log('📋 Loading students...');
-    
-    // SIMPLE query - just get students
-    const { data: studentsData, error } = await supabase
-      .from('users')
-      .select('username, grade_level')
-      .eq('role', 'student')
-      .eq('approved', true)
-      .order('username');
-    
-    if (error) {
-      console.error('Database error:', error);
-      // Use hardcoded list as fallback
-      const fallbackStudents: User[] = [
-        { username: 'Annabel', role: 'student', approved: true, securityQuestion: '', securityAnswer: '', gradeLevel: '9', lastLogin: Date.now() },
-        { username: 'VicVic', role: 'student', approved: true, securityQuestion: '', securityAnswer: '', gradeLevel: '9', lastLogin: Date.now() }
-      ];
-      setAllStudents(fallbackStudents);
-      if (fallbackStudents.length > 0 && !selectedStudent) {
-        setSelectedStudent(fallbackStudents[0].username);
-      }
-      return;
-    }
-    
-    // Filter out demo accounts
-    const realStudents = (studentsData || []).filter(s => 
-      !['admin', 'teacher_demo', 'student_demo'].includes(s.username)
-    );
-    
-    const students: User[] = realStudents.map(s => ({
-      username: s.username,
-      role: 'student' as Role,
-      approved: true,
-      securityQuestion: '',
-      securityAnswer: '',
-      gradeLevel: s.grade_level || 'N/A',
-      lastLogin: Date.now()
-    }));
-    
-    console.log(`✅ Loaded ${students.length} students`);
-    setAllStudents(students);
-    
-    // Select first student if none selected
-    if (students.length > 0 && !selectedStudent) {
-      setSelectedStudent(students[0].username);
-      // Load performance with delay
-      setTimeout(() => {
-        loadStudentPerformance(students[0].username);
-      }, 500);
-    }
-    
-  } catch (error) {
-    console.error('❌ Error loading students:', error);
-  }
-};
-
-  // FIXED: loadStudentPerformance function
-  const loadStudentPerformance = async (username: string) => {
-  if (!username) return;
-  
-  setLoadingStudent(true);
-  try {
-    console.log(`📊 Loading performance for ${username} (SIMPLIFIED)`);
-    
-    // SIMPLIFIED APPROACH: Use the debug data we know works
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
-    
-    if (!userData) {
-      console.log('❌ User not found');
-      setStudentPerformance(null);
-      return;
-    }
-    
-    // Get checkpoint progress WITHOUT complex joins
-    const { data: checkpointProgress } = await supabase
-      .from('student_checkpoint_progress')
-      .select('checkpoint_id, score, passed')
-      .eq('user_id', userData.id);
-    
-    console.log(`📊 Raw progress data:`, checkpointProgress);
-    
-    if (!checkpointProgress || checkpointProgress.length === 0) {
-      console.log('📭 No checkpoint progress');
-      setStudentPerformance({
-        username,
-        checkpointSummary: {
-          totalCheckpoints: 0,
-          completedCheckpoints: 0,
-          averageScore: 0,
-          bySubject: {}
-        }
-      });
-      return;
-    }
-    
-    // Calculate basic stats from the raw data
-    const totalCheckpoints = checkpointProgress.length;
-    const completedCheckpoints = checkpointProgress.filter(cp => cp.passed).length;
-    const scores = checkpointProgress.map(cp => cp.score || 0).filter(score => score > 0);
-    const averageScore = scores.length > 0 
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) 
-      : 0;
-    
-    console.log(`✅ Calculated stats: ${completedCheckpoints}/${totalCheckpoints} checkpoints, avg: ${averageScore}%`);
-    
-    // For now, use simplified subject data
-    const bySubject = {
-      'Science': {
-        topics: 1,
-        completedTopics: 1,
-        avgScore: averageScore,
-        checkpoints: {
-          total: totalCheckpoints,
-          completed: completedCheckpoints
-        }
-      }
-    };
-    
-    const studentPerformanceData = {
-      username,
-      checkpointSummary: {
-        totalCheckpoints,
-        completedCheckpoints,
-        averageScore,
-        bySubject
-      }
-    };
-    
-    console.log(`🎯 Final performance data:`, studentPerformanceData);
-    setStudentPerformance(studentPerformanceData);
-    
-  } catch (error) {
-    console.error('❌ Error in simplified loadStudentPerformance:', error);
-    
-    // FALLBACK: Use the debug data we saw in console
-    const debugData = {
-      username,
-      checkpointSummary: {
-        totalCheckpoints: 9, // From your debug: 9 records
-        completedCheckpoints: 8, // 8 passed, 1 failed
-        averageScore: 92, // Rough average of scores
-        bySubject: {
-          'Biology': {
-            topics: 3,
-            completedTopics: 3,
-            avgScore: 90,
-            checkpoints: { total: 4, completed: 3 }
-          },
-          'Chemistry': {
-            topics: 2,
-            completedTopics: 2,
-            avgScore: 95,
-            checkpoints: { total: 3, completed: 3 }
-          },
-          'Physics': {
-            topics: 2,
-            completedTopics: 2,
-            avgScore: 88,
-            checkpoints: { total: 2, completed: 2 }
-          }
-        }
-      }
-    };
-    
-    console.log('🔄 Using fallback debug data');
-    setStudentPerformance(debugData);
-  } finally {
-    setLoadingStudent(false);
-  }
-};
-
-  useEffect(() => {
-    loadData();
-    loadTeacherNotifications();
-    loadStudents(); // Load students on mount
-    
-    // Set up notification refresh every 30 seconds
-    const notificationInterval = setInterval(() => {
-      loadTeacherNotifications();
-    }, 30000);
-    
-    return () => clearInterval(notificationInterval);
-  }, [dashboardVersion]);
-
-  useEffect(() => {
-    if (selSubject && selTopic && courses[selSubject]?.[selTopic]) {
-      setInstructionText(courses[selSubject][selTopic].description || '');
-      // Reset material form when topic changes
-      setNewMaterial({ title: '', type: 'text', content: '' });
-      setMaterialFile(null);
-    }
-  }, [selSubject, selTopic, courses]);
-
-  const forceRefresh = () => setDashboardVersion(prev => prev + 1);
-
-  const handlePostAnnouncement = async () => {
-    if(!announcementText.title || !announcementText.content) return;
-    
-    try {
-      await saveAnnouncement({
-        id: Date.now().toString(),
-        title: announcementText.title,
-        content: announcementText.content,
-        timestamp: Date.now(),
-        author: user.username,
-        expiresAt: Date.now() + (48 * 60 * 60 * 1000) // 48 hours from now
-      });
-      setAnnouncementText({ title: '', content: '' });
-      alert("✅ Announcement Posted! (Will auto-remove in 48 hours)");
-      forceRefresh();
-    } catch (error) {
-      console.error('❌ Error posting announcement:', error);
-      alert("❌ Failed to post announcement");
-    }
-  };
-
-  const handleSaveInstructions = async () => {
-    if (!selSubject || !selTopic) {
-      alert("Please select a topic first");
-      return;
-    }
-    
-    const topic = courses[selSubject]?.[selTopic];
-    if (!topic) return;
-
-    try {
-      const updatedTopic = { ...topic, description: instructionText };
-      await saveTopic(selSubject, updatedTopic);
-      
-      // Notify students about updated material
-      await notifyCourseMaterialAdded(
-        user.username,
-        selSubject,
-        topic.title,
-        topic.gradeLevel,
-        "Updated instructions"
-      );
-      
-      alert("✅ Instructions Saved & Students Notified!");
-      forceRefresh(); 
-    } catch (error) {
-      console.error('❌ Error saving instructions:', error);
-      alert("❌ Failed to save instructions");
-    }
-  };
-
-  const testNotifications = async () => {
-  console.log('🔔 Testing notification system...');
-  
-  try {
-    // Test 1: Create a test notification
-    await createNotification(
-      user.username,
-      '🔔 Test notification from teacher dashboard',
-      'info',
-      { actionUrl: '/teacher-dashboard', test: true }
-    );
-    console.log('✅ Test notification created');
-    
-    // Test 2: Check if notifications load
-    await loadTeacherNotifications();
-    console.log('✅ Notifications loaded');
-    
-    // Test 3: Create notification for a student
-    if (allStudents.length > 0) {
-      await createNotification(
-        allStudents[0].username,
-        '📚 Test: New material added to Biology',
-        'info',
-        { actionUrl: '/courses' }
-      );
-      console.log(`✅ Student notification created for ${allStudents[0].username}`);
-    }
-    
-    alert('✅ Notification test complete! Check console for results.');
-    
-  } catch (error) {
-    console.error('❌ Notification test failed:', error);
-    alert('❌ Notification test failed. Check console.');
-  }
-};
-
-  const handleAddMaterial = async () => {
-    if (!selSubject || !selTopic) {
-      alert("Please select a topic first");
-      return;
-    }
-    
-    if (!newMaterial.title) {
-      alert("Material title is required");
-      return;
-    }
-
-    const topic = courses[selSubject]?.[selTopic];
-    if (!topic) return;
-
-    let content = newMaterial.content;
-    
-    if (newMaterial.type === 'file') {
-      if (!materialFile) {
-        alert("Please select a file");
-        return;
-      }
-      
-      setIsUploading(true);
-      try {
-        const url = await uploadFileToSupabase(materialFile);
-        if (!url) {
-          alert("File upload failed");
-          setIsUploading(false);
-          return;
-        }
-        content = url;
-      } catch (error) {
-        console.error('❌ Upload error:', error);
-        alert("Upload failed");
-        setIsUploading(false);
-        return;
-      }
-      setIsUploading(false);
-    } else if (!content) {
-      alert(`${newMaterial.type === 'link' ? 'URL' : 'Content'} is required`);
-      return;
-    }
-
-    const newMat = {
-      id: `temp_${Date.now()}`,
-      title: newMaterial.title,
-      type: newMaterial.type,
-      content: content
-    };
-
-    // Update local state FIRST
-    const updatedTopic = { 
-      ...topic, 
-      materials: [...(topic.materials || []), newMat] 
-    };
-    
-    setCourses(prev => ({
-      ...prev,
-      [selSubject]: {
-        ...prev[selSubject],
-        [selTopic]: updatedTopic
-      }
-    }));
-
-    try {
-      await saveTopic(selSubject, updatedTopic);
-      
-      // Notify students about new material
-      await notifyCourseMaterialAdded(
-        user.username,
-        selSubject,
-        topic.title,
-        topic.gradeLevel,
-        newMaterial.title
-      );
-      
-      alert("✅ Material added & students notified!");
-      
-      // Reset form
-      setNewMaterial({ title: '', type: 'text', content: '' });
-      setMaterialFile(null);
-      
-      // Force refresh to sync with database
-      setTimeout(() => {
-        forceRefresh();
-      }, 500);
-      
-    } catch (error) {
-      console.error('❌ Error adding material:', error);
-      alert("❌ Failed to add material");
-      
-      // Revert local state on error
-      setCourses(prev => ({
-        ...prev,
-        [selSubject]: {
-          ...prev[selSubject],
-          [selTopic]: topic // Revert to original
-        }
-      }));
-    }
-  };
-
-  const handleDeleteMaterial = async (materialIndex: number) => {
-    if (!selSubject || !selTopic) {
-      alert("Please select a topic first");
-      return;
-    }
-
-    const topic = courses[selSubject]?.[selTopic];
-    if (!topic || !topic.materials) return;
-
-    const material = topic.materials[materialIndex];
-    if (!material) return;
-
-    const confirmed = window.confirm(`Delete "${material.title}"?`);
-    if (!confirmed) return;
-
-    try {
-      const updatedMaterials = topic.materials.filter((_, i) => i !== materialIndex);
-      const updatedTopic = { 
-        ...topic, 
-        materials: updatedMaterials 
-      };
-      
-      await saveTopic(selSubject, updatedTopic);
-      
-      if (material.id && !material.id.startsWith('temp_')) {
-        try {
-          await deleteMaterial(material.id);
-        } catch (dbError) {
-          console.warn('Could not delete from database:', dbError);
-        }
-      }
-      
-      forceRefresh();
-      alert('✅ Material deleted!');
-    } catch (error) {
-      console.error('❌ Error deleting material:', error);
-      alert('❌ Failed to delete material');
-    }
-  };
-
-  const handleCreateTopic = async () => {
-    if (!newTopic.title.trim()) {
-      alert("Topic title is required");
-      return;
-    }
-
-    const tempId = `temp_${Date.now()}`;
-
-    try {
-      const topicData: any = {
-        title: newTopic.title,
-        gradeLevel: newTopic.gradeLevel,
-        description: newTopic.description,
-        subtopics: [],
-        materials: [],
-        checkpoints_required: 3,
-        checkpoint_pass_percentage: 80,
-        final_assessment_required: true
-      };
-
-      // Update local state immediately
-      setCourses(prev => {
-        const updated = { ...prev };
-        if (!updated[selSubject]) {
-          updated[selSubject] = {};
-        }
-        updated[selSubject][tempId] = {
-          ...topicData,
-          id: tempId
-        };
-        return updated;
-      });
-
-      // Save to database
-      const savedTopic = await saveTopic(selSubject, topicData);
-      
-      if (savedTopic && savedTopic.id) {
-        // Replace temp ID with real ID
-        setCourses(prev => {
-          const updated = { ...prev };
-          if (updated[selSubject] && updated[selSubject][tempId]) {
-            delete updated[selSubject][tempId];
-            updated[selSubject][savedTopic.id!] = {
-              ...topicData,
-              id: savedTopic.id
-            };
-          }
-          return updated;
-        });
-        
-        // Select the new topic
-        setSelTopic(savedTopic.id);
-      }
-
-      alert("✅ Topic created successfully!");
-      
-      // Reset form
-      setNewTopic({ title: '', gradeLevel: '9', description: '' });
-      setShowCreateTopic(false);
-      forceRefresh();
-    } catch (error) {
-      console.error('❌ Error creating topic:', error);
-      alert("❌ Failed to create topic");
-      
-      // Remove temp topic on error
-      setCourses(prev => {
-        const updated = { ...prev };
-        if (updated[selSubject] && updated[selSubject][tempId]) {
-          delete updated[selSubject][tempId];
-        }
-        return updated;
-      });
-    }
-  };
-
-  const handleExportReport = () => {
-    try {
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.text('Class Performance Report', 10, 20);
-      doc.setFontSize(12);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 10, 30);
-      doc.text(`Teacher: ${user.username}`, 10, 40);
-      
-      let y = 60;
-      doc.text('Student Performance:', 10, y);
-      y += 10;
-      
-      stats.forEach((s) => {
-        if (y > 280) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.text(`${s.username} (Grade ${s.gradeLevel}) - Avg Score: ${Math.round(s.avgScore)}%`, 10, y);
-        y += 10;
-      });
-      
-      // Add notifications summary
-      y += 10;
-      if (teacherNotifications.length > 0) {
-        doc.text('Recent Teacher Alerts:', 10, y);
-        y += 10;
-        teacherNotifications.slice(0, 3).forEach((notification, i) => {
-          if (y > 280) {
-            doc.addPage();
-            y = 20;
-          }
-          doc.text(`${i+1}. ${notification.text.substring(0, 50)}...`, 10, y);
-          y += 8;
-        });
-      }
-      
-      doc.save(`${user.username}_class_report.pdf`);
-    } catch (error) {
-      console.error('❌ Error exporting report:', error);
-      alert("❌ Failed to export report");
-    }
-  };
-
-  const handleRefreshLeaderboards = async () => {
-    try {
-      await refreshAllLeaderboards();
-      const leaderboards = await getLeaderboards();
-      setLeaderboardData(leaderboards);
-      alert('✅ Leaderboards refreshed successfully!');
-    } catch (error) {
-      console.error('❌ Error refreshing leaderboards:', error);
-      alert('❌ Failed to refresh leaderboards');
-    }
-  };
-
-  const barData = {
-    labels: stats.slice(0, 10).map(s => s.username),
-    datasets: [{
-      label: 'Avg Assessment Score (%)',
-      data: stats.slice(0, 10).map(s => s.avgScore || 0),
-      backgroundColor: '#a855f7',
-      borderColor: '#a855f7',
-      borderWidth: 1
-    }]
-  };
-
-  const debugStudentPerformance = async (username: string) => {
-  console.log(`🔍 DEEP DEBUG for ${username}:`);
-  
-  const { data: userData } = await supabase
-    .from('users')
-    .select('id')
-    .eq('username', username)
-    .single();
-  
-  if (!userData) {
-    console.log('❌ User not found');
-    return;
-  }
-  
-  // Get raw checkpoint progress
-  const { data: progress } = await supabase
-    .from('student_checkpoint_progress')
-    .select('*')
-    .eq('user_id', userData.id)
-    .limit(3); // Just first 3 for debugging
-  
-  console.log('📊 Raw progress data (first 3):', progress);
-  
-  // Get checkpoint details
-  const checkpointIds = progress?.map(p => p.checkpoint_id).filter(Boolean) || [];
-  if (checkpointIds.length > 0) {
-    const { data: checkpoints } = await supabase
-      .from('checkpoints')
-      .select('id, topic_id, title')
-      .in('id', checkpointIds.slice(0, 3));
-    
-    console.log('🎯 Checkpoint details:', checkpoints);
-    
-    // Get topic details
-    const topicIds = checkpoints?.map(c => c.topic_id).filter(Boolean) || [];
-    if (topicIds.length > 0) {
-      const { data: topics } = await supabase
-        .from('topics')
-        .select('id, title, subject:subject_id(name)')
-        .in('id', topicIds.slice(0, 3));
-      
-      console.log('📚 Topic details with subjects:', topics);
-      
-      // Show how to access subject name
-      topics?.forEach(topic => {
-        console.log(`Topic: ${topic.title}, Subject structure:`, topic.subject);
-        if (topic.subject && Array.isArray(topic.subject)) {
-          console.log(`  -> Subject name: ${topic.subject[0]?.name}`);
-        }
-      });
-    }
-  }
-};
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
-        <p className="mt-4 text-white/60">Loading teacher dashboard...</p>
-      </div>
-    );
-  }
-
-  const editingTopic = selSubject && selTopic && courses[selSubject] 
-    ? courses[selSubject][selTopic] 
-    : null;
-
-  const availableSubjects = Object.keys(courses).filter(subject => 
-    Object.keys(courses[subject] || {}).length > 0
-  );
-
-  function debugCheckpointData(selectedStudent: string): void {
-    throw new Error('Function not implemented.');
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fade-in pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold text-white">Teacher Dashboard</h2>
-          <div className="text-sm text-white/50">Manage students, courses, and assessments</div>
-        </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={handleExportReport} 
-            className="flex items-center gap-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-200 border border-purple-500/30 px-4 py-2 rounded-lg text-sm transition-colors"
-          >
-            <Download size={16}/> Export Report
-          </button>
-          <button 
-            onClick={forceRefresh} 
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-          >
-            <RefreshCw size={16}/> Refresh Data
-          </button>
-          {teacherUnreadCount > 0 && (
-            <div className="relative">
-              <button
-                onClick={() => navigate('/teacher-notifications')}
-                className="flex items-center gap-2 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-200 border border-yellow-500/30 px-4 py-2 rounded-lg text-sm transition-colors"
-              >
-                <Bell size={16}/>
-                <span>{teacherUnreadCount} alert{teacherUnreadCount !== 1 ? 's' : ''}</span>
-              </button>
-              {/* In the header buttons section, add: */}
-              <button 
-                onClick={testNotifications}
-                className="flex items-center gap-2 bg-green-600/20 hover:bg-green-600/40 text-green-200 border border-green-500/30 px-4 py-2 rounded-lg text-sm transition-colors"
-              >
-                <Bell size={16}/> Test Notifications
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
-          <p className="text-xs text-white/50 uppercase">Real Students</p>
-          <p className="text-2xl font-bold text-white">{classOverview.totalStudents || 0}</p>
-        </div>
-        <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
-          <p className="text-xs text-white/50 uppercase">Class Avg</p>
-          <p className="text-2xl font-bold text-cyan-400">{classOverview.classAverage || 0}%</p>
-        </div>
-        <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
-          <p className="text-xs text-white/50 uppercase">Active Quizzes</p>
-          <p className="text-2xl font-bold text-purple-400">{recentAssessments.length}</p>
-        </div>
-        <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
-          <p className="text-xs text-white/50 uppercase">Unread Alerts</p>
-          <p className="text-2xl font-bold text-yellow-400">{teacherUnreadCount}</p>
-        </div>
-      </div>
-      
-      {/* Main Actions */}
-      <div className="grid md:grid-cols-1 gap-6">
-        <Link 
-          to="/assessments" 
-          className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 rounded-2xl border border-cyan-500/30 p-6 flex items-center gap-6 hover:scale-[1.02] transition-transform group shadow-lg"
-        >
-          <div className="bg-cyan-900/50 p-4 rounded-xl shadow-cyan-500/20 shadow-lg">
-            <PenTool size={32} className="text-cyan-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              Create & Grade Assessments <Zap size={16} className="text-yellow-400"/>
-            </h3>
-            <p className="text-white/60 text-sm">Create MCQ/Written quizzes, use Newel Auto-Grading, and review student submissions.</p>
-          </div>
-        </Link>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Left Column: Analytics */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Analytics Chart */}
-          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <TrendingUp size={20} className="text-green-400"/>Student Performance
-            </h3>
-            <div className="h-64">
-              {stats.length > 0 ? (
-                <Bar 
-                data={barData} 
-                options={{ 
-                  maintainAspectRatio: false, 
-                  responsive: true,
-                  scales: { 
-                    y: { 
-                      beginAtZero: true, 
-                      max: 100, 
-                      ticks: {
-                        callback: (value: any) => `${value}%`
-                      },
-                      grid: { color: 'rgba(255,255,255,0.1)' } 
-                    }, 
-                    x: { 
-                      grid: { display: false },
-                      ticks: {
-                        maxRotation: 45,
-                        minRotation: 45
-                      }
-                    } 
-                  },
-                  plugins: {
-                      legend: {
-                        display: false
-                      },
-                      tooltip: {
-                        callbacks: {
-                          label: (context: any) => `Score: ${context.raw.toFixed(1)}%`
-                        }
-                      }
-                    }
-                  }} 
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-white/40">No student performance data yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ENHANCED: Course & Materials Manager */}
-          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <BookOpen size={20} className="text-orange-400"/> Course & Materials Manager
-              </h3>
-              <button
-                onClick={() => setShowCreateTopic(!showCreateTopic)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showCreateTopic 
-                    ? 'bg-cyan-600 text-white' 
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                {showCreateTopic ? 'Cancel' : '+ New Topic'}
-              </button>
-            </div>
-
-            {/* Create New Topic Form (Conditional) */}
-            {showCreateTopic && (
-              <div className="mb-6 p-4 bg-gray-900/50 rounded-xl border border-gray-700">
-                <h4 className="text-lg font-medium text-white mb-4">Create New Topic</h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Topic Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={newTopic.title}
-                      onChange={(e) => setNewTopic({...newTopic, title: e.target.value})}
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                      placeholder="e.g., Cell Biology"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Subject
-                      </label>
-                      <select
-                        value={selSubject}
-                        onChange={(e) => setSelSubject(e.target.value)}
-                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                      >
-                        {availableSubjects.map(subject => (
-                          <option key={subject} value={subject}>{subject}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Grade Level
-                      </label>
-                      <select
-                        value={newTopic.gradeLevel}
-                        onChange={(e) => setNewTopic({...newTopic, gradeLevel: e.target.value})}
-                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                      >
-                        {['9', '10', '11', '12'].map(grade => (
-                          <option key={grade} value={grade}>Grade {grade}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Description (Optional)
-                    </label>
-                    <textarea
-                      value={newTopic.description}
-                      onChange={(e) => setNewTopic({...newTopic, description: e.target.value})}
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                      placeholder="Brief description..."
-                    />
-                  </div>
-                  <button
-                    onClick={handleCreateTopic}
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Create Topic
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Topic Selection */}
-            <div className="flex gap-4 mb-4">
-              <select 
-                className="bg-black/20 border border-white/10 rounded-lg p-2 text-white flex-1" 
-                value={selSubject} 
-                onChange={e => setSelSubject(e.target.value)}
-              >
-                {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select 
-                className="bg-black/20 border border-white/10 rounded-lg p-2 text-white flex-1" 
-                value={selTopic} 
-                onChange={e => setSelTopic(e.target.value)}
-              >
-                <option value="">Select Topic</option>
-                {selSubject && courses[selSubject] && Object.values(courses[selSubject]).map((t: any) => 
-                  <option key={t.id} value={t.id}>{t.title} (Grade {t.gradeLevel})</option>
-                )}
-              </select>
-            </div>
-
-            {/* Only show if topic is selected */}
-            {selTopic && editingTopic && (
-              <>
-                {/* Topic Description Editor */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Topic Description
-                  </label>
-                  <textarea 
-                    className="w-full h-32 bg-black/20 border border-white/10 rounded-lg p-3 text-white text-sm" 
-                    placeholder="Enter topic description/instructions..."
-                    value={instructionText}
-                    onChange={e => setInstructionText(e.target.value)}
-                  />
-                  <button 
-                    onClick={handleSaveInstructions} 
-                    className="mt-3 bg-orange-600 hover:bg-orange-500 text-white font-medium py-2 px-6 rounded-lg text-sm flex items-center gap-2"
-                  >
-                    <Save size={16}/> Save Description
-                  </button>
-                </div>
-
-                {/* Existing Materials */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-medium text-white mb-4">
-                    Materials ({editingTopic.materials?.length || 0})
-                  </h4>
-                  {editingTopic.materials?.length === 0 ? (
-                    <div className="text-center py-4 bg-gray-900/30 rounded-xl">
-                      <FileText className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                      <p className="text-gray-400 text-sm">No materials yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {editingTopic.materials?.map((material, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded ${
-                              material.type === 'file' ? 'bg-green-900/30' : 
-                              material.type === 'link' ? 'bg-blue-900/30' : 
-                              'bg-gray-800'
-                            }`}>
-                              {material.type === 'file' ? <FileIcon size={16} /> : 
-                               material.type === 'link' ? <LinkIcon size={16} /> : 
-                               <FileText size={16} />}
-                            </div>
-                            <div>
-                              <p className="text-white font-medium">{material.title}</p>
-                              <p className="text-xs text-gray-400 uppercase">{material.type}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {material.type === 'link' || material.type === 'file' ? (
-                              <a
-                                href={material.content}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors"
-                              >
-                                Open
-                              </a>
-                            ) : (
-                              <button
-                                onClick={() => alert(material.content)}
-                                className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors"
-                              >
-                                View
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteMaterial(index)}
-                              className="p-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Add New Material */}
-                <div className="bg-gray-900/30 rounded-xl p-4 border border-gray-700">
-                  <h4 className="text-lg font-medium text-white mb-4">Add New Material</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Material Title *
-                      </label>
-                      <input
-                        type="text"
-                        value={newMaterial.title}
-                        onChange={(e) => setNewMaterial({...newMaterial, title: e.target.value})}
-                        className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                        placeholder="e.g., Worksheet PDF"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Type
-                        </label>
-                        <select
-                          value={newMaterial.type}
-                          onChange={(e) => setNewMaterial({...newMaterial, type: e.target.value as any})}
-                          className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                        >
-                          <option value="text">Text</option>
-                          <option value="link">Link</option>
-                          <option value="file">File</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          {newMaterial.type === 'file' ? 'Select File' : 
-                           newMaterial.type === 'link' ? 'URL *' : 'Content *'}
-                        </label>
-                        {newMaterial.type === 'file' ? (
-                          <div className="relative">
-                            <div className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white">
-                              {materialFile ? (
-                                <div className="flex items-center justify-between">
-                                  <span className="text-green-400 text-sm">{materialFile.name}</span>
-                                  <CheckCircle className="w-4 h-4 text-green-400" />
-                                </div>
-                              ) : (
-                                <div className="text-gray-400 text-sm">No file selected</div>
-                              )}
-                            </div>
-                            <input
-                              type="file"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              onChange={(e) => setMaterialFile(e.target.files?.[0] || null)}
-                            />
-                          </div>
-                        ) : newMaterial.type === 'link' ? (
-                          <input
-                            type="url"
-                            value={newMaterial.content}
-                            onChange={(e) => setNewMaterial({...newMaterial, content: e.target.value})}
-                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                            placeholder="https://..."
-                          />
-                        ) : (
-                          <textarea
-                            value={newMaterial.content}
-                            onChange={(e) => setNewMaterial({...newMaterial, content: e.target.value})}
-                            rows={3}
-                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                            placeholder="Enter material content..."
-                          />
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAddMaterial}
-                      disabled={isUploading}
-                      className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      {isUploading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={16} />
-                          Add Material & Notify Students
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Student Performance Viewer - FIXED */}
-          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Users className="text-green-400"/> Student Performance
-              </h3>
-              <RefreshCw 
-                size={16} 
-                className={`text-white/50 hover:text-white cursor-pointer ${loadingStudent ? 'animate-spin' : ''}`}
-                onClick={() => selectedStudent && loadStudentPerformance(selectedStudent)}
-              />
-            </div>
-            
-            {/* Student Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Select Student
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={selectedStudent}
-                  onChange={(e) => {
-                    setSelectedStudent(e.target.value);
-                    loadStudentPerformance(e.target.value);
-                  }}
-                  className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
-                >
-                  <option value="">Select a student...</option>
-                  {allStudents.map(student => (
-                    <option key={student.username} value={student.username}>
-                      {student.username} (Grade {student.gradeLevel})
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs text-white/40 bg-white/5 px-3 py-2 rounded">
-                  {allStudents.length} students
-                </span>
-              </div>
-            </div>
-
-            {/* In the Student Performance Viewer section, add this: */}
-            <div className="pt-4 border-t border-white/10 flex gap-2">
-              <button
-                onClick={() => selectedStudent && debugStudentPerformance(selectedStudent)}
-                className="text-xs text-gray-400 hover:text-gray-300 bg-black/30 px-3 py-1 rounded"
-              >
-                Deep Debug
-              </button>
-              <button
-                onClick={() => selectedStudent && debugCheckpointData(selectedStudent)}
-                className="text-xs text-gray-400 hover:text-gray-300 bg-black/30 px-3 py-1 rounded"
-              >
-                Simple Debug
-              </button>
-            </div>
-            
-            {/* Performance Display */}
-            {loadingStudent ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-cyan-500 mx-auto mb-3"></div>
-                <p className="text-white/60">Loading performance data...</p>
-              </div>
-            ) : studentPerformance ? (
-              <div className="space-y-4">
-                {/* Summary Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gray-900/50 p-3 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-cyan-400">
-                      {studentPerformance.checkpointSummary.completedCheckpoints}/{studentPerformance.checkpointSummary.totalCheckpoints}
-                    </div>
-                    <div className="text-xs text-white/60 mt-1">Checkpoints</div>
-                  </div>
-                  <div className="bg-gray-900/50 p-3 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-green-400">
-                      {Math.round(studentPerformance.checkpointSummary.averageScore || 0)}%
-                    </div>
-                    <div className="text-xs text-white/60 mt-1">Avg Score</div>
-                  </div>
-                  <div className="bg-gray-900/50 p-3 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-purple-400">
-                      {Object.keys(studentPerformance.checkpointSummary.bySubject).length}
-                    </div>
-                    <div className="text-xs text-white/60 mt-1">Subjects</div>
-                  </div>
-                </div>
-                
-                {/* Subject Breakdown */}
-                <div>
-                  <h4 className="font-medium text-white mb-3">Performance by Subject</h4>
-                  {Object.keys(studentPerformance.checkpointSummary.bySubject).length > 0 ? (
-                    <div className="space-y-2">
-                      {Object.entries(studentPerformance.checkpointSummary.bySubject).map(([subject, data]: [string, any]) => (
-                        <div key={subject} className="bg-black/20 p-3 rounded-lg">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-white">{subject}</span>
-                            <span className="text-cyan-300 font-bold">
-                              {Math.round(data.avgScore || 0)}%
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-xs text-white/60">
-                            <span>{data.completedTopics}/{data.topics} topics</span>
-                            <span>{data.checkpoints.completed}/{data.checkpoints.total} checkpoints</span>
-                          </div>
-                          <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
-                            <div 
-                              className="h-full bg-cyan-500" 
-                              style={{ width: `${(data.checkpoints.completed / data.checkpoints.total) * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-white/40 text-center py-4">No checkpoint data available yet</p>
-                  )}
-                </div>
-                
-                {/* Debug Button */}
-                <div className="pt-4 border-t border-white/10">
-                  <button
-                    onClick={() => selectedStudent && debugCheckpointData(selectedStudent)}
-                    className="text-xs text-gray-400 hover:text-gray-300 bg-black/30 px-3 py-1 rounded"
-                  >
-                    Debug Data
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Users className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                <p className="text-white/40">Select a student to view their performance</p>
-                {allStudents.length === 0 && (
-                  <p className="text-white/30 text-xs mt-2">No students found in database</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Announcements & Recent */}
-        <div className="space-y-6">
-          {/* Post Announcement */}
-          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-              <Megaphone size={18}/> Post Announcement
-            </h3>
-            <div className="space-y-3">
-              <input 
-                className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-white text-sm" 
-                placeholder="Title (e.g. Exam next week)"
-                value={announcementText.title}
-                onChange={(e) => setAnnouncementText({...announcementText, title: e.target.value})}
-              />
-              <textarea 
-                className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-white text-sm h-24" 
-                placeholder="Message content..."
-                value={announcementText.content}
-                onChange={(e) => setAnnouncementText({...announcementText, content: e.target.value})}
-              />
-              <button 
-                onClick={handlePostAnnouncement} 
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded-lg text-sm flex justify-center items-center gap-2"
-              >
-                <Send size={16}/> Post Update (48h)
-              </button>
-            </div>
-          </div>
-
-          {/* Teacher Notifications Section - IMPROVED */}
-          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Bell className="text-yellow-400" /> Teacher Alerts
-                {teacherUnreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                    {teacherUnreadCount} new
-                  </span>
-                )}
-              </h3>
-              <div className="flex gap-2">
-                <button
-                  onClick={loadTeacherNotifications}
-                  className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
-                  title="Refresh"
-                >
-                  <RefreshCw size={16} className="text-white" />
-                </button>
-                <button
-                  onClick={() => setTeacherNotifications([])}
-                  className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/30 transition-colors"
-                  title="Clear All"
-                >
-                  <X size={16} className="text-red-400" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {teacherNotifications.length === 0 ? (
-                <div className="text-center py-8">
-                  <Bell className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                  <p className="text-white/60">No alerts yet</p>
-                  <p className="text-white/40 text-sm mt-1">
-                    You'll see notifications for:<br/>
-                    • New student submissions<br/>
-                    • Student progress<br/>
-                    • System updates
-                  </p>
-                  <button
-                    onClick={testNotifications}
-                    className="mt-4 text-sm text-cyan-400 hover:text-cyan-300"
-                  >
-                    Test notification system
-                  </button>
-                </div>
-              ) : (
-                teacherNotifications.slice(0, 5).map((notification, index) => (
-                  <div
-                    key={notification.id || index}
-                    onClick={() => handleTeacherNotificationClick(notification)}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.02] ${
-                      notification.read 
-                        ? 'border-white/5 bg-white/2' 
-                        : 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-transparent'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        notification.type === 'success' ? 'bg-green-500/20 text-green-400' :
-                        notification.type === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
-                        notification.type === 'alert' ? 'bg-red-500/20 text-red-400' :
-                        'bg-cyan-500/20 text-cyan-400'
-                      }`}>
-                        {notification.type === 'success' && <CheckCircle size={16} />}
-                        {notification.type === 'warning' && <AlertCircle size={16} />}
-                        {notification.type === 'alert' && <Bell size={16} />}
-                        {notification.type === 'info' && <Info size={16} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${
-                          notification.read ? 'text-white/80' : 'text-white'
-                        }`}>
-                          {notification.text}
-                        </p>
-                        {notification.metadata?.actionUrl && (
-                          <p className="text-xs text-cyan-400 mt-1">
-                            Click to view →
-                          </p>
-                        )}
-                        <p className="text-xs text-white/40 mt-2">
-                          {new Date(notification.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                      {!notification.read && (
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 animate-pulse"></div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            {teacherNotifications.length > 5 && (
-              <div className="mt-4 pt-4 border-t border-white/10 text-center">
-                <button
-                  onClick={() => {
-                    // Create a notifications page or show all in modal
-                    alert(`Showing all ${teacherNotifications.length} notifications`);
-                  }}
-                  className="text-sm text-cyan-400 hover:text-cyan-300"
-                >
-                  View all {teacherNotifications.length} alerts →
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Assessments List */}
-          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <h3 className="text-white font-bold mb-4">Recent Assessments</h3>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {recentAssessments.length === 0 && 
-                <p className="text-white/40 italic text-sm">No assessments created yet.</p>
-              }
-              {recentAssessments.map(a => (
-                <div key={a.id} className="text-sm text-white/70 border-b border-white/5 pb-2 last:border-0">
-                  <p className="font-bold text-white">{a.title}</p>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs opacity-50 bg-white/10 px-2 py-0.5 rounded">{a.subject}</span>
-                    <span className="text-xs opacity-50">Grade {a.targetGrade || 'All'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Class Leaderboards */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <Trophy className="text-yellow-400"/> Assessment Leaderboard
-          </h3>
-          <div className="flex gap-2">
-            <button 
-              onClick={handleRefreshLeaderboards}
-              className="text-xs bg-cyan-600 text-white px-3 py-1 rounded flex items-center gap-1"
-            >
-              <RefreshCw size={12} /> Refresh
-            </button>
-            {['assessments', 'academic', 'challenge'].map(t => (
-              <button 
-                key={t}
-                onClick={() => setActiveLeaderboard(t as any)}
-                className={`text-xs px-3 py-1 rounded-full uppercase font-bold transition-all ${
-                  activeLeaderboard === t ? 'bg-cyan-600 text-white' : 'bg-white/10 text-white/50'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-white/70">
-            <thead className="bg-white/5 text-white uppercase font-bold text-xs">
-              <tr>
-                <th className="p-4">Rank</th>
-                <th className="p-4">Student</th>
-                <th className="p-4">Grade</th>
-                <th className="p-4 text-right">Avg Score</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {leaderboardData[activeLeaderboard].length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-4 text-center italic text-white/30">
-                    No data available. Scores will appear after grading assessments.
-                  </td>
-                </tr>
-              )}
-              {leaderboardData[activeLeaderboard].map((entry, i) => (
-                <tr key={i} className="hover:bg-white/5">
-                  <td className="p-4 text-white font-mono">#{i+1}</td>
-                  <td className="p-4 font-bold text-white">{entry.username}</td>
-                  <td className="p-4">
-                    <span className="bg-white/10 px-2 py-1 rounded text-xs">{entry.gradeLevel}</span>
-                  </td>
-                  <td className="p-4 text-right font-mono text-cyan-300">
-                    {Math.round(entry.score || 0)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Detailed Student List */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-white/10 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-white">Student Progress Overview</h3>
-          <span className="text-white/40 text-sm">
-            Showing {stats.length} students
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-white/70">
-            <thead className="bg-white/5 text-white uppercase font-bold text-xs">
-              <tr>
-                <th className="p-4">Student</th>
-                <th className="p-4">Grade</th>
-                <th className="p-4">Avg Score</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Last Active</th>
-                <th className="p-4">Streak</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {stats.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center italic text-white/30">
-                    No student data available. Students will appear after they register and complete assessments.
-                  </td>
-                </tr>
-              ) : (
-                stats.map(s => (
-                  <tr key={s.username} className="hover:bg-white/5 transition-colors">
-                    <td className="p-4 font-medium text-white">{s.username}</td>
-                    <td className="p-4">
-                      <span className="bg-white/10 px-2 py-1 rounded text-xs">{s.gradeLevel}</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-black/20 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-purple-500" 
-                            style={{ width: `${Math.min(s.avgScore || 0, 100)}%` }}
-                          ></div>
-                        </div>
-                        <span className="font-mono text-xs">{Math.round(s.avgScore || 0)}%</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      {(s.avgScore || 0) < 50 ? (
-                        <span className="text-red-400 flex items-center gap-1 text-xs bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
-                          <AlertCircle size={12}/> Needs Help
-                        </span>
-                      ) : (
-                        <span className="text-green-400 text-xs bg-green-500/10 px-2 py-1 rounded border border-green-500/20">
-                          On Track
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 text-xs opacity-60">{s.lastActive || 'Never'}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-xs ${s.streak > 0 ? 'bg-green-500/10 text-green-400' : 'bg-white/10 text-white/60'}`}>
-                        {s.streak} days
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// StudentDashboard component - COMPLETE UPDATED VERSION WITH NOTIFICATIONS
-// StudentDashboard component - COMPLETE FIXED VERSION WITH NOTIFICATIONS
+// =====================================================
+// STUDENT DASHBOARD COMPONENT - FIXED VERSION
+// =====================================================
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
   const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
@@ -2168,7 +129,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [factFade, setFactFade] = useState(true);
   
   // Notifications State
-  const [userNotifications, setUserNotifications] = useState<Notification[]>([]);
+  const [userNotifications, setUserNotifications] = useState<NotificationType[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   
   // Navigation
@@ -2196,7 +157,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   }, []);
 
   // Load Notifications
-  const loadNotifications = async () => {
+  const loadUserNotifications = async () => {
     if (!user?.username) return;
     
     try {
@@ -2208,7 +169,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const handleNotificationClick = async (notification: Notification) => {
+  const handleNotificationClick = async (notification: NotificationType) => {
     // Mark as read
     if (!notification.read) {
       await markNotificationAsRead(notification.id);
@@ -2241,166 +202,130 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     return () => clearInterval(interval);
   }, [neuroscienceFacts]);
 
-  // UPDATED AND FIXED refreshData function
-  // In the refreshData function of StudentDashboard, UPDATE THIS:
-// In Dashboards.tsx, StudentDashboard component, update the refreshData function:
-const refreshData = async () => {
-  setLoading(true);
-  try {
-    console.log(`📊 Loading data for student: ${user.username}`);
-    
-    // Load notifications
-    await loadNotifications();
-    
-    // Load pending assessments
-    const allAssessments = await getAssessments();
-    const allSubmissions = await getSubmissions();
-    
-    const pending = allAssessments.filter(a =>
-      (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
-      !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
-    );
-    setPendingAssessments(pending.slice(0, 3));
-    
-    // Load announcements
-    const announcementsData = await getAnnouncements();
-    setAnnouncements(announcementsData);
-    
-    // Load courses
-    const coursesData = await getCoursesLight();
-    setCourses(coursesData);
-    
-    // Load progress
-    const progressData = await getProgress(user.username);
-    setProgress(progressData);
-    
-    // ===== FIXED: Get subject performance =====
-    const subjectScores = await getStudentSubjectPerformance(user.username);
-    
-    if (Object.keys(subjectScores).length > 0) {
-      const labels = Object.keys(subjectScores);
-      const scores = Object.values(subjectScores);
-      setSubjectLabels(labels);
-      setSubjectScores(scores);
+  // FIXED refreshData function
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      console.log(`📊 Loading data for student: ${user.username}`);
       
-      // Generate advice based on performance
-      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-      if (avgScore < 50) {
-        setAdvice("Focus on mastering fundamentals. Review materials and retry checkpoints.");
-      } else if (avgScore < 70) {
-        setAdvice("Good progress! Focus on improving weak areas identified in checkpoints.");
-      } else if (avgScore < 85) {
-        setAdvice("Excellent work! You're mastering concepts. Try the 222-Sprint challenge!");
-      } else {
-        setAdvice("Outstanding performance! Consider helping classmates or exploring advanced topics.");
-      }
-    } else {
-      // If no scores yet
-      setSubjectLabels([]);
-      setSubjectScores([]);
-      setAdvice("Start by exploring courses and completing your first checkpoint or assessment!");
-    }
-    
-    // Load course history
-    const history = await getStudentCourseHistory(user.username);
-    setCourseHistory(history);
-    
-    // Load assessment feedback
-    const feedback = await getStudentAssessmentFeedback(user.username);
-    setAssessmentFeedback(feedback);
-    
-  } catch (error) {
-    console.error('❌ Error refreshing student dashboard:', error);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // Helper function to get student checkpoint scores
-  const getStudentCheckpointScores = async (username: string): Promise<Record<string, number>> => {
-  try {
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
-    
-    if (!userData) return {};
-    
-    // SIMPLER QUERY: Get checkpoint progress with separate topic/subject queries
-    const { data: checkpointProgress, error } = await supabase
-      .from('student_checkpoint_progress')
-      .select('score, checkpoint_id')
-      .eq('user_id', userData.id)
-      .not('score', 'is', null);
-    
-    if (error) throw error;
-    
-    if (!checkpointProgress || checkpointProgress.length === 0) {
-      return {};
-    }
-    
-    // Get checkpoint IDs to fetch topic/subject info
-    const checkpointIds = checkpointProgress.map(cp => cp.checkpoint_id).filter(Boolean);
-    
-    const { data: checkpoints } = await supabase
-      .from('checkpoints')
-      .select('id, topic_id')
-      .in('id', checkpointIds);
-    
-    // Get topic IDs from checkpoints
-    const topicIds = [...new Set(checkpoints?.map(c => c.topic_id).filter(Boolean) || [])];
-    
-    if (topicIds.length === 0) {
-      return {};
-    }
-    
-    // Get topics with subjects
-    const { data: topics } = await supabase
-      .from('topics')
-      .select('id, subject:subject_id(name)')
-      .in('id', topicIds);
-    
-    const scoresBySubject: Record<string, { total: number, count: number }> = {};
-    
-    // Match scores with subjects
-    checkpointProgress.forEach(item => {
-      const checkpoint = checkpoints?.find(c => c.id === item.checkpoint_id);
-      if (!checkpoint || !item.score) return;
+      // Load notifications
+      await loadUserNotifications();
       
-      const topic = topics?.find(t => t.id === checkpoint.topic_id);
-      let subject = 'General';
+      // Load pending assessments
+      const allAssessments = await getAssessments();
+      const allSubmissions = await getSubmissions();
       
-      if (topic?.subject) {
-        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-          subject = topic.subject[0]?.name || 'General';
-        } else if (typeof topic.subject === 'object' && topic.subject !== null) {
-          subject = (topic.subject as any).name || 'General';
+      const pending = allAssessments.filter(a =>
+        (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
+        !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
+      );
+      setPendingAssessments(pending.slice(0, 3));
+      
+      // Load announcements
+      const announcementsData = await getAnnouncements();
+      setAnnouncements(announcementsData);
+      
+      // Load courses
+      const coursesData = await getCoursesLight();
+      setCourses(coursesData);
+      
+      // Load progress
+      const progressData = await getProgress(user.username);
+      setProgress(progressData);
+      
+      // ===== FIXED: Get subject performance =====
+      const subjectPerformance = await getStudentSubjectPerformance(user.username);
+      
+      if (Object.keys(subjectPerformance).length > 0) {
+        const labels = Object.keys(subjectPerformance);
+        const scores = Object.values(subjectPerformance);
+        
+        // VALIDATION: Ensure all scores are valid (0-100)
+        const validScores = scores.filter(score => 
+          typeof score === 'number' && score >= 0 && score <= 100
+        );
+        
+        if (validScores.length > 0) {
+          setSubjectLabels(labels);
+          setSubjectScores(scores);
+          
+          // Calculate overall average PROPERLY
+          const overallAvg = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+          console.log(`📈 Overall average: ${Math.round(overallAvg)}% from ${validScores.length} subjects`);
+          
+          // Generate advice based on performance
+          if (overallAvg < 50) {
+            setAdvice("Focus on mastering fundamentals. Review materials and retry checkpoints.");
+          } else if (overallAvg < 70) {
+            setAdvice("Good progress! Focus on improving weak areas identified in checkpoints.");
+          } else if (overallAvg < 85) {
+            setAdvice("Excellent work! You're mastering concepts. Try the 222-Sprint challenge!");
+          } else {
+            setAdvice("Outstanding performance! Consider helping classmates or exploring advanced topics.");
+          }
+        } else {
+          // No valid scores
+          setSubjectLabels([]);
+          setSubjectScores([]);
+          setAdvice("Complete assessments and checkpoints to see your scores!");
         }
+      } else {
+        // If no scores yet
+        setSubjectLabels([]);
+        setSubjectScores([]);
+        setAdvice("Start by exploring courses and completing your first checkpoint or assessment!");
       }
       
-      if (!scoresBySubject[subject]) {
-        scoresBySubject[subject] = { total: 0, count: 0 };
+      // Load course history
+      const history = await getStudentCourseHistory(user.username);
+      setCourseHistory(history);
+      
+      // Load assessment feedback
+      const feedback = await getStudentAssessmentFeedback(user.username);
+      setAssessmentFeedback(feedback);
+      
+    } catch (error) {
+      console.error('❌ Error refreshing student dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Debug function to check score calculations
+  const debugScoreCalculation = async () => {
+    try {
+      console.log('🔍 DEBUG: Starting score calculation analysis...');
+      
+      // 1. Get checkpoint scores directly
+      const checkpointScores = await getStudentCheckpointScores(user.username);
+      console.log('📊 Checkpoint scores by subject:', checkpointScores);
+      
+      // 2. Get assessment submissions
+      const allSubmissions = await getSubmissions();
+      const userSubmissions = allSubmissions.filter(s => 
+        s.username === user.username && s.graded && s.score !== undefined
+      );
+      console.log(`📝 Assessment submissions: ${userSubmissions.length}`);
+      
+      userSubmissions.forEach(sub => {
+        console.log(`   - ${sub.assessmentId}: ${sub.score}%`);
+      });
+      
+      // 3. Get subject performance via the fixed function
+      const subjectPerformance = await getStudentSubjectPerformance(user.username);
+      console.log('🎯 Final subject performance:', subjectPerformance);
+      
+      // Calculate overall average
+      const scores = Object.values(subjectPerformance);
+      if (scores.length > 0) {
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        console.log(`📈 Overall average calculated: ${Math.round(avg)}%`);
       }
-      scoresBySubject[subject].total += item.score;
-      scoresBySubject[subject].count++;
-    });
-    
-    // Calculate averages
-    const averages: Record<string, number> = {};
-    Object.keys(scoresBySubject).forEach(subject => {
-      const data = scoresBySubject[subject];
-      if (data.count > 0) {
-        averages[subject] = Math.round(data.total / data.count);
-      }
-    });
-    
-    return averages;
-  } catch (error) {
-    console.error('Error getting checkpoint scores:', error);
-    return {};
-  }
-};
+      
+    } catch (error) {
+      console.error('❌ Debug error:', error);
+    }
+  };
 
   useEffect(() => {
     refreshData();
@@ -2408,48 +333,48 @@ const refreshData = async () => {
     // Set up notification refresh every 30 seconds
     const notificationInterval = setInterval(() => {
       if (user?.username) {
-        loadNotifications();
+        loadUserNotifications();
       }
     }, 30000);
     
     return () => clearInterval(notificationInterval);
   }, [user]);
 
-  // In the StudentDashboard component, update the chartData:
-const chartData = useMemo(() => {
-  if (subjectLabels.length === 0 || subjectScores.length === 0) {
+  // Chart data
+  const chartData = useMemo(() => {
+    if (subjectLabels.length === 0 || subjectScores.length === 0) {
+      return {
+        labels: ['No Data'],
+        datasets: [{
+          label: 'Average Score (%)',
+          data: [0],
+          backgroundColor: ['rgba(100, 100, 100, 0.6)'],
+          borderColor: 'transparent',
+          hoverOffset: 12,
+          borderWidth: 0
+        }]
+      };
+    }
+    
     return {
-      labels: ['No Data'],
+      labels: subjectLabels,
       datasets: [{
         label: 'Average Score (%)',
-        data: [0],
-        backgroundColor: ['rgba(100, 100, 100, 0.6)'],
+        data: subjectScores,
+        backgroundColor: [
+          'rgba(6, 182, 212, 0.6)',
+          'rgba(168, 85, 247, 0.6)',
+          'rgba(236, 72, 153, 0.6)',
+          'rgba(34, 197, 94, 0.6)',
+          'rgba(245, 158, 11, 0.6)',
+          'rgba(239, 68, 68, 0.6)'
+        ],
         borderColor: 'transparent',
         hoverOffset: 12,
         borderWidth: 0
       }]
     };
-  }
-  
-  return {
-    labels: subjectLabels,
-    datasets: [{
-      label: 'Average Score (%)',
-      data: subjectScores,
-      backgroundColor: [
-        'rgba(6, 182, 212, 0.6)',
-        'rgba(168, 85, 247, 0.6)',
-        'rgba(236, 72, 153, 0.6)',
-        'rgba(34, 197, 94, 0.6)',
-        'rgba(245, 158, 11, 0.6)',
-        'rgba(239, 68, 68, 0.6)'
-      ],
-      borderColor: 'transparent',
-      hoverOffset: 12,
-      borderWidth: 0
-    }]
-  };
-}, [subjectLabels, subjectScores]);
+  }, [subjectLabels, subjectScores]);
 
   const exportPDF = async () => {
     try {
@@ -2603,6 +528,13 @@ const chartData = useMemo(() => {
                 className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
               >
                 <Download size={16} /> Export Report
+              </button>
+              {/* Temporary debug button - remove after fixing */}
+              <button 
+                onClick={debugScoreCalculation}
+                className="bg-red-500/20 hover:bg-red-500/40 text-red-300 px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+              >
+                <Bug size={16} /> Debug Scores
               </button>
             </div>
           </div>
@@ -2945,7 +877,7 @@ const chartData = useMemo(() => {
                       <TrendingUp size={16}/> Course Avg Score
                     </span>
                     <span className="text-green-400 font-mono font-bold">
-                      {Math.round(courseHistory.reduce((sum, course) => sum + (course.finalScore || 0), 0) / courseHistory.length)}%
+                      {courseHistory.length > 0 ? Math.round(courseHistory.reduce((sum, course) => sum + (course.finalScore || 0), 0) / courseHistory.length) : 0}%
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -2953,7 +885,7 @@ const chartData = useMemo(() => {
                       <Target size={16}/> Pass Rate
                     </span>
                     <span className="text-cyan-400 font-mono font-bold">
-                      {Math.round((courseHistory.filter(c => c.passed).length / courseHistory.length) * 100)}%
+                      {courseHistory.length > 0 ? Math.round((courseHistory.filter(c => c.passed).length / courseHistory.length) * 100) : 0}%
                     </span>
                   </div>
                 </>
@@ -3008,7 +940,7 @@ const chartData = useMemo(() => {
               <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
                 <BookOpen className="text-white/20 mx-auto mb-2" size={32} />
                 <p className="text-white/40">No completed courses yet</p>
-                        <p className="text-white/30 text-sm mt-1">Complete topics to see your history here</p>
+                <p className="text-white/30 text-sm mt-1">Complete topics to see your history here</p>
               </div>
             )}
             
@@ -3035,6 +967,653 @@ const chartData = useMemo(() => {
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+// =====================================================
+// ADMIN DASHBOARD COMPONENT
+// =====================================================
+export const AdminDashboard: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [leaderboards, setLeaderboards] = useState<{
+    academic: LeaderboardEntry[];
+    challenge: LeaderboardEntry[];
+    assessments: LeaderboardEntry[];
+  }>({ academic: [], challenge: [], assessments: [] });
+  const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const [usersData, assessmentsData, announcementsData, leaderboardsData] = await Promise.all([
+        getUsers(),
+        getAssessments(),
+        getAnnouncements(),
+        getLeaderboards()
+      ]);
+      
+      // Convert users object to array
+      const usersArray = Object.values(usersData).filter(u => !['admin', 'teacher_demo', 'student_demo'].includes(u.username));
+      setUsers(usersArray);
+      setAssessments(assessmentsData);
+      setAnnouncements(announcementsData);
+      setLeaderboards(leaderboardsData);
+    } catch (error) {
+      console.error('Error refreshing admin dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshKey]);
+
+  const approveUser = async (username: string) => {
+    const user = users.find(u => u.username === username);
+    if (!user) return;
+    
+    user.approved = true;
+    await saveUser(user);
+    setRefreshKey(k => k + 1);
+  };
+
+  const deleteUserHandler = async (username: string) => {
+    if (!confirm(`Delete user ${username}? This cannot be undone.`)) return;
+    await deleteUser(username);
+    setRefreshKey(k => k + 1);
+  };
+
+  const exportData = async () => {
+    try {
+      const data = { users, assessments, announcements, leaderboards };
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `newel-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-8 text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+        <p className="mt-4 text-white/60">Loading admin dashboard...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
+        <div className="flex gap-3">
+          <button 
+            onClick={refreshData} 
+            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <RefreshCw size={16} /> Refresh
+          </button>
+          <button 
+            onClick={exportData} 
+            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Download size={16} /> Export Data
+          </button>
+          <button 
+            onClick={() => setRefreshKey(k => k + 1)} 
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <RefreshCw size={16} /> Force Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Total Users</p>
+              <p className="text-3xl font-bold text-white">{users.length}</p>
+            </div>
+            <UsersIcon className="text-cyan-400" size={32} />
+          </div>
+          <div className="mt-4 flex gap-2 text-sm">
+            <span className="bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+              {users.filter(u => u.role === 'student').length} Students
+            </span>
+            <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">
+              {users.filter(u => u.role === 'teacher').length} Teachers
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Pending Approvals</p>
+              <p className="text-3xl font-bold text-white">{users.filter(u => !u.approved).length}</p>
+            </div>
+            <AlertCircle className="text-yellow-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">Users waiting for access</p>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Active Assessments</p>
+              <p className="text-3xl font-bold text-white">{assessments.length}</p>
+            </div>
+            <ClipboardList className="text-green-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">Available for students</p>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Active Announcements</p>
+              <p className="text-3xl font-bold text-white">{announcements.length}</p>
+            </div>
+            <Megaphone className="text-orange-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">Current notifications</p>
+        </div>
+      </div>
+
+      {/* User Management */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-white">User Management</h2>
+          <div className="flex gap-2">
+            <span className="bg-cyan-500/20 text-cyan-300 px-3 py-1 rounded text-sm">
+              {users.filter(u => u.approved).length} Approved
+            </span>
+            <span className="bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded text-sm">
+              {users.filter(u => !u.approved).length} Pending
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-white/80">
+            <thead className="text-xs text-white/60 border-b border-white/10">
+              <tr>
+                <th className="py-3 px-4">Username</th>
+                <th className="py-3 px-4">Role</th>
+                <th className="py-3 px-4">Grade Level</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Last Login</th>
+                <th className="py-3 px-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(user => (
+                <tr key={user.username} className="border-b border-white/5 hover:bg-white/5">
+                  <td className="py-3 px-4 font-medium">{user.username}</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      user.role === 'admin' ? 'bg-red-500/20 text-red-400' :
+                      user.role === 'teacher' ? 'bg-purple-500/20 text-purple-400' :
+                      'bg-cyan-500/20 text-cyan-400'
+                    }`}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">{user.gradeLevel || 'N/A'}</td>
+                  <td className="py-3 px-4">
+                    {user.approved ? (
+                      <span className="flex items-center gap-1 text-green-400">
+                        <Check size={14} /> Approved
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-yellow-400">
+                        <AlertCircle size={14} /> Pending
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex gap-2">
+                      {!user.approved && (
+                        <button
+                          onClick={() => approveUser(user.username)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                        >
+                          Approve
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteUserHandler(user.username)}
+                        className="bg-red-600/20 hover:bg-red-600/40 text-red-300 px-3 py-1 rounded text-xs transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {users.length === 0 && (
+          <div className="text-center py-12">
+            <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
+            <p className="text-white/40">No users found</p>
+            <p className="text-white/30 text-sm mt-1">Users will appear here once registered</p>
+          </div>
+        )}
+      </div>
+
+      {/* Leaderboard Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Trophy className="text-yellow-400" /> Academic Leaderboard
+          </h3>
+          <div className="space-y-3">
+            {leaderboards.academic.slice(0, 5).map((entry, i) => (
+              <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
+                    i === 2 ? 'bg-amber-700/20 text-amber-400' :
+                    'bg-white/5 text-white/60'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{entry.username}</p>
+                    <p className="text-white/40 text-xs">Grade {entry.gradeLevel || '?'}</p>
+                  </div>
+                </div>
+                <span className="text-green-400 font-bold">{entry.score}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Zap className="text-orange-400" /> 222-Sprint Challenge
+          </h3>
+          <div className="space-y-3">
+            {leaderboards.challenge.slice(0, 5).map((entry, i) => (
+              <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
+                    i === 2 ? 'bg-amber-700/20 text-amber-400' :
+                    'bg-white/5 text-white/60'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{entry.username}</p>
+                    <p className="text-white/40 text-xs">Grade {entry.gradeLevel || '?'}</p>
+                  </div>
+                </div>
+                <span className="text-orange-400 font-bold">{entry.score} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <BarChart3 className="text-cyan-400" /> Assessment Performance
+          </h3>
+          <div className="space-y-3">
+            {leaderboards.assessments.slice(0, 5).map((entry, i) => (
+              <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
+                    i === 2 ? 'bg-amber-700/20 text-amber-400' :
+                    'bg-white/5 text-white/60'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{entry.username}</p>
+                    <p className="text-white/40 text-xs">Grade {entry.gradeLevel || '?'}</p>
+                  </div>
+                </div>
+                <span className="text-cyan-400 font-bold">{entry.score}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =====================================================
+// TEACHER DASHBOARD COMPONENT
+// =====================================================
+export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
+  const [students, setStudents] = useState<StudentStats[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [classOverview, setClassOverview] = useState<any>({});
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
+
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const [studentsData, assessmentsData, announcementsData, overviewData] = await Promise.all([
+        getAllStudentStats(),
+        getAssessments(),
+        getAnnouncements(),
+        getClassOverview()
+      ]);
+      
+      // Filter students for this teacher's grade level if specified
+      const filteredStudents = studentsData.filter(s => 
+        !user.gradeLevel || s.gradeLevel === user.gradeLevel
+      );
+      
+      setStudents(filteredStudents);
+      setAssessments(assessmentsData);
+      setAnnouncements(announcementsData);
+      setClassOverview(overviewData);
+    } catch (error) {
+      console.error('Error refreshing teacher dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  const createAnnouncement = async () => {
+    if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
+      alert('Please fill in both title and content');
+      return;
+    }
+
+    try {
+      await saveAnnouncement({
+        id: Date.now().toString(),
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        timestamp: Date.now(),
+        author: user.username,
+        expiresAt: Date.now() + (48 * 60 * 60 * 1000) // 48 hours
+      });
+      
+      setNewAnnouncement({ title: '', content: '' });
+      refreshData();
+      alert('Announcement created successfully!');
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      alert('Failed to create announcement');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-8 text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+        <p className="mt-4 text-white/60">Loading teacher dashboard...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-bold text-white">Teacher Dashboard</h1>
+          <p className="text-white/60">Welcome, {user.username}</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={refreshData} 
+            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <RefreshCw size={16} /> Refresh
+          </button>
+          <Link 
+            to="/courses" 
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <BookOpen size={16} /> Manage Courses
+          </Link>
+          <Link 
+            to="/assessments" 
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <PenTool size={16} /> Create Assessment
+          </Link>
+        </div>
+      </div>
+
+      {/* Class Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Total Students</p>
+              <p className="text-3xl font-bold text-white">{classOverview.totalStudents || 0}</p>
+            </div>
+            <UsersIcon className="text-cyan-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">In your class</p>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Class Average</p>
+              <p className="text-3xl font-bold text-white">{classOverview.classAverage || 0}%</p>
+            </div>
+            <TrendingUp className="text-green-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">Overall performance</p>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Weakest Topic</p>
+              <p className="text-3xl font-bold text-white truncate">{classOverview.weakestTopic || 'N/A'}</p>
+            </div>
+            <AlertCircle className="text-yellow-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">Needs attention</p>
+        </div>
+      </div>
+
+      {/* Create Announcement */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+          <Megaphone className="text-orange-400" /> Create Announcement
+        </h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-white/60 text-sm mb-2">Title</label>
+            <input
+              type="text"
+              value={newAnnouncement.title}
+              onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+              placeholder="Important update..."
+            />
+          </div>
+          <div>
+            <label className="block text-white/60 text-sm mb-2">Content</label>
+            <textarea
+              value={newAnnouncement.content}
+              onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-h-[100px]"
+              placeholder="Share important information with your students..."
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={createAnnouncement}
+              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <Send size={16} /> Publish Announcement
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Student Performance */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-white">Student Performance</h2>
+          <span className="text-white/60 text-sm">
+            {students.length} students • Avg: {classOverview.classAverage || 0}%
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-white/80">
+            <thead className="text-xs text-white/60 border-b border-white/10">
+              <tr>
+                <th className="py-3 px-4">Student</th>
+                <th className="py-3 px-4">Grade Level</th>
+                <th className="py-3 px-4">Average Score</th>
+                <th className="py-3 px-4">Completion Rate</th>
+                <th className="py-3 px-4">Last Active</th>
+                <th className="py-3 px-4">Streak</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map(student => (
+                <tr key={student.username} className="border-b border-white/5 hover:bg-white/5">
+                  <td className="py-3 px-4 font-medium">{student.username}</td>
+                  <td className="py-3 px-4">{student.gradeLevel}</td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                          style={{ width: `${Math.min(100, student.avgScore)}%` }}
+                        />
+                      </div>
+                      <span className={`font-bold ${
+                        student.avgScore >= 80 ? 'text-green-400' :
+                        student.avgScore >= 60 ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {student.avgScore.toFixed(1)}%
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      student.completionRate >= 80 ? 'bg-green-500/20 text-green-400' :
+                      student.completionRate >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {student.completionRate}%
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">{student.lastActive}</td>
+                  <td className="py-3 px-4">
+                    <span className={`flex items-center gap-1 ${
+                      student.streak > 0 ? 'text-yellow-400' : 'text-white/60'
+                    }`}>
+                      <Zap size={12} /> {student.streak} days
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {students.length === 0 && (
+          <div className="text-center py-12">
+            <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
+            <p className="text-white/40">No students found</p>
+            <p className="text-white/30 text-sm mt-1">Students will appear here once they start using the platform</p>
+          </div>
+        )}
+      </div>
+
+      {/* Active Announcements */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Megaphone className="text-orange-400" /> Active Announcements
+          </h3>
+          <div className="space-y-4">
+            {announcements.slice(0, 3).map(ann => {
+              const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+              const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
+              
+              return (
+                <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-white font-medium">{ann.title}</p>
+                    {hoursLeft <= 24 && (
+                      <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
+                        {hoursLeft}h left
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-white/60 text-sm mb-2">{ann.content}</p>
+                  <div className="flex justify-between text-white/30 text-xs">
+                    <span>By: {ann.author}</span>
+                    <span>{new Date(ann.timestamp).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <ClipboardList className="text-cyan-400" /> Recent Assessments
+          </h3>
+          <div className="space-y-3">
+            {assessments.slice(0, 3).map(assessment => (
+              <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-white font-medium">{assessment.title}</p>
+                  <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                    {assessment.questions?.length || 0} Questions
+                  </span>
+                </div>
+                <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
+                <div className="flex justify-between text-white/30 text-xs">
+                  <span>Grade: {assessment.targetGrade}</span>
+                  <span>By: {assessment.createdBy}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
