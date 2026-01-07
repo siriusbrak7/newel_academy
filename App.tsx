@@ -34,7 +34,7 @@ import {
   X,
   User as UserIcon // Aliased to avoid conflict with User type
 } from 'lucide-react';
-import { setupNotifications } from './services/storageService';
+import { getUserNotifications } from './services/storageService';
 
 // Declare ThemeManager from index.html
 declare global {
@@ -500,10 +500,15 @@ const App: React.FC = () => {
       
       // ADD THIS: Setup notification system
       try {
-        await setupNotifications();
-        console.log('✅ Notification system ready');
+        // Initialize notification system
+        console.log('🔔 Setting up notification system...');
+        // The system is initialized via database triggers, just check if user has notifications
+        if (auth.user?.username) {
+          const notifications = await getUserNotifications(auth.user.username);
+          console.log(`✅ ${notifications.length} notifications loaded`);
+        }
       } catch (notifError) {
-        console.warn('⚠️ Notification setup failed:', notifError);
+        console.warn('⚠️ Notification check failed:', notifError);
       }
       
     } finally {

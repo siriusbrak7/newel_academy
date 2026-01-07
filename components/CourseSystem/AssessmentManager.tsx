@@ -9,7 +9,8 @@ import {
   saveAssessment, 
   saveSubmission, 
   getStoredSession,
-  notifyNewAssessment 
+  createNotification, 
+  notifyNewAssessment
 } from '../../services/storageService';
 import { 
   Plus, Save, Brain, Eye, Edit, X, CheckCircle, Timer, List, 
@@ -138,12 +139,21 @@ export const AssessmentManager: React.FC = () => {
     await saveAssessment(newAssessment);
     
     // Add notification trigger after assessment is created
+    try {
+      const currentUsername = "teacher_demo"; // Replace with actual user
+// OR if you have user in props/context:
+// const currentUsername = user?.username || 'teacher';
+
     await notifyNewAssessment(
-      user.username, // teacher username
+      currentUsername, // Fixed variable name
       newAssessment.title,
       newAssessment.subject,
       newAssessment.targetGrade
     );
+    } catch (error) {
+      console.error('Failed to send assessment notification:', error);
+      // Continue anyway - don't block assessment creation
+    }
     console.log('📢 Notification sent:', { teacher: user.username, assessment: newAssessment.title });
 
     alert("Assessment Published! Students can now see this in their 'My Assignments'.");

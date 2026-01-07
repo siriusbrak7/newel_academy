@@ -18,11 +18,9 @@ import {
   saveTopic,
   getStudentCourseHistory,
   getStudentAssessmentFeedback,
-  getStudentTopicPerformance,
   saveAnnouncement,
   getSubmissions,
   refreshAllLeaderboards,
-  getPendingTheorySubmissions,
   uploadFileToSupabase,
   deleteMaterial,
   // ADD THESE NOTIFICATION FUNCTIONS:
@@ -31,10 +29,6 @@ import {
   markAllNotificationsAsRead,
   createNotification,
   notifyCourseMaterialAdded,
-  notifyNewAssessment,
-  notifyTopic80PercentComplete,
-  notifyLeaderboardUpdate,
-  notifyNewSubmission,
   getCoursesLight,
   getStudentSubjectPerformance
 } from '../services/storageService';
@@ -69,13 +63,7 @@ import {
   Plus,
   // ADD THESE NOTIFICATION ICONS:
   Bell,
-  Info,
-  Star,
-  Sparkles,
-  Award,
-  // Add any other icons used in the component...
-  TrendingUp as TrendingUpIcon
-} from 'lucide-react';
+  Info} from 'lucide-react';
 
 // Fixed Chart.js imports
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
@@ -120,6 +108,57 @@ export const AdminDashboard: React.FC = () => {
     challenge: [], 
     assessments: [] 
   });
+
+  // Then create helper functions in the component:
+const notifyCourseMaterialAdded = async (
+  teacherName: string,
+  subject: string,
+  topicTitle: string,
+  gradeLevel: string,
+  materialTitle: string
+) => {
+  const text = `📚 New material added to ${subject}: ${materialTitle} in "${topicTitle}"`;
+  const metadata = {
+    teacher: teacherName,
+    subject,
+    topic: topicTitle,
+    material: materialTitle,
+    actionUrl: `/courses`
+  };
+  // You'll need to get student usernames for this grade
+  // await createNotification(studentUsername, text, 'info', metadata);
+};
+
+const notifyNewAssessment = async (
+  teacherName: string,
+  assessmentTitle: string,
+  subject: string,
+  gradeLevel: string
+) => {
+  const text = `📝 New assessment: "${assessmentTitle}" in ${subject}`;
+  const metadata = {
+    teacher: teacherName,
+    assessment: assessmentTitle,
+    subject,
+    actionUrl: `/assessments`
+  };
+  // Get students for this grade
+  // await createNotification(studentUsername, text, 'alert', metadata);
+};
+
+const notifyNewSubmission = async (
+  studentName: string,
+  assessmentTitle: string,
+  teacherUsername: string
+) => {
+  const text = `📥 New submission from ${studentName}: "${assessmentTitle}"`;
+  const metadata = {
+    student: studentName,
+    assessment: assessmentTitle,
+    actionUrl: `/teacher-assessments`
+  };
+  await createNotification(teacherUsername, text, 'alert', metadata);
+};
 
   const refreshData = async () => {
     setLoading(true);

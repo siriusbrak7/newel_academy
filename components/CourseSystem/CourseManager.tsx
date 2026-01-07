@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CourseStructure, Topic, Question, Material } from '../../types';
 import { getAITutorResponse } from "../../services/geminiService";
+import { getPendingTheorySubmissions } from '../../services/theoryGradingService';
 import { 
   getCourses, 
   saveTopic, 
   uploadFileToSupabase,
-  getPendingTheorySubmissions,
   getTopicCheckpoints,
   getTopicQuestions,
   deleteMaterial
