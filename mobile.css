@@ -1,403 +1,252 @@
 /* ============================================
-   MOBILE.CSS - IPHONE 12 OPTIMIZED
-   Version 3.0 - Elegant Mobile UI/UX
+   MOBILE.CSS - PROFESSIONAL REFINED VERSION
+   Clean, functional, production-ready
    ============================================ */
 
-/* ===== IPHONE 12 SPECIFIC (390px width) ===== */
+/* ===== BASE RESETS FOR MOBILE ===== */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body.mobile-menu-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== IPHONE 12 OPTIMIZATION (390px) ===== */
 @media (max-width: 390px) {
-  /* 1. FIXED NAVBAR FOR IPHONE 12 */
+  /* 1. FIXED NAVBAR */
   nav {
-    height: 56px !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    height: 60px;
+    padding: 0 16px;
   }
   
-  /* 2. NOTIFICATION BELL - PROMINENT & ELEGANT */
+  /* 2. CLEAN NOTIFICATION BELL */
   .notification-bell {
-    position: relative !important;
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 12px !important;
-    background: rgba(59, 130, 246, 0.15) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    margin-right: 8px !important;
-    border: 1px solid rgba(59, 130, 246, 0.3) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-    transition: all 0.3s ease !important;
-  }
-  
-  .notification-bell:hover,
-  .notification-bell:active {
-    background: rgba(59, 130, 246, 0.25) !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25) !important;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: rgba(59, 130, 246, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    position: relative;
   }
   
   .notification-bell svg {
-    width: 22px !important;
-    height: 22px !important;
-    color: #60a5fa !important;
+    width: 20px;
+    height: 20px;
+    color: #3b82f6;
   }
   
-  /* 3. NOTIFICATION BADGE - PROMINENT */
   .notification-bell .notification-badge {
-    position: absolute !important;
-    top: -4px !important;
-    right: -4px !important;
-    background: #ef4444 !important;
-    color: white !important;
-    font-size: 11px !important;
-    font-weight: 800 !important;
-    width: 20px !important;
-    height: 20px !important;
-    border-radius: 50% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border: 2px solid rgba(15, 23, 42, 0.9) !important;
-    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3) !important;
-    animation: pulse-red 2s infinite !important;
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid rgba(15, 23, 42, 0.95);
   }
   
-  @keyframes pulse-red {
-    0%, 100% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3); }
-    50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
-  }
-  
-  /* 4. NOTIFICATION DROPDOWN - ELEGANT */
+  /* 3. CLEAN NOTIFICATION DROPDOWN */
   .notification-dropdown {
-    position: fixed !important;
-    top: 56px !important;
-    left: 12px !important;
-    right: 12px !important;
-    width: auto !important;
-    max-height: 65vh !important;
-    max-width: none !important;
-    background: rgba(15, 23, 42, 0.98) !important;
-    backdrop-filter: blur(30px) !important;
-    -webkit-backdrop-filter: blur(30px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 18px !important;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
-    overflow: hidden !important;
+    position: fixed;
+    top: 60px;
+    left: 16px;
+    right: 16px;
+    background: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    max-height: 60vh;
+    overflow-y: auto;
   }
   
-  .notification-dropdown::before {
-    content: '' !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    height: 1px !important;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent) !important;
-  }
-  
-  /* 5. NOTIFICATION ITEMS - BETTER SPACING */
-  .notification-item {
-    padding: 18px 20px !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    transition: all 0.2s ease !important;
-  }
-  
-  .notification-item:active {
-    background: rgba(255, 255, 255, 0.05) !important;
-    transform: scale(0.995) !important;
-  }
-  
-  .notification-item.unread {
-    border-left: 4px solid #60a5fa !important;
-    background: rgba(59, 130, 246, 0.05) !important;
-  }
-  
-  /* 6. MOBILE MENU - IPHONE 12 OPTIMIZED */
+  /* 4. CLEAN MOBILE MENU */
   .mobile-nav-container {
-    width: 85% !important;
-    max-width: 340px !important;
-    background: rgba(15, 23, 42, 0.98) !important;
-    backdrop-filter: blur(40px) !important;
-    -webkit-backdrop-filter: blur(40px) !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    width: 85%;
+    max-width: 340px;
+    background: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
   }
   
   .mobile-nav-item {
-    padding: 18px 22px !important;
-    margin-bottom: 10px !important;
-    border-radius: 14px !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    font-size: 16px !important;
-    font-weight: 500 !important;
+    padding: 16px 20px;
+    margin: 6px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    font-size: 16px;
   }
   
   .mobile-nav-item:active {
-    background: rgba(255, 255, 255, 0.1) !important;
-    transform: translateX(4px) !important;
+    background: rgba(255, 255, 255, 0.1);
   }
   
-  /* 7. BOTTOM SAFE AREA FOR IPHONE */
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom) !important;
-  }
-  
-  /* 8. CONTENT AREA - BETTER SPACING */
+  /* 5. CONTENT SPACING */
   main.container {
-    padding-left: 18px !important;
-    padding-right: 18px !important;
-    padding-top: 24px !important;
+    padding: 20px 16px;
   }
   
-  /* 9. BUTTONS - LARGER TOUCH TARGETS */
+  /* 6. TOUCH TARGETS */
   button:not(.icon-only) {
-    min-height: 52px !important;
-    padding: 16px 24px !important;
-    font-size: 16px !important;
-    border-radius: 14px !important;
+    min-height: 48px;
+    padding: 14px 20px;
+    font-size: 16px;
   }
   
-  /* 10. INPUT FIELDS - BETTER UX */
+  /* 7. INPUTS */
   input, textarea, select {
-    font-size: 17px !important; /* iOS standard */
-    padding: 18px 16px !important;
-    border-radius: 14px !important;
-    min-height: 56px !important;
+    font-size: 16px;
+    padding: 16px;
+    min-height: 52px;
   }
 }
 
-/* ===== IPHONE 12 LANDSCAPE ===== */
-@media (max-width: 390px) and (orientation: landscape) {
-  .notification-dropdown {
-    max-height: 50vh !important;
+/* ===== SAFE AREA SUPPORT ===== */
+@supports (padding: max(0px)) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
   }
   
-  .mobile-nav-container {
-    width: 60% !important;
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
   }
 }
 
-/* ===== ELEGANT ANIMATIONS ===== */
-@keyframes slide-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+/* ===== UTILITY CLASSES ===== */
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .desktop-only {
+    display: none;
   }
 }
 
+/* ===== CLEAN ANIMATIONS ===== */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-/* ===== SMOOTH SCROLLING ===== */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.mobile-nav-container {
+  animation: slide-in-right 0.25s ease-out;
+}
+
+/* ===== SCROLLBAR HIDING ===== */
+.mobile-nav-container::-webkit-scrollbar,
+.notification-dropdown::-webkit-scrollbar {
+  display: none;
+}
+
 .mobile-nav-container,
 .notification-dropdown {
-  animation: slide-in-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-/* ===== GLASS MORPHISM EFFECT ===== */
-.glass-effect {
-  background: rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+/* ===== FIXED FOOTER FOR MOBILE ===== */
+.mobile-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 16px;
+  z-index: 100;
 }
 
-/* ===== HAPTIC FEEDBACK SIMULATION ===== */
-.haptic-feedback:active {
-  animation: haptic-pulse 0.15s ease !important;
-}
-
-@keyframes haptic-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.98); }
-  100% { transform: scale(1); }
-}
-
-/* ===== NOTIFICATION BADGE ANIMATIONS ===== */
-.notification-badge.new {
-  animation: badge-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-}
-
-@keyframes badge-pop {
-  0% { transform: scale(0); }
-  70% { transform: scale(1.2); }
-  100% { transform: scale(1); }
-}
-
-/* ===== IMPROVED NOTIFICATION ICONS ===== */
-.notification-icon {
-  width: 44px !important;
-  height: 44px !important;
-  border-radius: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 20px !important;
-}
-
-.notification-icon.info {
-  background: rgba(59, 130, 246, 0.15) !important;
-  color: #60a5fa !important;
-}
-
-.notification-icon.success {
-  background: rgba(34, 197, 94, 0.15) !important;
-  color: #4ade80 !important;
-}
-
-.notification-icon.warning {
-  background: rgba(245, 158, 11, 0.15) !important;
-  color: #fbbf24 !important;
-}
-
-.notification-icon.alert {
-  background: rgba(239, 68, 68, 0.15) !important;
-  color: #f87171 !important;
-}
-
-/* ===== MOBILE CARD DESIGN ===== */
+/* ===== CARD STYLING ===== */
 .mobile-card {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 18px !important;
-  padding: 20px !important;
-  margin-bottom: 16px !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  transition: all 0.3s ease !important;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
 }
 
-.mobile-card:active {
-  background: rgba(255, 255, 255, 0.08) !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2) !important;
-}
-
-/* ===== SWIPE GESTURE HINTS ===== */
-.swipe-hint {
-  position: relative !important;
-}
-
-.swipe-hint::after {
-  content: '' !important;
-  position: absolute !important;
-  top: 50% !important;
-  right: 16px !important;
-  width: 24px !important;
-  height: 24px !important;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2)) !important;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z'/%3E%3C/svg%3E") center/contain no-repeat !important;
-  opacity: 0.5 !important;
-  transform: translateY(-50%) !important;
-}
-
-/* ===== LOADING STATES ===== */
-.mobile-loading {
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-.mobile-loading::after {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: -100% !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent) !important;
-  animation: loading-shimmer 1.5s infinite !important;
-}
-
-@keyframes loading-shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
-}
-
-/* ===== TOAST NOTIFICATIONS ===== */
-.mobile-toast {
-  position: fixed !important;
-  bottom: 90px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  background: rgba(15, 23, 42, 0.95) !important;
-  backdrop-filter: blur(30px) !important;
-  -webkit-backdrop-filter: blur(30px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 16px !important;
-  padding: 16px 24px !important;
-  max-width: 320px !important;
-  width: 90% !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
-  z-index: 99999 !important;
-  animation: toast-slide-up 0.3s ease !important;
-}
-
-@keyframes toast-slide-up {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 20px);
+/* ===== TABLET (768px-1024px) ===== */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .mobile-nav-container {
+    width: 60%;
   }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
+  
+  .notification-dropdown {
+    width: 400px;
+    max-width: 400px;
   }
 }
 
-/* ===== IPHONE STATUS BAR MATCHING ===== */
-.status-bar-overlay {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: env(safe-area-inset-top) !important;
-  background: rgba(15, 23, 42, 0.95) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  z-index: 9998 !important;
+/* ===== LANDSCAPE ORIENTATION ===== */
+@media (max-width: 768px) and (orientation: landscape) {
+  .notification-dropdown {
+    max-height: 50vh;
+  }
+  
+  .mobile-nav-container {
+    width: 60%;
+  }
 }
 
-/* ===== IMPROVED TAB BAR (FOR PWA) ===== */
-.mobile-tab-bar {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: calc(60px + env(safe-area-inset-bottom)) !important;
-  background: rgba(15, 23, 42, 0.98) !important;
-  backdrop-filter: blur(40px) !important;
-  -webkit-backdrop-filter: blur(40px) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-  display: flex !important;
-  justify-content: space-around !important;
-  align-items: center !important;
-  padding-bottom: env(safe-area-inset-bottom) !important;
-  z-index: 9990 !important;
+/* ===== PRINT STYLES ===== */
+@media print {
+  .mobile-nav-container,
+  .notification-dropdown,
+  .mobile-footer {
+    display: none;
+  }
 }
 
-.mobile-tab-item {
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  height: 100% !important;
-  color: rgba(255, 255, 255, 0.6) !important;
-  transition: all 0.2s ease !important;
-  -webkit-tap-highlight-color: transparent !important;
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+.mobile-nav-container,
+.notification-dropdown {
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
-.mobile-tab-item.active {
-  color: #60a5fa !important;
-}
-
-.mobile-tab-item:active {
-  transform: scale(0.95) !important;
+/* ===== ACCESSIBILITY ===== */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-nav-container,
+  .notification-dropdown {
+    animation: none;
+    transition: none;
+  }
 }
