@@ -1310,7 +1310,7 @@ export const AdminDashboard: React.FC = () => {
 };
 
 // =====================================================
-// TEACHER DASHBOARD COMPONENT
+// TEACHER DASHBOARD COMPONENT - WITH STUDENT TRACKING
 // =====================================================
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [students, setStudents] = useState<StudentStats[]>([]);
@@ -1319,6 +1319,17 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [classOverview, setClassOverview] = useState<any>({});
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
+  
+  // Student tracking states
+  const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [studentCheckpointData, setStudentCheckpointData] = useState<{
+    checkpointScores: Record<string, number>;
+    courseHistory: any[];
+    subjectPerformance: any;
+    username: string;
+  } | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [showTrackingSection, setShowTrackingSection] = useState(false);
 
   const refreshData = async () => {
     setLoading(true);
@@ -1339,6 +1350,11 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       setAssessments(assessmentsData);
       setAnnouncements(announcementsData);
       setClassOverview(overviewData);
+      
+      // Auto-select first student if none selected
+      if (filteredStudents.length > 0 && !selectedStudent) {
+        setSelectedStudent(filteredStudents[0].username);
+      }
     } catch (error) {
       console.error('Error refreshing teacher dashboard:', error);
     } finally {
@@ -1349,6 +1365,39 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     refreshData();
   }, []);
+
+  // Load student checkpoint data when selected student changes
+  useEffect(() => {
+    if (selectedStudent) {
+      loadStudentCheckpointData(selectedStudent);
+    }
+  }, [selectedStudent]);
+
+  const loadStudentCheckpointData = async (username: string) => {
+    setTrackingLoading(true);
+    try {
+      // Get student's checkpoint scores by subject
+      const checkpointScores = await getStudentCheckpointScores(username);
+      
+      // Get student's course history
+      const courseHistory = await getStudentCourseHistory(username);
+      
+      // Get student's subject performance
+      const subjectPerformance = await getStudentSubjectPerformance(username);
+      
+      setStudentCheckpointData({
+        checkpointScores,
+        courseHistory,
+        subjectPerformance,
+        username
+      });
+    } catch (error) {
+      console.error('Error loading student checkpoint data:', error);
+      setStudentCheckpointData(null);
+    } finally {
+      setTrackingLoading(false);
+    }
+  };
 
   const createAnnouncement = async () => {
     if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
@@ -1373,6 +1422,20 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       console.error('Error creating announcement:', error);
       alert('Failed to create announcement');
     }
+  };
+
+  const formatCheckpointData = (checkpointScores: Record<string, number>) => {
+    if (!checkpointScores || Object.keys(checkpointScores).length === 0) {
+      return [];
+    }
+    
+    return Object.entries(checkpointScores).map(([subject, score]) => ({
+      subject,
+      score,
+      status: score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs Improvement',
+      color: score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400',
+      bgColor: score >= 80 ? 'bg-green-500/20' : score >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+    }));
   };
 
   if (loading) {
@@ -1449,6 +1512,211 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
+      {/* Student Checkpoint Tracking Section */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Target className="text-purple-400" /> Student Checkpoint Tracking
+          </h2>
+          <button
+            onClick={() => setShowTrackingSection(!showTrackingSection)}
+            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+          >
+            {showTrackingSection ? 'Hide Details' : 'Show Details'}
+            <ChevronDown className={`transform transition-transform ${showTrackingSection ? 'rotate-180' : ''}`} size={14} />
+          </button>
+        </div>
+        
+        {showTrackingSection && (
+          <>
+            {/* Student Selection */}
+            <div className="mb-6">
+              <label className="block text-white/60 text-sm mb-2">Select Student to Track</label>
+              <div className="flex gap-3">
+                <select
+                  value={selectedStudent}
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">Choose a student...</option>
+                  {students.map(student => (
+                    <option key={student.username} value={student.username}>
+                      {student.username} (Grade {student.gradeLevel}) - Avg: {student.avgScore.toFixed(1)}%
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => selectedStudent && loadStudentCheckpointData(selectedStudent)}
+                  disabled={!selectedStudent || trackingLoading}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {trackingLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw size={16} /> Refresh Data
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Student Performance Data */}
+            {selectedStudent && studentCheckpointData ? (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Checkpoint Performance: {selectedStudent}</h3>
+                      <p className="text-white/60 text-sm">
+                        Grade {students.find(s => s.username === selectedStudent)?.gradeLevel || 'N/A'} • 
+                        Overall Average: {students.find(s => s.username === selectedStudent)?.avgScore.toFixed(1) || '0'}%
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/60 text-sm">Last Updated</p>
+                      <p className="text-white">{new Date().toLocaleTimeString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subject Performance */}
+                {studentCheckpointData.checkpointScores && Object.keys(studentCheckpointData.checkpointScores).length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                      <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <BookOpen size={18} /> Subject Performance
+                      </h4>
+                      <div className="space-y-3">
+                        {formatCheckpointData(studentCheckpointData.checkpointScores).map((item, index) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <div>
+                              <p className="text-white font-medium">{item.subject}</p>
+                              <p className={`text-xs px-2 py-1 rounded mt-1 inline-block ${item.bgColor} ${item.color}`}>
+                                {item.status}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`text-xl font-bold ${item.color}`}>{item.score}%</p>
+                              <p className="text-white/40 text-xs">Checkpoint Avg</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Overall Statistics */}
+                    <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                      <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <BarChart3 size={18} /> Overall Statistics
+                      </h4>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-white/60">Subjects Tracked</span>
+                          <span className="text-white font-bold">
+                            {Object.keys(studentCheckpointData.checkpointScores).length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-white/60">Overall Average</span>
+                          <span className="text-green-400 font-bold">
+                            {Object.values<number>(studentCheckpointData.checkpointScores).length > 0 
+                              ? Math.round(
+                                  Object.values<number>(studentCheckpointData.checkpointScores)
+                                    .reduce((a: number, b: number) => a + b, 0) / 
+                                  Object.keys(studentCheckpointData.checkpointScores).length
+                                )
+                              : 0}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-white/60">Strongest Subject</span>
+                          <span className="text-green-400 font-bold">
+                            {Object.entries(studentCheckpointData.checkpointScores)
+                              .sort((a: [string, number], b: [string, number]) => b[1] - a[1])[0]?.[0] || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-white/60">Weakest Subject</span>
+                          <span className="text-red-400 font-bold">
+                            {Object.entries(studentCheckpointData.checkpointScores)
+                              .sort((a: [string, number], b: [string, number]) => a[1] - b[1])[0]?.[0] || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Target className="text-white/20 mx-auto mb-4" size={48} />
+                    <p className="text-white/40">No checkpoint data available</p>
+                    <p className="text-white/30 text-sm mt-1">
+                      {selectedStudent} hasn't completed any checkpoints yet
+                    </p>
+                  </div>
+                )}
+
+                {/* Course History */}
+                {studentCheckpointData.courseHistory && studentCheckpointData.courseHistory.length > 0 && (
+                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <CheckCircle size={18} /> Completed Courses
+                    </h4>
+                    <div className="space-y-3">
+                      {studentCheckpointData.courseHistory.slice(0, 5).map((course: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center bg-black/20 p-3 rounded-lg">
+                          <div>
+                            <p className="text-white font-medium">{course.topicTitle}</p>
+                            <p className="text-white/60 text-sm">{course.subject} • Grade {course.gradeLevel}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              course.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {course.finalScore}% {course.passed ? '✓' : '✗'}
+                            </span>
+                            <p className="text-white/40 text-xs mt-1">
+                              {course.checkpoints?.filter((cp: any) => cp.passed).length}/{course.checkpoints?.length} checkpoints
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : selectedStudent ? (
+              <div className="text-center py-8">
+                {trackingLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+                    <p className="text-white/60">Loading checkpoint data for {selectedStudent}...</p>
+                  </>
+                ) : (
+                  <>
+                    <Target className="text-white/20 mx-auto mb-4" size={48} />
+                    <p className="text-white/40">No checkpoint data available</p>
+                    <p className="text-white/30 text-sm mt-1">
+                      {selectedStudent} hasn't completed any checkpoints or there was an error loading data
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
+                <p className="text-white/40">Select a student to track their checkpoint performance</p>
+                <p className="text-white/30 text-sm mt-1">Choose from the dropdown menu above</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Create Announcement */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
         <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
@@ -1485,7 +1753,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Student Performance */}
+      {/* Student Performance Table */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-white">Student Performance</h2>
@@ -1504,6 +1772,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <th className="py-3 px-4">Completion Rate</th>
                 <th className="py-3 px-4">Last Active</th>
                 <th className="py-3 px-4">Streak</th>
+                <th className="py-3 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1544,6 +1813,17 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                     }`}>
                       <Zap size={12} /> {student.streak} days
                     </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <button
+                      onClick={() => {
+                        setSelectedStudent(student.username);
+                        setShowTrackingSection(true);
+                      }}
+                      className="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 px-3 py-1 rounded transition-colors"
+                    >
+                      Track Checkpoints
+                    </button>
                   </td>
                 </tr>
               ))}
