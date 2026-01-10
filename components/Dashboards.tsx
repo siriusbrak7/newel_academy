@@ -1,5 +1,5 @@
 ﻿// Dashboards.tsx - COMPLETE FIXED VERSION
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -108,7 +108,7 @@ try {
 }
 
 // =====================================================
-// STUDENT DASHBOARD COMPONENT - FIXED VERSION
+// STUDENT DASHBOARD COMPONENT - OPTIMIZED VERSION
 // =====================================================
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
@@ -116,7 +116,6 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [progress, setProgress] = useState<any>({});
   const [courses, setCourses] = useState<CourseStructure>({});
-  const [loading, setLoading] = useState(true);
   const [subjectLabels, setSubjectLabels] = useState<string[]>([]);
   const [subjectScores, setSubjectScores] = useState<number[]>([]);
   const [courseHistory, setCourseHistory] = useState<any[]>([]);
@@ -132,13 +131,29 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [userNotifications, setUserNotifications] = useState<NotificationType[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   
+  // Progressive loading states
+  const [loadingStates, setLoadingStates] = useState({
+    essential: true,          // Critical for UI to show
+    notifications: false,     // Can load after UI
+    assessments: false,       // Less critical
+    performance: false,       // Heavy calculation
+    courseHistory: false,     // Can be lazy loaded
+    announcements: false      // Not critical
+  });
+  
+  // Cache for expensive calculations
+  const [performanceCache, setPerformanceCache] = useState<{
+    subjectPerformance?: Record<string, number>;
+    lastUpdated?: number;
+  }>({});
+  
   // Navigation
   const navigate = useNavigate();
   
   // Stats
   const { activeDays, streak } = calculateUserStats(user);
 
-  // Load Neuroscience Facts
+  // Load Neuroscience Facts (immediate, no API)
   useEffect(() => {
     if (window.neuroscienceFacts && window.neuroscienceFacts.length > 0) {
       setNeuroscienceFacts(window.neuroscienceFacts);
@@ -156,18 +171,236 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   }, []);
 
-  // Load Notifications
+  // Rotate neuroscience facts (non-blocking)
+  useEffect(() => {
+    if (neuroscienceFacts.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setFactFade(false);
+      setTimeout(() => {
+        setCurrentFactIndex((prev) => (prev + 1) % neuroscienceFacts.length);
+        setFactFade(true);
+      }, 300);
+    }, 11110);
+
+    return () => clearInterval(interval);
+  }, [neuroscienceFacts]);
+
+  // Load Notifications (can be delayed)
   const loadUserNotifications = async () => {
     if (!user?.username) return;
     
+    setLoadingStates(prev => ({ ...prev, notifications: true }));
     try {
       const notifications = await getUserNotifications(user.username);
       setUserNotifications(notifications);
       setUnreadCount(notifications.filter(n => !n.read).length);
     } catch (error) {
       console.error('Error loading notifications:', error);
+    } finally {
+      setLoadingStates(prev => ({ ...prev, notifications: false }));
     }
   };
+
+  // Load essential data first (immediate)
+  const loadEssentialData = async () => {
+    try {
+      console.log(`📊 Loading essential data for student: ${user.username}`);
+      
+      // 1. Load progress (quick)
+      const progressData = await getProgress(user.username);
+      setProgress(progressData);
+      
+      // 2. Load courses light (quick)
+      const coursesData = await getCoursesLight();
+      setCourses(coursesData);
+      
+      // 3. Load pending assessments (filtered)
+      const allAssessments = await getAssessments();
+      const allSubmissions = await getSubmissions();
+      
+      const pending = allAssessments.filter(a =>
+        (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
+        !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
+      );
+      setPendingAssessments(pending.slice(0, 3));
+      
+      // Mark essential data as loaded
+      setLoadingStates(prev => ({ ...prev, essential: false, assessments: false }));
+      
+      console.log('✅ Essential data loaded');
+      
+    } catch (error) {
+      console.error('❌ Error loading essential data:', error);
+      setLoadingStates(prev => ({ ...prev, essential: false, assessments: false }));
+    }
+  };
+
+  // Load performance data (can be delayed - heavy)
+  const loadPerformanceData = async (forceRefresh = false) => {
+    // Check cache first (1 hour cache)
+    const now = Date.now();
+    const cacheValid = performanceCache.lastUpdated && 
+                      (now - performanceCache.lastUpdated < 60 * 60 * 1000) && 
+                      !forceRefresh;
+    
+    if (cacheValid && performanceCache.subjectPerformance) {
+      console.log('📊 Using cached performance data');
+      const labels = Object.keys(performanceCache.subjectPerformance);
+      const scores = Object.values(performanceCache.subjectPerformance);
+      setSubjectLabels(labels);
+      setSubjectScores(scores);
+      generateAdvice(scores);
+      setLoadingStates(prev => ({ ...prev, performance: false }));
+      return;
+    }
+    
+    setLoadingStates(prev => ({ ...prev, performance: true }));
+    
+    try {
+      console.log('📊 Loading performance data...');
+      
+      const subjectPerformance = await getStudentSubjectPerformance(user.username);
+      
+      // Update cache
+      setPerformanceCache({
+        subjectPerformance,
+        lastUpdated: Date.now()
+      });
+      
+      if (Object.keys(subjectPerformance).length > 0) {
+        const labels = Object.keys(subjectPerformance);
+        const scores = Object.values(subjectPerformance);
+        
+        // VALIDATION: Ensure all scores are valid (0-100)
+        const validScores = scores.filter(score => 
+          typeof score === 'number' && score >= 0 && score <= 100
+        );
+        
+        if (validScores.length > 0) {
+          setSubjectLabels(labels);
+          setSubjectScores(scores);
+          generateAdvice(validScores);
+        } else {
+          setSubjectLabels([]);
+          setSubjectScores([]);
+          setAdvice("Complete assessments and checkpoints to see your scores!");
+        }
+      } else {
+        setSubjectLabels([]);
+        setSubjectScores([]);
+        setAdvice("Start by exploring courses and completing your first checkpoint or assessment!");
+      }
+      
+      console.log('✅ Performance data loaded');
+      
+    } catch (error) {
+      console.error('❌ Error loading performance data:', error);
+      setSubjectLabels([]);
+      setSubjectScores([]);
+      setAdvice("Error loading performance data. Please try refreshing.");
+    } finally {
+      setLoadingStates(prev => ({ ...prev, performance: false }));
+    }
+  };
+
+  // Helper to generate advice
+  const generateAdvice = (scores: number[]) => {
+    const overallAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    
+    if (overallAvg < 50) {
+      setAdvice("Focus on mastering fundamentals. Review materials and retry checkpoints.");
+    } else if (overallAvg < 70) {
+      setAdvice("Good progress! Focus on improving weak areas identified in checkpoints.");
+    } else if (overallAvg < 85) {
+      setAdvice("Excellent work! You're mastering concepts. Try the 222-Sprint challenge!");
+    } else {
+      setAdvice("Outstanding performance! Consider helping classmates or exploring advanced topics.");
+    }
+  };
+
+  // Load course history (lazy load)
+  const loadCourseHistory = async () => {
+    setLoadingStates(prev => ({ ...prev, courseHistory: true }));
+    try {
+      const history = await getStudentCourseHistory(user.username);
+      setCourseHistory(history);
+    } catch (error) {
+      console.error('Error loading course history:', error);
+    } finally {
+      setLoadingStates(prev => ({ ...prev, courseHistory: false }));
+    }
+  };
+
+  // Load assessment feedback (lazy load)
+  const loadAssessmentFeedback = async () => {
+    try {
+      const feedback = await getStudentAssessmentFeedback(user.username);
+      setAssessmentFeedback(feedback);
+    } catch (error) {
+      console.error('Error loading assessment feedback:', error);
+    }
+  };
+
+  // Load announcements (low priority)
+  const loadAnnouncements = async () => {
+    setLoadingStates(prev => ({ ...prev, announcements: true }));
+    try {
+      const announcementsData = await getAnnouncements();
+      setAnnouncements(announcementsData);
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+    } finally {
+      setLoadingStates(prev => ({ ...prev, announcements: false }));
+    }
+  };
+
+  // Initial data loading with progressive strategy
+  useEffect(() => {
+    const loadDataSequentially = async () => {
+      console.log('🚀 Starting progressive data load...');
+      
+      // Phase 1: Essential data (immediate)
+      await loadEssentialData();
+      
+      // Phase 2: Notifications (after 200ms delay)
+      setTimeout(() => {
+        loadUserNotifications();
+      }, 200);
+      
+      // Phase 3: Performance data (after 500ms delay)
+      setTimeout(() => {
+        loadPerformanceData();
+      }, 500);
+      
+      // Phase 4: Announcements (after 1 second delay)
+      setTimeout(() => {
+        loadAnnouncements();
+      }, 1000);
+      
+      // Phase 5: Course history and feedback (lazy load when needed)
+      // Will load when user expands grade history section
+    };
+    
+    loadDataSequentially();
+    
+    // Set up notification refresh every 30 seconds
+    const notificationInterval = setInterval(() => {
+      if (user?.username) {
+        loadUserNotifications();
+      }
+    }, 30000);
+    
+    return () => clearInterval(notificationInterval);
+  }, [user]);
+
+  // Lazy load course history when section is expanded
+  useEffect(() => {
+    if (showGradeHistory && courseHistory.length === 0 && !loadingStates.courseHistory) {
+      loadCourseHistory();
+      loadAssessmentFeedback();
+    }
+  }, [showGradeHistory]);
 
   const handleNotificationClick = async (notification: NotificationType) => {
     // Mark as read
@@ -187,160 +420,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  // Rotate neuroscience facts
-  useEffect(() => {
-    if (neuroscienceFacts.length === 0) return;
-    
-    const interval = setInterval(() => {
-      setFactFade(false);
-      setTimeout(() => {
-        setCurrentFactIndex((prev) => (prev + 1) % neuroscienceFacts.length);
-        setFactFade(true);
-      }, 300);
-    }, 11110); // Change fact every 11 seconds
-
-    return () => clearInterval(interval);
-  }, [neuroscienceFacts]);
-
-  // FIXED refreshData function
-  const refreshData = async () => {
-    setLoading(true);
-    try {
-      console.log(`📊 Loading data for student: ${user.username}`);
-      
-      // Load notifications
-      await loadUserNotifications();
-      
-      // Load pending assessments
-      const allAssessments = await getAssessments();
-      const allSubmissions = await getSubmissions();
-      
-      const pending = allAssessments.filter(a =>
-        (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
-        !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
-      );
-      setPendingAssessments(pending.slice(0, 3));
-      
-      // Load announcements
-      const announcementsData = await getAnnouncements();
-      setAnnouncements(announcementsData);
-      
-      // Load courses
-      const coursesData = await getCoursesLight();
-      setCourses(coursesData);
-      
-      // Load progress
-      const progressData = await getProgress(user.username);
-      setProgress(progressData);
-      
-      // ===== FIXED: Get subject performance =====
-      const subjectPerformance = await getStudentSubjectPerformance(user.username);
-      
-      if (Object.keys(subjectPerformance).length > 0) {
-        const labels = Object.keys(subjectPerformance);
-        const scores = Object.values(subjectPerformance);
-        
-        // VALIDATION: Ensure all scores are valid (0-100)
-        const validScores = scores.filter(score => 
-          typeof score === 'number' && score >= 0 && score <= 100
-        );
-        
-        if (validScores.length > 0) {
-          setSubjectLabels(labels);
-          setSubjectScores(scores);
-          
-          // Calculate overall average PROPERLY
-          const overallAvg = validScores.reduce((a, b) => a + b, 0) / validScores.length;
-          console.log(`📈 Overall average: ${Math.round(overallAvg)}% from ${validScores.length} subjects`);
-          
-          // Generate advice based on performance
-          if (overallAvg < 50) {
-            setAdvice("Focus on mastering fundamentals. Review materials and retry checkpoints.");
-          } else if (overallAvg < 70) {
-            setAdvice("Good progress! Focus on improving weak areas identified in checkpoints.");
-          } else if (overallAvg < 85) {
-            setAdvice("Excellent work! You're mastering concepts. Try the 222-Sprint challenge!");
-          } else {
-            setAdvice("Outstanding performance! Consider helping classmates or exploring advanced topics.");
-          }
-        } else {
-          // No valid scores
-          setSubjectLabels([]);
-          setSubjectScores([]);
-          setAdvice("Complete assessments and checkpoints to see your scores!");
-        }
-      } else {
-        // If no scores yet
-        setSubjectLabels([]);
-        setSubjectScores([]);
-        setAdvice("Start by exploring courses and completing your first checkpoint or assessment!");
-      }
-      
-      // Load course history
-      const history = await getStudentCourseHistory(user.username);
-      setCourseHistory(history);
-      
-      // Load assessment feedback
-      const feedback = await getStudentAssessmentFeedback(user.username);
-      setAssessmentFeedback(feedback);
-      
-    } catch (error) {
-      console.error('❌ Error refreshing student dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Debug function to check score calculations
-  const debugScoreCalculation = async () => {
-    try {
-      console.log('🔍 DEBUG: Starting score calculation analysis...');
-      
-      // 1. Get checkpoint scores directly
-      const checkpointScores = await getStudentCheckpointScores(user.username);
-      console.log('📊 Checkpoint scores by subject:', checkpointScores);
-      
-      // 2. Get assessment submissions
-      const allSubmissions = await getSubmissions();
-      const userSubmissions = allSubmissions.filter(s => 
-        s.username === user.username && s.graded && s.score !== undefined
-      );
-      console.log(`📝 Assessment submissions: ${userSubmissions.length}`);
-      
-      userSubmissions.forEach(sub => {
-        console.log(`   - ${sub.assessmentId}: ${sub.score}%`);
-      });
-      
-      // 3. Get subject performance via the fixed function
-      const subjectPerformance = await getStudentSubjectPerformance(user.username);
-      console.log('🎯 Final subject performance:', subjectPerformance);
-      
-      // Calculate overall average
-      const scores = Object.values(subjectPerformance);
-      if (scores.length > 0) {
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        console.log(`📈 Overall average calculated: ${Math.round(avg)}%`);
-      }
-      
-    } catch (error) {
-      console.error('❌ Debug error:', error);
-    }
-  };
-
-  useEffect(() => {
-    refreshData();
-    
-    // Set up notification refresh every 30 seconds
-    const notificationInterval = setInterval(() => {
-      if (user?.username) {
-        loadUserNotifications();
-      }
-    }, 30000);
-    
-    return () => clearInterval(notificationInterval);
-  }, [user]);
-
-  // Chart data
+  // Optimized chart data with memoization
   const chartData = useMemo(() => {
     if (subjectLabels.length === 0 || subjectScores.length === 0) {
       return {
@@ -469,6 +549,54 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  const refreshData = async (force = false) => {
+    console.log('🔄 Refreshing student dashboard...');
+    
+    // Show loading states for what we're refreshing
+    setLoadingStates({
+      essential: true,
+      notifications: force,
+      assessments: true,
+      performance: true,
+      courseHistory: false,
+      announcements: force
+    });
+    
+    try {
+      await loadEssentialData();
+      
+      if (force) {
+        // Clear cache and reload everything
+        setPerformanceCache({});
+        await Promise.all([
+          loadUserNotifications(),
+          loadPerformanceData(true),
+          loadAnnouncements()
+        ]);
+      } else {
+        // Just reload performance data
+        await loadPerformanceData();
+      }
+      
+      console.log('✅ Refresh complete');
+    } catch (error) {
+      console.error('❌ Error during refresh:', error);
+    }
+  };
+
+  // Debug function
+  const debugScoreCalculation = async () => {
+    try {
+      console.log('🔍 DEBUG: Starting score calculation analysis...');
+      
+      const checkpointScores = await getStudentCheckpointScores(user.username);
+      console.log('📊 Checkpoint scores by subject:', checkpointScores);
+      
+    } catch (error) {
+      console.error('❌ Debug error:', error);
+    }
+  };
+
   const features = [
     { 
       title: "Critical Questions", 
@@ -493,11 +621,61 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   ];
 
-  if (loading) {
+  // Show skeleton loader only for essential data
+  if (loadingStates.essential) {
     return (
-      <div className="max-w-7xl mx-auto p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
-        <p className="mt-4 text-white/60">Loading your dashboard...</p>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Skeleton for header */}
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 space-y-6">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-white/10 p-8 rounded-2xl flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="h-10 w-64 bg-white/10 rounded-lg animate-pulse"></div>
+                <div className="h-4 w-96 bg-white/5 rounded animate-pulse"></div>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-10 w-24 bg-white/10 rounded-lg animate-pulse"></div>
+                <div className="h-10 w-28 bg-white/10 rounded-lg animate-pulse"></div>
+              </div>
+            </div>
+            
+            {/* Skeleton for features */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+                  <div className="h-12 w-12 bg-white/10 rounded-xl mb-4 animate-pulse"></div>
+                  <div className="h-6 w-32 bg-white/10 rounded mb-2 animate-pulse"></div>
+                  <div className="h-4 w-48 bg-white/5 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Skeleton for right column */}
+          <div className="space-y-6">
+            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-64 flex flex-col items-center justify-center">
+              <div className="h-48 w-48 bg-white/5 rounded-full animate-pulse"></div>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+              <div className="h-6 w-32 bg-white/10 rounded mb-4 animate-pulse"></div>
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="flex justify-between">
+                    <div className="h-4 w-24 bg-white/5 rounded animate-pulse"></div>
+                    <div className="h-4 w-12 bg-white/5 rounded animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+          <p className="mt-4 text-white/60">Loading your dashboard...</p>
+          <p className="text-white/40 text-sm mt-2">Getting your courses and progress ready</p>
+        </div>
       </div>
     );
   }
@@ -506,7 +684,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
-          {/* Header Section */}
+          {/* Header Section - Shows immediately */}
           <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-white/10 p-8 rounded-2xl flex items-center justify-between">
             <div>
               <h2 className="text-4xl font-bold text-white mb-2">Welcome Back, {user.username}</h2>
@@ -518,10 +696,20 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
             <div className="flex gap-2">
               <button 
-                onClick={refreshData} 
-                className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+                onClick={() => refreshData(false)}
+                disabled={loadingStates.performance || loadingStates.assessments}
+                className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <RefreshCw size={16} /> Refresh
+                {loadingStates.performance || loadingStates.assessments ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} /> Refresh
+                  </>
+                )}
               </button>
               <button 
                 onClick={exportPDF} 
@@ -529,17 +717,10 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               >
                 <Download size={16} /> Export Report
               </button>
-              {/* Temporary debug button - remove after fixing */}
-              <button 
-                onClick={debugScoreCalculation}
-                className="bg-red-500/20 hover:bg-red-500/40 text-red-300 px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
-              >
-                <Bug size={16} /> Debug Scores
-              </button>
             </div>
           </div>
 
-          {/* Quick Start Guide for Students - UPDATED */}
+          {/* Quick Start Guide - Shows immediately */}
           <div className="mb-6">
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-4 rounded-xl">
               <div className="flex items-center gap-3 mb-3">
@@ -586,8 +767,28 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Notifications Section - NEW */}
-          {userNotifications.length > 0 && (
+          {/* Notifications Section - Lazy loaded */}
+          {loadingStates.notifications ? (
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-6 w-32 bg-white/10 rounded animate-pulse"></div>
+                <div className="h-6 w-16 bg-white/10 rounded animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                {[1, 2].map(i => (
+                  <div key={i} className="p-3 rounded-lg border border-white/10">
+                    <div className="flex items-start gap-2">
+                      <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-48 bg-white/10 rounded animate-pulse"></div>
+                        <div className="h-3 w-32 bg-white/5 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : userNotifications.length > 0 && (
             <div className="bg-white/5 border border-white/10 p-4 rounded-xl mb-6">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-bold text-white flex items-center gap-2">
@@ -642,7 +843,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          {/* Neuroscience Facts Section */}
+          {/* Neuroscience Facts Section - Shows immediately */}
           {neuroscienceFacts.length > 0 && (
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
@@ -684,7 +885,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          {/* AI Advisor */}
+          {/* AI Advisor - Shows immediately (uses cached data when available) */}
           <div className="bg-gradient-to-r from-purple-900/40 to-cyan-900/40 border border-white/10 p-6 rounded-2xl flex gap-4 items-start">
             <div className="bg-white/10 p-3 rounded-full">
               <Brain className="text-cyan-300" size={24}/>
@@ -695,8 +896,24 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Announcements */}
-          {announcements.length > 0 && (
+          {/* Announcements - Lazy loaded */}
+          {loadingStates.announcements ? (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 p-6 rounded-2xl">
+              <div className="h-6 w-48 bg-yellow-500/20 rounded mb-4 animate-pulse"></div>
+              <div className="space-y-4">
+                {[1, 2].map(i => (
+                  <div key={i} className="border-l-4 border-yellow-500 pl-4">
+                    <div className="h-5 w-56 bg-yellow-500/10 rounded mb-2 animate-pulse"></div>
+                    <div className="h-4 w-full bg-yellow-500/5 rounded mb-2 animate-pulse"></div>
+                    <div className="flex justify-between">
+                      <div className="h-3 w-24 bg-yellow-500/5 rounded animate-pulse"></div>
+                      <div className="h-3 w-20 bg-yellow-500/5 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : announcements.length > 0 && (
             <div className="bg-yellow-500/10 border border-yellow-500/30 p-6 rounded-2xl">
               <h3 className="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
                 <Megaphone size={20}/> Important Updates
@@ -728,7 +945,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          {/* Pending Assessments Summary */}
+          {/* Pending Assessments - Shows immediately (loaded in essential phase) */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -759,7 +976,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Feature Cards */}
+          {/* Feature Cards - Shows immediately */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {features.map((f, i) => (
               <Link 
@@ -779,11 +996,17 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
         {/* Right Column */}
         <div className="space-y-6">
-          {/* Performance Chart */}
+          {/* Performance Chart - Shows loading state if data not ready */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-64 flex flex-col items-center justify-center">
             <div className="w-full">
               <h3 className="text-white font-bold mb-4 self-start">Subject Performance</h3>
-              {subjectLabels.length > 0 ? (
+              {loadingStates.performance ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+                  <p className="text-white/60">Calculating your performance...</p>
+                  <p className="text-white/40 text-sm mt-1">This may take a moment</p>
+                </div>
+              ) : subjectLabels.length > 0 ? (
                 <div className="w-48 h-48 mx-auto">
                   <Doughnut 
                     data={chartData} 
@@ -820,7 +1043,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
           
-          {/* Quick Stats */}
+          {/* Quick Stats - Shows immediately with placeholders for loading data */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-white font-bold mb-4">Quick Stats</h3>
             <div className="space-y-4">
@@ -842,7 +1065,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <span className="text-white/60 flex items-center gap-2">
                   <Brain size={16}/> Subjects Tracked
                 </span>
-                <span className="text-white font-mono">{subjectLabels.length}</span>
+                <span className="text-white font-mono">
+                  {loadingStates.performance ? (
+                    <span className="inline-block h-4 w-6 bg-white/10 rounded animate-pulse"></span>
+                  ) : (
+                    subjectLabels.length
+                  )}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-white/60 flex items-center gap-2">
@@ -850,7 +1079,14 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </span>
                 <span className="text-white font-mono">{pendingAssessments.length}</span>
               </div>
-              {subjectScores.length > 0 && (
+              {loadingStates.performance ? (
+                <div className="flex justify-between items-center">
+                  <span className="text-white/60 flex items-center gap-2">
+                    <TrendingUp size={16}/> Overall Average
+                  </span>
+                  <span className="inline-block h-6 w-12 bg-white/10 rounded animate-pulse"></span>
+                </div>
+              ) : subjectScores.length > 0 && (
                 <div className="flex justify-between items-center">
                   <span className="text-white/60 flex items-center gap-2">
                     <TrendingUp size={16}/> Overall Average
@@ -861,8 +1097,19 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               )}
               
-              {/* Performance Metrics */}
-              {courseHistory.length > 0 && (
+              {/* Performance Metrics - Lazy loaded */}
+              {loadingStates.courseHistory && showGradeHistory ? (
+                <>
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/60 flex items-center gap-2">
+                        <CheckCircle size={16}/> Courses Completed
+                      </span>
+                      <span className="inline-block h-4 w-8 bg-white/10 rounded animate-pulse"></span>
+                    </div>
+                  </div>
+                </>
+              ) : courseHistory.length > 0 && (
                 <>
                   <div className="pt-4 border-t border-white/10">
                     <div className="flex justify-between items-center">
@@ -895,7 +1142,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
       
-      {/* Grade History Section */}
+      {/* Grade History Section - Lazy loaded */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -903,9 +1150,10 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
           </h3>
           <button 
             onClick={() => setShowGradeHistory(!showGradeHistory)}
-            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+            disabled={loadingStates.courseHistory}
+            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {showGradeHistory ? 'Hide Details' : 'Show Details'}
+            {loadingStates.courseHistory ? 'Loading...' : (showGradeHistory ? 'Hide Details' : 'Show Details')}
             <ChevronDown className={`transform transition-transform ${showGradeHistory ? 'rotate-180' : ''}`} size={14} />
           </button>
         </div>
@@ -913,8 +1161,25 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         {/* Grade History Cards (Collapsible) */}
         {showGradeHistory && (
           <div className="space-y-4">
-            {/* Completed Courses */}
-            {courseHistory.length > 0 ? (
+            {loadingStates.courseHistory ? (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <div className="h-6 w-48 bg-white/10 rounded mb-4 animate-pulse"></div>
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="bg-black/20 p-3 rounded-lg">
+                      <div className="flex justify-between mb-2">
+                        <div className="h-5 w-56 bg-white/10 rounded animate-pulse"></div>
+                        <div className="h-6 w-16 bg-white/10 rounded animate-pulse"></div>
+                      </div>
+                      <div className="flex justify-between">
+                        <div className="h-3 w-36 bg-white/5 rounded animate-pulse"></div>
+                        <div className="h-3 w-24 bg-white/5 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : courseHistory.length > 0 ? (
               <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                 <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Completed Courses</h4>
                 <div className="space-y-2">
@@ -944,7 +1209,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               </div>
             )}
             
-            {/* Assessment Feedback */}
+            {/* Assessment Feedback - Lazy loaded */}
             {assessmentFeedback.length > 0 && (
               <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                 <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Recent Feedback</h4>
@@ -1310,13 +1575,12 @@ export const AdminDashboard: React.FC = () => {
 };
 
 // =====================================================
-// TEACHER DASHBOARD COMPONENT - WITH STUDENT TRACKING
+// TEACHER DASHBOARD COMPONENT - OPTIMIZED VERSION
 // =====================================================
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [students, setStudents] = useState<StudentStats[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
   const [classOverview, setClassOverview] = useState<any>({});
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
   
@@ -1328,74 +1592,177 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     subjectPerformance: any;
     username: string;
   } | null>(null);
-  const [trackingLoading, setTrackingLoading] = useState(false);
+  
+  // Loading states for progressive loading
+  const [loadingStates, setLoadingStates] = useState({
+    mainData: true,
+    classOverview: false,
+    studentTracking: false,
+    assessments: false,
+    announcements: false
+  });
+  
   const [showTrackingSection, setShowTrackingSection] = useState(false);
+  
+  // Cache for student data to avoid repeated API calls
+  const [studentDataCache, setStudentDataCache] = useState<Record<string, any>>({});
 
-  const refreshData = async () => {
-    setLoading(true);
+  // Load critical data first (students and class overview)
+  const loadCriticalData = async () => {
     try {
-      const [studentsData, assessmentsData, announcementsData, overviewData] = await Promise.all([
-        getAllStudentStats(),
-        getAssessments(),
-        getAnnouncements(),
-        getClassOverview()
-      ]);
-      
-      // Filter students for this teacher's grade level if specified
+      // Load students first (most important)
+      const studentsData = await getAllStudentStats();
       const filteredStudents = studentsData.filter(s => 
         !user.gradeLevel || s.gradeLevel === user.gradeLevel
       );
-      
       setStudents(filteredStudents);
-      setAssessments(assessmentsData);
-      setAnnouncements(announcementsData);
-      setClassOverview(overviewData);
       
-      // Auto-select first student if none selected
+      // Auto-select first student
       if (filteredStudents.length > 0 && !selectedStudent) {
         setSelectedStudent(filteredStudents[0].username);
       }
+      
+      // Load class overview
+      const overviewData = await getClassOverview();
+      setClassOverview(overviewData);
+      
+      // Update loading state
+      setLoadingStates(prev => ({ ...prev, mainData: false, classOverview: false }));
+      
     } catch (error) {
-      console.error('Error refreshing teacher dashboard:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error loading critical data:', error);
+      setLoadingStates(prev => ({ ...prev, mainData: false, classOverview: false }));
+    }
+  };
+
+  // Load secondary data (assessments and announcements) after critical data
+  const loadSecondaryData = async () => {
+    try {
+      const [assessmentsData, announcementsData] = await Promise.all([
+        getAssessments(),
+        getAnnouncements()
+      ]);
+      
+      setAssessments(assessmentsData);
+      setAnnouncements(announcementsData);
+      
+      setLoadingStates(prev => ({ ...prev, assessments: false, announcements: false }));
+    } catch (error) {
+      console.error('Error loading secondary data:', error);
+      setLoadingStates(prev => ({ ...prev, assessments: false, announcements: false }));
     }
   };
 
   useEffect(() => {
-    refreshData();
+    // Load critical data immediately
+    loadCriticalData();
+    
+    // Load secondary data after a short delay
+    const secondaryDataTimer = setTimeout(() => {
+      loadSecondaryData();
+    }, 500); // Half second delay
+    
+    return () => clearTimeout(secondaryDataTimer);
   }, []);
 
-  // Load student checkpoint data when selected student changes
-  useEffect(() => {
-    if (selectedStudent) {
-      loadStudentCheckpointData(selectedStudent);
+  // Optimized student checkpoint data loading with caching
+  const loadStudentCheckpointData = useCallback(async (username: string) => {
+    // Check cache first
+    if (studentDataCache[username]) {
+      setStudentCheckpointData(studentDataCache[username]);
+      return;
     }
-  }, [selectedStudent]);
-
-  const loadStudentCheckpointData = async (username: string) => {
-    setTrackingLoading(true);
+    
+    setLoadingStates(prev => ({ ...prev, studentTracking: true }));
+    
     try {
-      // Get student's checkpoint scores by subject
-      const checkpointScores = await getStudentCheckpointScores(username);
+      // Load all student data in parallel
+      const [checkpointScores, courseHistory, subjectPerformance] = await Promise.all([
+        getStudentCheckpointScores(username),
+        getStudentCourseHistory(username),
+        getStudentSubjectPerformance(username)
+      ]);
       
-      // Get student's course history
-      const courseHistory = await getStudentCourseHistory(username);
-      
-      // Get student's subject performance
-      const subjectPerformance = await getStudentSubjectPerformance(username);
-      
-      setStudentCheckpointData({
+      const studentData = {
         checkpointScores,
         courseHistory,
         subjectPerformance,
         username
-      });
+      };
+      
+      // Update cache
+      setStudentDataCache(prev => ({
+        ...prev,
+        [username]: studentData
+      }));
+      
+      setStudentCheckpointData(studentData);
     } catch (error) {
       console.error('Error loading student checkpoint data:', error);
       setStudentCheckpointData(null);
     } finally {
-      setTrackingLoading(false);
+      setLoadingStates(prev => ({ ...prev, studentTracking: false }));
+    }
+  }, [studentDataCache]);
+
+  // Debounced student selection to avoid rapid API calls
+  useEffect(() => {
+    if (!selectedStudent) return;
+    
+    const timer = setTimeout(() => {
+      loadStudentCheckpointData(selectedStudent);
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [selectedStudent, loadStudentCheckpointData]);
+
+  // Optimized formatCheckpointData with memoization
+  const formatCheckpointData = useCallback((checkpointScores: Record<string, number>) => {
+    if (!checkpointScores || Object.keys(checkpointScores).length === 0) {
+      return [];
+    }
+    
+    return Object.entries(checkpointScores).map(([subject, score]) => ({
+      subject,
+      score,
+      status: score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs Improvement',
+      color: score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400',
+      bgColor: score >= 80 ? 'bg-green-500/20' : score >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+    }));
+  }, []);
+
+  // Optimized refresh function
+  const refreshData = async (force = false) => {
+    setLoadingStates({
+      mainData: true,
+      classOverview: true,
+      studentTracking: false,
+      assessments: true,
+      announcements: true
+    });
+    
+    try {
+      if (force) {
+        // Force refresh everything
+        await loadCriticalData();
+        await loadSecondaryData();
+      } else {
+        // Just refresh critical data
+        await loadCriticalData();
+      }
+      
+      // Refresh selected student data
+      if (selectedStudent) {
+        // Clear cache for this student
+        setStudentDataCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[selectedStudent];
+          return newCache;
+        });
+        await loadStudentCheckpointData(selectedStudent);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
     }
   };
 
@@ -1416,7 +1783,9 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       });
       
       setNewAnnouncement({ title: '', content: '' });
-      refreshData();
+      // Only refresh announcements
+      const announcementsData = await getAnnouncements();
+      setAnnouncements(announcementsData);
       alert('Announcement created successfully!');
     } catch (error) {
       console.error('Error creating announcement:', error);
@@ -1424,25 +1793,44 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const formatCheckpointData = (checkpointScores: Record<string, number>) => {
-    if (!checkpointScores || Object.keys(checkpointScores).length === 0) {
-      return [];
-    }
-    
-    return Object.entries(checkpointScores).map(([subject, score]) => ({
-      subject,
-      score,
-      status: score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs Improvement',
-      color: score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400',
-      bgColor: score >= 80 ? 'bg-green-500/20' : score >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
-    }));
-  };
-
-  if (loading) {
+  // Show minimal loading state - only for critical data
+  if (loadingStates.mainData) {
     return (
-      <div className="max-w-7xl mx-auto p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
-        <p className="mt-4 text-white/60">Loading teacher dashboard...</p>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Skeleton loader for header */}
+        <div className="flex justify-between items-center">
+          <div className="space-y-3">
+            <div className="h-10 w-64 bg-white/10 rounded-lg animate-pulse"></div>
+            <div className="h-4 w-48 bg-white/5 rounded animate-pulse"></div>
+          </div>
+          <div className="flex gap-3">
+            <div className="h-10 w-32 bg-white/10 rounded-lg animate-pulse"></div>
+            <div className="h-10 w-40 bg-white/10 rounded-lg animate-pulse"></div>
+            <div className="h-10 w-40 bg-white/10 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Skeleton for class overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-white/10 rounded animate-pulse"></div>
+                  <div className="h-8 w-16 bg-white/10 rounded animate-pulse"></div>
+                </div>
+                <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress indicator */}
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+          <p className="mt-4 text-white/60">Loading essential data...</p>
+          <p className="text-white/40 text-sm mt-2">Students and class overview</p>
+        </div>
       </div>
     );
   }
@@ -1456,10 +1844,20 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
         <div className="flex gap-3">
           <button 
-            onClick={refreshData} 
-            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            onClick={() => refreshData(false)}
+            disabled={loadingStates.assessments || loadingStates.announcements}
+            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw size={16} /> Refresh
+            {loadingStates.assessments || loadingStates.announcements ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw size={16} /> Refresh
+              </>
+            )}
           </button>
           <Link 
             to="/courses" 
@@ -1476,13 +1874,13 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Class Overview */}
+      {/* Class Overview - Show immediately after loading */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/60 text-sm">Total Students</p>
-              <p className="text-3xl font-bold text-white">{classOverview.totalStudents || 0}</p>
+              <p className="text-3xl font-bold text-white">{classOverview.totalStudents || students.length || 0}</p>
             </div>
             <UsersIcon className="text-cyan-400" size={32} />
           </div>
@@ -1493,7 +1891,11 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/60 text-sm">Class Average</p>
-              <p className="text-3xl font-bold text-white">{classOverview.classAverage || 0}%</p>
+              {loadingStates.classOverview ? (
+                <div className="h-12 w-24 bg-white/10 rounded animate-pulse"></div>
+              ) : (
+                <p className="text-3xl font-bold text-white">{classOverview.classAverage || 0}%</p>
+              )}
             </div>
             <TrendingUp className="text-green-400" size={32} />
           </div>
@@ -1504,7 +1906,11 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/60 text-sm">Weakest Topic</p>
-              <p className="text-3xl font-bold text-white truncate">{classOverview.weakestTopic || 'N/A'}</p>
+              {loadingStates.classOverview ? (
+                <div className="h-12 w-32 bg-white/10 rounded animate-pulse mt-2"></div>
+              ) : (
+                <p className="text-3xl font-bold text-white truncate">{classOverview.weakestTopic || 'N/A'}</p>
+              )}
             </div>
             <AlertCircle className="text-yellow-400" size={32} />
           </div>
@@ -1547,10 +1953,10 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </select>
                 <button
                   onClick={() => selectedStudent && loadStudentCheckpointData(selectedStudent)}
-                  disabled={!selectedStudent || trackingLoading}
+                  disabled={!selectedStudent || loadingStates.studentTracking}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {trackingLoading ? (
+                  {loadingStates.studentTracking ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
                       Loading...
@@ -1691,7 +2097,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
               </div>
             ) : selectedStudent ? (
               <div className="text-center py-8">
-                {trackingLoading ? (
+                {loadingStates.studentTracking ? (
                   <>
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4"></div>
                     <p className="text-white/60">Loading checkpoint data for {selectedStudent}...</p>
@@ -1753,7 +2159,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Student Performance Table */}
+      {/* Student Performance Table - Loads immediately with student data */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-white">Student Performance</h2>
@@ -1840,59 +2246,86 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         )}
       </div>
 
-      {/* Active Announcements */}
+      {/* Active Announcements - Lazy loaded */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Megaphone className="text-orange-400" /> Active Announcements
           </h3>
-          <div className="space-y-4">
-            {announcements.slice(0, 3).map(ann => {
-              const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
-              const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
-              
-              return (
-                <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-white font-medium">{ann.title}</p>
-                    {hoursLeft <= 24 && (
-                      <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
-                        {hoursLeft}h left
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-white/60 text-sm mb-2">{ann.content}</p>
-                  <div className="flex justify-between text-white/30 text-xs">
-                    <span>By: {ann.author}</span>
-                    <span>{new Date(ann.timestamp).toLocaleDateString()}</span>
-                  </div>
+          {loadingStates.announcements ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                  <div className="h-4 w-48 bg-white/10 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-full bg-white/5 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-32 bg-white/5 rounded animate-pulse"></div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {announcements.slice(0, 3).map(ann => {
+                const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+                const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
+                
+                return (
+                  <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-white font-medium">{ann.title}</p>
+                      {hoursLeft <= 24 && (
+                        <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
+                          {hoursLeft}h left
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-white/60 text-sm mb-2">{ann.content}</p>
+                    <div className="flex justify-between text-white/30 text-xs">
+                      <span>By: {ann.author}</span>
+                      <span>{new Date(ann.timestamp).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <ClipboardList className="text-cyan-400" /> Recent Assessments
           </h3>
-          <div className="space-y-3">
-            {assessments.slice(0, 3).map(assessment => (
-              <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-white font-medium">{assessment.title}</p>
-                  <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
-                    {assessment.questions?.length || 0} Questions
-                  </span>
+          {loadingStates.assessments ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                  <div className="h-4 w-56 bg-white/10 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-32 bg-white/5 rounded animate-pulse mb-3"></div>
+                  <div className="flex justify-between">
+                    <div className="h-3 w-20 bg-white/5 rounded animate-pulse"></div>
+                    <div className="h-3 w-24 bg-white/5 rounded animate-pulse"></div>
+                  </div>
                 </div>
-                <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
-                <div className="flex justify-between text-white/30 text-xs">
-                  <span>Grade: {assessment.targetGrade}</span>
-                  <span>By: {assessment.createdBy}</span>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {assessments.slice(0, 3).map(assessment => (
+                <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-white font-medium">{assessment.title}</p>
+                    <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                      {assessment.questions?.length || 0} Questions
+                    </span>
+                  </div>
+                  <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
+                  <div className="flex justify-between text-white/30 text-xs">
+                    <span>Grade: {assessment.targetGrade}</span>
+                    <span>By: {assessment.createdBy}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
