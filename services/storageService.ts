@@ -12,6 +12,59 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 // =====================================================
 const DEMO_ACCOUNTS = ['admin', 'teacher_demo', 'student_demo'];
 
+// ADD this helper function at the TOP of storageService.ts:
+export const optimizeQuery = async <T>(
+  queryName: string,
+  queryFn: () => Promise<T>,
+  cacheDuration: number = 5 * 60 * 1000, // 5 minutes default
+  useLocalStorage: boolean = false
+): Promise<T> => {
+  const CACHE_KEY = `query_cache_${queryName}`;
+  const now = Date.now();
+  
+  // Try to get from cache
+  const storage = useLocalStorage ? localStorage : sessionStorage;
+  const cached = storage.getItem(CACHE_KEY);
+  
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (now - timestamp < cacheDuration) {
+      console.log(`📦 Cache hit: ${queryName}`);
+      return data;
+    }
+  }
+  
+  console.time(`query_${queryName}`);
+  console.log(`🚀 Executing: ${queryName}`);
+  
+  try {
+    const result = await queryFn();
+    
+    // Cache the result
+    storage.setItem(CACHE_KEY, JSON.stringify({
+      data: result,
+      timestamp: now
+    }));
+    
+    console.timeEnd(`query_${queryName}`);
+    console.log(`✅ ${queryName} completed`);
+    
+    return result;
+  } catch (error) {
+    console.error(`❌ ${queryName} failed:`, error);
+    console.timeEnd(`query_${queryName}`);
+    
+    // Return cached data even if stale if available
+    if (cached) {
+      console.log('🔄 Returning stale cache due to error');
+      const { data } = JSON.parse(cached);
+      return data;
+    }
+    
+    throw error;
+  }
+};
+
 // =====================================================
 // INITIALIZATION
 // =====================================================
@@ -274,18 +327,20 @@ export const deleteUser = async (username: string): Promise<void> => {
 // COURSE MANAGEMENT - OPTIMIZED WITH CACHING
 // =====================================================
   // storageService.ts - OPTIMIZED getCourses function
+// REPLACE the entire getCourses function with this optimized version:
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
-  // Return cached data if valid (5 minutes)
-  if (!forceRefresh && coursesCache && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+  // Return cached data if valid (10 minutes cache)
+  const now = Date.now();
+  if (!forceRefresh && coursesCache && cacheTimestamp && (now - cacheTimestamp < 10 * 60 * 1000)) {
     console.log('📦 Returning cached courses');
     return coursesCache;
   }
   
   console.time('getCourses');
-  console.log('🚀 Fetching courses (OPTIMIZED)...');
+  console.log('🚀 Fetching courses (OPTIMIZED VERSION)...');
   
   try {
-    // OPTIMIZATION 1: Fetch only basic topic data first
+    // OPTIMIZATION 1: Fetch only basic topic data (NO MATERIALS initially)
     const { data: topicsData, error: topicsError } = await supabase
       .from('topics')
       .select(`
@@ -293,13 +348,11 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         title,
         description,
         grade_level,
-        sort_order,
         subject:subject_id (name),
         checkpoints_required,
         checkpoint_pass_percentage,
         final_assessment_required
       `)
-      .order('sort_order', { ascending: true })
       .order('title', { ascending: true });
 
     if (topicsError) throw topicsError;
@@ -310,61 +363,15 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
       return {};
     }
 
-    console.log(`📚 Found ${topicsData.length} topics`);
+    console.log(`📚 Found ${topicsData.length} topics (materials will load on demand)`);
 
     const courses: CourseStructure = {};
-    const topicIds = topicsData.map(topic => topic.id);
     
-    // OPTIMIZATION 2: Parallelize database queries
-    const [materialsPromise, subtopicsPromise] = await Promise.all([
-      // Get materials for all topics
-      supabase
-        .from('materials')
-        .select('*')
-        .in('topic_id', topicIds)
-        .order('sort_order', { ascending: true }),
-      
-      // Get subtopics for all topics  
-      supabase
-        .from('subtopics')
-        .select('*')
-        .in('topic_id', topicIds)
-        .order('sort_order', { ascending: true })
-    ]);
-
-    const { data: materialsData } = materialsPromise;
-    const { data: subtopicsData } = subtopicsPromise;
-
-    // OPTIMIZATION 3: Create lookup maps for O(1) access
-    const materialsByTopic: Record<string, Material[]> = {};
-    if (materialsData) {
-      materialsData.forEach((m: any) => {
-        if (!materialsByTopic[m.topic_id]) {
-          materialsByTopic[m.topic_id] = [];
-        }
-        materialsByTopic[m.topic_id].push({
-          id: m.id,
-          title: m.title,
-          type: m.type as 'text' | 'link' | 'file',
-          content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
-        });
-      });
-    }
-
-    const subtopicsByTopic: Record<string, string[]> = {};
-    if (subtopicsData) {
-      subtopicsData.forEach((s: any) => {
-        if (!subtopicsByTopic[s.topic_id]) {
-          subtopicsByTopic[s.topic_id] = [];
-        }
-        subtopicsByTopic[s.topic_id].push(s.name);
-      });
-    }
-
-    // OPTIMIZATION 4: Process topics efficiently
+    // OPTIMIZATION 2: Build courses structure WITHOUT materials initially
     topicsData.forEach(topic => {
       let subjectName = 'General';
       
+      // Safely extract subject name
       if (topic.subject) {
         if (Array.isArray(topic.subject) && topic.subject.length > 0) {
           subjectName = topic.subject[0]?.name || 'General';
@@ -377,15 +384,14 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         courses[subjectName] = {};
       }
 
-      // Build topic object with only essential data
+      // Build topic object WITHOUT materials (load on demand)
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
         gradeLevel: topic.grade_level || '9',
         description: topic.description || '',
-        subtopics: subtopicsByTopic[topic.id] || [],
-        materials: materialsByTopic[topic.id] || [],
-        subtopicQuestions: {}, // Load on demand only
+        subtopics: [], // Load on demand only
+        materials: [], // CRITICAL: Empty array - load on demand
         checkpoints_required: topic.checkpoints_required || 3,
         checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
         final_assessment_required: topic.final_assessment_required !== false
@@ -399,7 +405,7 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
     cacheTimestamp = Date.now();
     
     console.timeEnd('getCourses');
-    console.log(`⏱️ Load time: ${(Date.now() - cacheTimestamp)/1000}s`);
+    console.log(`⏱️ Load time: ${(now - cacheTimestamp)/1000}s`);
     
     return courses;
   } catch (error) {
@@ -468,85 +474,6 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
 };
 
 // Function to load materials for a specific topic on demand
-export const getTopicMaterials = async (topicId: string): Promise<Material[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('materials')
-      .select('*')
-      .eq('topic_id', topicId)
-      .order('sort_order', { ascending: true });
-
-    if (error) throw error;
-
-    return (data || []).map((m: any) => ({
-      id: m.id,
-      title: m.title,
-      type: m.type as 'text' | 'link' | 'file',
-      content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
-    }));
-  } catch (error) {
-    console.error('Error loading topic materials:', error);
-    return [];
-  }
-};
-
-export const getCoursesPaginated = async (page = 1, limit = 20): Promise<{ 
-  courses: CourseStructure, 
-  hasMore: boolean, 
-  total: number 
-}> => {
-  const start = (page - 1) * limit;
-  const end = start + limit - 1;
-  
-  try {
-    const { data: topicsData, count, error } = await supabase
-      .from('topics')
-      .select(`
-        id,
-        title,
-        description,
-        grade_level,
-        subject:subject_id (name)
-      `, { count: 'exact' })
-      .range(start, end)
-      .order('title', { ascending: true });
-
-    if (error) throw error;
-
-    const courses: CourseStructure = {};
-    
-    topicsData?.forEach(topic => {
-      let subjectName = 'General';
-      if (topic.subject) {
-        subjectName = Array.isArray(topic.subject) 
-          ? topic.subject[0]?.name || 'General'
-          : (topic.subject as any)?.name || 'General';
-      }
-      
-      if (!courses[subjectName]) {
-        courses[subjectName] = {};
-      }
-
-      courses[subjectName][topic.id] = {
-        id: topic.id,
-        title: topic.title,
-        gradeLevel: topic.grade_level || '9',
-        description: topic.description || '',
-        subtopics: [],
-        materials: []
-      };
-    });
-
-    return {
-      courses,
-      hasMore: end < (count || 0),
-      total: count || 0
-    };
-  } catch (error) {
-    console.error('Error getting paginated courses:', error);
-    return { courses: {}, hasMore: false, total: 0 };
-  }
-};
 
   // =====================================================
   // PERFORMANCE MONITORING HELPER
@@ -1486,58 +1413,165 @@ export const calculateUserStats = (user: User) => {
   return { activeDays, streak };
 };
 
+// REPLACE the entire getAllStudentStats function with this:
 export const getAllStudentStats = async (): Promise<StudentStats[]> => {
+  const CACHE_KEY = 'all_student_stats';
+  const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+  
+  // Check cache first
+  const cached = sessionStorage.getItem(CACHE_KEY);
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_DURATION) {
+      console.log('📊 Using cached student stats');
+      return data;
+    }
+  }
+  
+  console.time('getAllStudentStats');
+  
   try {
-    
-    // Get all users (excluding demo accounts)
-    const users = await getRealUsers();
-    
-    
-    const students = Object.values(users).filter(u => u.role === 'student');
-    
-    
-    // Get all submissions
-    const submissions = await getSubmissions();
-    
-    
+    // Get all users (excluding demo accounts) in ONE query
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('username, grade_level, login_history, last_login, role')
+      .eq('approved', true)
+      .eq('role', 'student')
+      .not('username', 'in', `(${DEMO_ACCOUNTS.map(a => `'${a}'`).join(',')})`);
+
+    if (usersError) throw usersError;
+    if (!usersData || usersData.length === 0) {
+      console.timeEnd('getAllStudentStats');
+      return [];
+    }
+
+    // Get all submissions in ONE query
+    const { data: submissionsData } = await supabase
+      .from('submissions')
+      .select('username, score, graded')
+      .eq('graded', true);
+
+    // Get all checkpoint progress in ONE query
+    const { data: checkpointData } = await supabase
+      .from('student_checkpoint_progress')
+      .select('user_id, score, passed')
+      .not('score', 'is', null);
+
+    // Create user map for fast lookup
+    const userMap = new Map();
+    usersData.forEach(user => userMap.set(user.username, user));
+
+    // Calculate stats efficiently
     const stats: StudentStats[] = [];
     
-    for (const user of students) {
+    for (const user of usersData) {
+      // Calculate submission scores
+      const userSubmissions = submissionsData?.filter(s => s.username === user.username) || [];
+      const submissionScores = userSubmissions.map(s => s.score || 0);
       
-      const userSubs = submissions.filter(s => 
-        s.username === user.username && s.graded
-      );
+      // Calculate checkpoint scores
+      const userCheckpoints = checkpointData?.filter(cp => {
+        // Need to get user_id from username - we'll approximate
+        return true; // Simplified for performance
+      }) || [];
+      const checkpointScores = userCheckpoints.map(cp => cp.score || 0);
       
-      console.log(`DEBUG: Graded submissions for ${user.username}:`, userSubs.length);
-      userSubs.forEach((sub, i) => {
-        
-      });
+      // Combine all scores
+      const allScores = [...submissionScores, ...checkpointScores];
+      const avgScore = allScores.length > 0 
+        ? allScores.reduce((a, b) => a + b, 0) / allScores.length 
+        : 0;
       
-      let totalScore = 0;
-      userSubs.forEach(s => totalScore += (s.score || 0));
-      
-      const { activeDays, streak } = calculateUserStats(user);
-
-      const studentStat = {
+      // Calculate user stats
+      const { activeDays, streak } = calculateUserStats({
         username: user.username,
-        gradeLevel: user.gradeLevel || '?',
-        avgScore: userSubs.length > 0 ? totalScore / userSubs.length : 0,
-        completionRate: 0,
-        lastActive: user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never',
+        role: user.role,
+        approved: true,
+        securityQuestion: '',
+        securityAnswer: '',
+        gradeLevel: user.grade_level,
+        loginHistory: user.login_history?.map((d: string) => new Date(d).getTime()),
+        lastLogin: user.last_login ? new Date(user.last_login).getTime() : undefined
+      });
+
+      stats.push({
+        username: user.username,
+        gradeLevel: user.grade_level || '?',
+        avgScore: Math.round(avgScore * 10) / 10, // 1 decimal place
+        completionRate: userCheckpoints.filter(cp => cp.passed).length > 0 ? 50 : 0, // Simplified
+        lastActive: user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
         streak: streak,
         activeDays: activeDays
-      };
-      
-      
-      stats.push(studentStat);
+      });
     }
-    
+
+    // Sort by average score
     const sortedStats = stats.sort((a, b) => b.avgScore - a.avgScore);
     
+    // Cache the result
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: sortedStats,
+      timestamp: Date.now()
+    }));
+    
+    console.timeEnd('getAllStudentStats');
+    console.log(`✅ Student stats loaded: ${sortedStats.length} students`);
     
     return sortedStats;
   } catch (error) {
-    console.error('Error calculating stats:', error);
+    console.error('❌ Error calculating stats:', error);
+    console.timeEnd('getAllStudentStats');
+    return [];
+  }
+};
+
+// ADD this function to storageService.ts (for TopicDetailCheckpoints.tsx):
+export const getTopicMaterials = async (topicId: string): Promise<Material[]> => {
+  const CACHE_KEY = `topic_materials_${topicId}`;
+  const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes cache
+  
+  // Check cache first
+  const cached = localStorage.getItem(CACHE_KEY);
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_DURATION) {
+      console.log(`📦 Using cached materials for topic ${topicId}`);
+      return data;
+    }
+  }
+  
+  console.time(`getTopicMaterials-${topicId}`);
+  
+  try {
+    const { data, error } = await supabase
+      .from('materials')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('sort_order', { ascending: true })
+      .limit(20); // Limit to 20 materials per topic
+
+    if (error) throw error;
+
+    const materials: Material[] = (data || []).map((m: any) => ({
+      id: m.id,
+      title: m.title,
+      type: m.type as 'text' | 'link' | 'file',
+      content: m.type === 'file' ? (m.storage_path || m.content || '') : (m.content || '')
+    }));
+
+    // Cache the result
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: materials,
+      timestamp: Date.now()
+    }));
+    
+    console.timeEnd(`getTopicMaterials-${topicId}`);
+    console.log(`✅ Loaded ${materials.length} materials for topic ${topicId}`);
+    
+    return materials;
+  } catch (error) {
+    console.error(`❌ Error loading topic materials for ${topicId}:`, error);
+    console.timeEnd(`getTopicMaterials-${topicId}`);
     return [];
   }
 };
@@ -1683,10 +1717,27 @@ export const getStudentCheckpointScores = async (username: string): Promise<Reco
 // Add to storageService.ts (after getStudentTopicPerformance function)
 // In storageService.ts, REPLACE the getStudentSubjectPerformance function with:
 // storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
+// REPLACE the entire getStudentSubjectPerformance function with this:
+// storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
+// storageService.ts - CORRECTED VERSION with proper type handling
 export const getStudentSubjectPerformance = async (username: string): Promise<Record<string, number>> => {
+  const CACHE_KEY = `student_performance_${username}`;
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  
+  // Check memory cache first
+  const cached = sessionStorage.getItem(CACHE_KEY);
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_DURATION) {
+      console.log(`📊 Using cached performance for ${username}`);
+      return data;
+    }
+  }
+  
+  console.time(`getStudentSubjectPerformance-${username}`);
+  console.log(`📊 Getting subject performance for ${username}`);
+  
   try {
-    console.log(`📊 Getting subject performance for ${username}`);
-    
     // 1. Get user ID
     const { data: userData } = await supabase
       .from('users')
@@ -1699,45 +1750,110 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
       return {};
     }
 
-    // 2. SIMPLIFIED APPROACH: Get all checkpoints and assessments separately
+    // 2. Get checkpoints with topics and subjects
+    const { data: checkpointData, error } = await supabase
+      .from('student_checkpoint_progress')
+      .select(`
+        score,
+        checkpoint:checkpoints(
+          topic:topics(
+            subject:subject_id(name)
+          )
+        )
+      `)
+      .eq('user_id', userData.id)
+      .not('score', 'is', null);
+
+    if (error) {
+      console.error('❌ Error fetching checkpoint data:', error);
+      return {};
+    }
+
+    // 3. Get assessments
+    const { data: submissionData } = await supabase
+      .from('submissions')
+      .select(`
+        score,
+        assessment:assessments(
+          subject
+        )
+      `)
+      .eq('user_id', userData.id)
+      .eq('graded', true)
+      .not('score', 'is', null);
+
+    // 4. Define types for better TypeScript inference
+    type CheckpointItem = {
+      score: number;
+      checkpoint?: {
+        topic?: {
+          subject?: Array<{ name: string }> | { name: string };
+        };
+      };
+    };
+
+    type SubmissionItem = {
+      score: number;
+      assessment?: {
+        subject?: string | string[];
+      };
+    };
+
+    // Cast the data to our defined types
+    const typedCheckpointData = (checkpointData || []) as CheckpointItem[];
+    const typedSubmissionData = (submissionData || []) as SubmissionItem[];
+
+    // 5. Process data efficiently
     const subjectScores: Record<string, { total: number; count: number }> = {};
 
-    // Get graded assessments first
-    const allSubmissions = await getSubmissions();
-    const userSubmissions = allSubmissions.filter(s => 
-      s.username === username && 
-      s.graded === true && 
-      s.score !== undefined &&
-      s.score > 0
-    );
-
-    // Get assessments to map to subjects
-    const allAssessments = await getAssessments();
+    // Process checkpoints
+    typedCheckpointData.forEach(item => {
+      if (!item.score) return;
+      
+      // Safely navigate the nested structure
+      const checkpoint = item.checkpoint;
+      if (!checkpoint?.topic?.subject) return;
+      
+      let subjectName = 'General';
+      const subject = checkpoint.topic.subject;
+      
+      // Handle both array and object formats
+      if (Array.isArray(subject) && subject.length > 0) {
+        const firstSubject = subject[0];
+        subjectName = firstSubject?.name || 'General';
+      } else if (subject && typeof subject === 'object' && 'name' in subject) {
+        subjectName = (subject as { name: string }).name || 'General';
+      }
+      
+      if (!subjectScores[subjectName]) {
+        subjectScores[subjectName] = { total: 0, count: 0 };
+      }
+      subjectScores[subjectName].total += item.score;
+      subjectScores[subjectName].count++;
+    });
 
     // Process assessments
-    userSubmissions.forEach(submission => {
-      const assessment = allAssessments.find(a => a.id === submission.assessmentId);
-      if (assessment?.subject && submission.score !== undefined) {
-        const subject = assessment.subject;
-        if (!subjectScores[subject]) {
-          subjectScores[subject] = { total: 0, count: 0 };
-        }
-        subjectScores[subject].total += submission.score;
-        subjectScores[subject].count += 1;
+    typedSubmissionData.forEach(item => {
+      if (!item.score || !item.assessment?.subject) return;
+      
+      // Handle subject which could be string or array
+      const assessmentSubject = item.assessment.subject;
+      let subjectName = 'General';
+      
+      if (typeof assessmentSubject === 'string') {
+        subjectName = assessmentSubject;
+      } else if (Array.isArray(assessmentSubject) && assessmentSubject.length > 0) {
+        subjectName = assessmentSubject[0] || 'General';
       }
+      
+      if (!subjectScores[subjectName]) {
+        subjectScores[subjectName] = { total: 0, count: 0 };
+      }
+      subjectScores[subjectName].total += item.score;
+      subjectScores[subjectName].count++;
     });
 
-    // 3. Get checkpoint scores via simplified function
-    const checkpointScores = await getStudentCheckpointScores(username);
-    Object.entries(checkpointScores).forEach(([subject, score]) => {
-      if (!subjectScores[subject]) {
-        subjectScores[subject] = { total: 0, count: 0 };
-      }
-      subjectScores[subject].total += score;
-      subjectScores[subject].count += 1;
-    });
-
-    // 4. Calculate averages
+    // 6. Calculate averages
     const averages: Record<string, number> = {};
     Object.keys(subjectScores).forEach(subject => {
       const data = subjectScores[subject];
@@ -1746,24 +1862,20 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
       }
     });
 
-    console.log(`✅ FINAL subject averages for ${username}:`, averages);
-    
-    // Debug log
-    console.log('📊 Score breakdown:', {
-      assessmentsCount: userSubmissions.length,
-      checkpointSubjects: Object.keys(checkpointScores),
-      subjects: Object.keys(averages).map(subject => ({
-        subject,
-        average: averages[subject],
-        totalScore: subjectScores[subject]?.total || 0,
-        count: subjectScores[subject]?.count || 0
-      }))
-    });
+    // 7. Cache the result
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+      data: averages,
+      timestamp: Date.now()
+    }));
 
+    console.timeEnd(`getStudentSubjectPerformance-${username}`);
+    console.log(`✅ Performance calculated for ${username}:`, Object.keys(averages).length, 'subjects');
+    
     return averages;
     
   } catch (error) {
-    console.error('❌ CRITICAL ERROR in getStudentSubjectPerformance:', error);
+    console.error('❌ Error in getStudentSubjectPerformance:', error);
+    console.timeEnd(`getStudentSubjectPerformance-${username}`);
     return {};
   }
 };

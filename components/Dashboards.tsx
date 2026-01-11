@@ -279,14 +279,14 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [userNotifications, setUserNotifications] = useState<NotificationType[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   
-  // Progressive loading states
+  // Progressive loading states - OPTIMIZED
   const [loadingStates, setLoadingStates] = useState({
-    essential: true,          // Critical for UI to show
-    notifications: false,     // Can load after UI
-    assessments: false,       // Less critical
-    performance: false,       // Heavy calculation
-    courseHistory: false,     // Can be lazy loaded
-    announcements: false      // Not critical
+    essential: true,          // Header, basic stats
+    performance: false,       // Charts, analytics (heavy)
+    notifications: false,     // Notifications (can delay)
+    assessments: false,       // Pending assessments
+    courseHistory: false,     // Only when expanded
+    announcements: false      // Low priority
   });
   
   // Cache for expensive calculations
@@ -295,32 +295,37 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     lastUpdated?: number;
   }>({});
   
+  // New: Data cache for quick refreshes
+  const [dataCache, setDataCache] = useState<{
+    essential?: {
+      progress: any;
+      courses: CourseStructure;
+      pendingAssessments: Assessment[];
+    };
+    timestamp?: number;
+  }>({});
+  
   // Navigation
   const navigate = useNavigate();
   
-  // Stats
-  const { activeDays, streak } = calculateUserStats(user);
+  // Stats (memoized to prevent recalculation)
+  const { activeDays, streak } = useMemo(() => calculateUserStats(user), [user]);
 
-  // Load Neuroscience Facts (immediate, no API)
+  // =====================================================
+  // OPTIMIZATION 1: LOAD NEUROSCIENCE FACTS FROM WINDOW
+  // =====================================================
   useEffect(() => {
-    // Declare window type augmentation
-    interface WindowWithFacts {
-      neuroscienceFacts?: string[];
-    }
-    
-    const windowWithFacts = window as unknown as WindowWithFacts;
-    
-    if (windowWithFacts.neuroscienceFacts && windowWithFacts.neuroscienceFacts.length > 0) {
-      setNeuroscienceFacts(windowWithFacts.neuroscienceFacts);
+    // Use window cache if available (fastest)
+    const windowWithFacts = window as any;
+    if (windowWithFacts.neuroscienceFacts && Array.isArray(windowWithFacts.neuroscienceFacts)) {
+      setNeuroscienceFacts(windowWithFacts.neuroscienceFacts.slice(0, 4)); // Only 4 facts
     } else {
-      // Fallback facts if not loaded from index.html
+      // Fallback facts (small set)
       const defaultFacts = [
-        "The human brain has about 86 billion neurons, each connected to thousands of others.",
-        "Your brain generates enough electricity to power a small light bulb (about 20 watts).",
-        "Neuroplasticity allows your brain to reorganize itself throughout your life.",
-        "Sleep is crucial for memory consolidation and neural repair.",
-        "The brain is 73% water. Dehydration of just 2% can impair attention and memory.",
-        "Learning new skills increases myelin, making neural pathways faster."
+        "The human brain has about 86 billion neurons.",
+        "Neuroplasticity allows your brain to reorganize itself.",
+        "Sleep is crucial for memory consolidation.",
+        "Learning new skills increases neural pathway speed."
       ];
       setNeuroscienceFacts(defaultFacts);
     }
@@ -341,62 +346,76 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     return () => clearInterval(interval);
   }, [neuroscienceFacts]);
 
-  // Load Notifications (can be delayed)
-  const loadUserNotifications = async () => {
-    if (!user?.username) return;
-    
-    setLoadingStates(prev => ({ ...prev, notifications: true }));
-    try {
-      const notifications = await getUserNotifications(user.username);
-      setUserNotifications(notifications);
-      setUnreadCount(notifications.filter(n => !n.read).length);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-    } finally {
-      setLoadingStates(prev => ({ ...prev, notifications: false }));
+  // =====================================================
+  // OPTIMIZATION 2: LOAD ESSENTIAL DATA IN PARALLEL
+  // =====================================================
+  const loadEssentialData = async (forceRefresh = false): Promise<{
+    progress: any;
+    courses: CourseStructure;
+    pendingAssessments: Assessment[];
+  }> => {
+    // Check cache first (5 minute cache for essential data)
+    if (!forceRefresh && dataCache.essential && dataCache.timestamp && 
+        (Date.now() - dataCache.timestamp < 5 * 60 * 1000)) {
+      console.log('📦 Using cached essential data');
+      return dataCache.essential;
     }
-  };
-
-  // Load essential data first (immediate)
-  const loadEssentialData = async () => {
+    
+    console.time('loadEssentialData');
+    
     try {
-      console.log(`📊 Loading essential data for student: ${user.username}`);
+      // OPTIMIZATION: Use Promise.all for independent operations
+      const [progressData, coursesData, allAssessments] = await Promise.all([
+        getProgress(user.username),
+        getCoursesLight(), // Use LIGHT version (no materials)
+        getAssessments()
+      ]);
       
-      // 1. Load progress (quick)
-      const progressData = await getProgress(user.username);
-      setProgress(progressData);
-      
-      // 2. Load courses light (quick)
-      const coursesData = await getCoursesLight();
-      setCourses(coursesData);
-      
-      // 3. Load pending assessments (filtered)
-      const allAssessments = await getAssessments();
+      // Get submissions separately (needed for filtering)
       const allSubmissions = await getSubmissions();
       
+      // Filter pending assessments (max 3)
       const pending = allAssessments.filter(a =>
         (a.targetGrade === 'all' || a.targetGrade === user.gradeLevel) &&
         !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
-      );
-      setPendingAssessments(pending.slice(0, 3));
+      ).slice(0, 3);
       
-      // Mark essential data as loaded
-      setLoadingStates(prev => ({ ...prev, essential: false, assessments: false }));
+      // Cache the essential data
+      const essentialData = {
+        progress: progressData,
+        courses: coursesData,
+        pendingAssessments: pending
+      };
       
-      console.log('✅ Essential data loaded');
+      setDataCache({
+        essential: essentialData,
+        timestamp: Date.now()
+      });
+      
+      console.timeEnd('loadEssentialData');
+      console.log('✅ Essential data loaded:', {
+        progressKeys: Object.keys(progressData).length,
+        courses: Object.keys(coursesData).length,
+        pendingAssessments: pending.length
+      });
+      
+      return essentialData;
       
     } catch (error) {
       console.error('❌ Error loading essential data:', error);
-      setLoadingStates(prev => ({ ...prev, essential: false, assessments: false }));
+      console.timeEnd('loadEssentialData');
+      throw error;
     }
   };
 
-  // Load performance data (can be delayed - heavy)
+  // =====================================================
+  // OPTIMIZATION 3: SMART PERFORMANCE DATA LOADING WITH CACHE
+  // =====================================================
   const loadPerformanceData = async (forceRefresh = false) => {
-    // Check cache first (1 hour cache)
+    // Check cache first (5 minute cache for performance data)
     const now = Date.now();
     const cacheValid = performanceCache.lastUpdated && 
-                      (now - performanceCache.lastUpdated < 60 * 60 * 1000) && 
+                      (now - performanceCache.lastUpdated < 5 * 60 * 1000) && 
                       !forceRefresh;
     
     if (cacheValid && performanceCache.subjectPerformance) {
@@ -411,11 +430,18 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
     
     setLoadingStates(prev => ({ ...prev, performance: true }));
+    console.time('loadPerformanceData');
     
     try {
       console.log('📊 Loading performance data...');
       
-      const subjectPerformance = await getStudentSubjectPerformance(user.username);
+      // OPTIMIZATION: Use the simpler function with timeout fallback
+      const subjectPerformance = await Promise.race([
+        getStudentSubjectPerformance(user.username),
+        new Promise<Record<string, number>>((_, reject) => 
+          setTimeout(() => reject(new Error('Performance data timeout')), 10000)
+        )
+      ]);
       
       // Update cache
       setPerformanceCache({
@@ -444,9 +470,10 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       } else {
         setSubjectLabels([]);
         setSubjectScores([]);
-        setAdvice("Start by exploring courses and completing your first checkpoint or assessment!");
+        setAdvice("Start by exploring courses and completing your first checkpoint!");
       }
       
+      console.timeEnd('loadPerformanceData');
       console.log('✅ Performance data loaded');
       
     } catch (error) {
@@ -459,8 +486,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  // Helper to generate advice
-  const generateAdvice = (scores: number[]) => {
+  // Helper to generate advice (memoized)
+  const generateAdvice = useCallback((scores: number[]) => {
+    if (scores.length === 0) {
+      setAdvice("Complete assessments and checkpoints to get personalized advice!");
+      return;
+    }
+    
     const overallAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
     
     if (overallAvg < 50) {
@@ -472,37 +504,93 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     } else {
       setAdvice("Outstanding performance! Consider helping classmates or exploring advanced topics.");
     }
-  };
+  }, []);
 
-  // Load course history (lazy load)
-  const loadCourseHistory = async () => {
-    setLoadingStates(prev => ({ ...prev, courseHistory: true }));
+  // =====================================================
+  // OPTIMIZATION 4: PROGRESSIVE DATA LOADING STRATEGY
+  // =====================================================
+  useEffect(() => {
+    const loadDataProgressive = async () => {
+      console.log('🚀 Starting progressive data load...');
+      
+      try {
+        // PHASE 1: ESSENTIAL DATA (immediate - critical for UI)
+        setLoadingStates(prev => ({ ...prev, essential: true, assessments: true }));
+        const essentialData = await loadEssentialData();
+        
+        // Update state with essential data
+        setProgress(essentialData.progress);
+        setCourses(essentialData.courses);
+        setPendingAssessments(essentialData.pendingAssessments);
+        setLoadingStates(prev => ({ ...prev, essential: false, assessments: false }));
+        
+        console.log('✅ Phase 1 complete: Essential data loaded');
+        
+        // PHASE 2: PERFORMANCE DATA (after 100ms delay)
+        setTimeout(() => {
+          setLoadingStates(prev => ({ ...prev, performance: true }));
+          loadPerformanceData();
+        }, 100);
+        
+        // PHASE 3: NOTIFICATIONS (after 300ms delay - lower priority)
+        setTimeout(() => {
+          loadUserNotifications();
+        }, 300);
+        
+        // PHASE 4: ANNOUNCEMENTS (after 500ms delay - lowest priority)
+        setTimeout(() => {
+          loadAnnouncements();
+        }, 500);
+        
+      } catch (error) {
+        console.error('❌ Error in progressive loading:', error);
+        setLoadingStates(prev => ({ 
+          ...prev, 
+          essential: false, 
+          assessments: false,
+          performance: false 
+        }));
+      }
+    };
+    
+    loadDataProgressive();
+    
+    // Set up notification refresh every 60 seconds (reduced frequency)
+    const notificationInterval = setInterval(() => {
+      if (user?.username && !loadingStates.notifications) {
+        loadUserNotifications();
+      }
+    }, 60000); // 60 seconds
+    
+    return () => clearInterval(notificationInterval);
+  }, [user]);
+
+  // =====================================================
+  // OPTIMIZATION 5: LAZY LOAD FUNCTIONS
+  // =====================================================
+  
+  // Load notifications (can be delayed)
+  const loadUserNotifications = async () => {
+    if (!user?.username) return;
+    
+    setLoadingStates(prev => ({ ...prev, notifications: true }));
     try {
-      const history = await getStudentCourseHistory(user.username);
-      setCourseHistory(history);
+      const notifications = await getUserNotifications(user.username);
+      setUserNotifications(notifications.slice(0, 5)); // Only show 5 most recent
+      setUnreadCount(notifications.filter(n => !n.read).length);
     } catch (error) {
-      console.error('Error loading course history:', error);
+      console.error('Error loading notifications:', error);
     } finally {
-      setLoadingStates(prev => ({ ...prev, courseHistory: false }));
+      setLoadingStates(prev => ({ ...prev, notifications: false }));
     }
   };
 
-  // Load assessment feedback (lazy load)
-  const loadAssessmentFeedback = async () => {
-    try {
-      const feedback = await getStudentAssessmentFeedback(user.username);
-      setAssessmentFeedback(feedback);
-    } catch (error) {
-      console.error('Error loading assessment feedback:', error);
-    }
-  };
-
-  // Load announcements (low priority)
+  // Load announcements (lowest priority)
   const loadAnnouncements = async () => {
     setLoadingStates(prev => ({ ...prev, announcements: true }));
     try {
       const announcementsData = await getAnnouncements();
-      setAnnouncements(announcementsData);
+      setAnnouncements(announcementsData.slice(0, 2)); // Only show 2 max
     } catch (error) {
       console.error('Error loading announcements:', error);
     } finally {
@@ -510,72 +598,80 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  // Initial data loading with progressive strategy
-  useEffect(() => {
-    const loadDataSequentially = async () => {
-      console.log('🚀 Starting progressive data load...');
-      
-      // Phase 1: Essential data (immediate)
-      await loadEssentialData();
-      
-      // Phase 2: Notifications (after 200ms delay)
-      setTimeout(() => {
-        loadUserNotifications();
-      }, 200);
-      
-      // Phase 3: Performance data (after 500ms delay)
-      setTimeout(() => {
-        loadPerformanceData();
-      }, 500);
-      
-      // Phase 4: Announcements (after 1 second delay)
-      setTimeout(() => {
-        loadAnnouncements();
-      }, 1000);
-      
-      // Phase 5: Course history and feedback (lazy load when needed)
-      // Will load when user expands grade history section
-    };
+  // Lazy load course history only when needed
+  const loadCourseHistory = async () => {
+    if (courseHistory.length > 0) return; // Already loaded
     
-    loadDataSequentially();
-    
-    // Set up notification refresh every 30 seconds
-    const notificationInterval = setInterval(() => {
-      if (user?.username) {
-        loadUserNotifications();
+    setLoadingStates(prev => ({ ...prev, courseHistory: true }));
+    try {
+      const history = await getStudentCourseHistory(user.username);
+      setCourseHistory(history.slice(0, 5)); // Only show 5 most recent
+      
+      // Also load assessment feedback if needed
+      if (showGradeHistory) {
+        const feedback = await getStudentAssessmentFeedback(user.username);
+        setAssessmentFeedback(feedback.slice(0, 3)); // Only show 3 most recent
       }
-    }, 30000);
-    
-    return () => clearInterval(notificationInterval);
-  }, [user]);
-
-  // Lazy load course history when section is expanded
-  useEffect(() => {
-    if (showGradeHistory && courseHistory.length === 0 && !loadingStates.courseHistory) {
-      loadCourseHistory();
-      loadAssessmentFeedback();
-    }
-  }, [showGradeHistory]);
-
-  const handleNotificationClick = async (notification: NotificationType) => {
-    // Mark as read
-    if (!notification.read) {
-      await markNotificationAsRead(notification.id);
-      setUnreadCount(prev => Math.max(0, prev - 1));
-      
-      // Update local state
-      setUserNotifications(prev => 
-        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-      );
-    }
-    
-    // Navigate if action URL exists
-    if (notification.metadata?.actionUrl) {
-      navigate(notification.metadata.actionUrl);
+    } catch (error) {
+      console.error('Error loading course history:', error);
+    } finally {
+      setLoadingStates(prev => ({ ...prev, courseHistory: false }));
     }
   };
 
-  // Optimized chart data with memoization - FIXED VERSION
+  // =====================================================
+  // OPTIMIZATION 6: LAZY LOAD TRIGGER
+  // =====================================================
+  useEffect(() => {
+    if (showGradeHistory && courseHistory.length === 0 && !loadingStates.courseHistory) {
+      loadCourseHistory();
+    }
+  }, [showGradeHistory]);
+
+  // =====================================================
+  // OPTIMIZATION 7: REFRESH WITH CACHE
+  // =====================================================
+  const refreshData = async (force = false) => {
+    console.log('🔄 Refreshing student dashboard...');
+    
+    // Show loading states for what we're refreshing
+    setLoadingStates({
+      essential: force || !dataCache.essential,
+      notifications: force,
+      assessments: force || !dataCache.essential,
+      performance: true, // Always reload performance
+      courseHistory: false,
+      announcements: force
+    });
+    
+    try {
+      if (force || !dataCache.essential) {
+        // Clear cache and reload everything
+        const essentialData = await loadEssentialData(true);
+        setProgress(essentialData.progress);
+        setCourses(essentialData.courses);
+        setPendingAssessments(essentialData.pendingAssessments);
+        
+        if (force) {
+          await loadUserNotifications();
+          await loadAnnouncements();
+        }
+      }
+      
+      // Always reload performance data (with potential cache)
+      await loadPerformanceData(force);
+      
+      console.log('✅ Refresh complete');
+    } catch (error) {
+      console.error('❌ Error during refresh:', error);
+    }
+  };
+
+  // =====================================================
+  // OPTIMIZATION 8: MEMOIZED COMPUTATIONS
+  // =====================================================
+  
+  // Optimized chart data with memoization
   const chartData = useMemo(() => {
     if (subjectLabels.length === 0 || subjectScores.length === 0) {
       return {
@@ -600,20 +696,16 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         'rgba(34, 197, 94, 0.6)',    // green
         'rgba(245, 158, 11, 0.6)',   // yellow
         'rgba(239, 68, 68, 0.6)',    // red
-        'rgba(59, 130, 246, 0.6)',   // blue
-        'rgba(139, 92, 246, 0.6)',   // violet
-        'rgba(20, 184, 166, 0.6)',   // teal
-        'rgba(249, 115, 22, 0.6)'    // orange
       ];
       
       if (count <= baseColors.length) {
         return baseColors.slice(0, count);
       }
       
-      // Generate more colors if needed
+      // Generate more colors if needed (simpler algorithm)
       const colors = [...baseColors];
       for (let i = baseColors.length; i < count; i++) {
-        const hue = (i * 137.508) % 360; // Golden angle approximation
+        const hue = (i * 50) % 360; // Simple hue distribution
         colors.push(`hsla(${hue}, 70%, 60%, 0.6)`);
       }
       return colors;
@@ -632,6 +724,26 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     };
   }, [subjectLabels, subjectScores]);
 
+  // Handle notification click
+  const handleNotificationClick = async (notification: NotificationType) => {
+    // Mark as read
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Update local state
+      setUserNotifications(prev => 
+        prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+      );
+    }
+    
+    // Navigate if action URL exists
+    if (notification.metadata?.actionUrl) {
+      navigate(notification.metadata.actionUrl);
+    }
+  };
+
+  // Export PDF
   const exportPDF = async () => {
     try {
       const doc = new jsPDF();
@@ -656,75 +768,9 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
           doc.text(`${subject}: ${Math.round(subjectScores[i])}% Average`, 10, y);
           y += 10;
         });
-      } else {
-        doc.text('No performance data available yet.', 10, y);
-        y += 10;
-        doc.text('Complete assessments to see your scores.', 10, y);
       }
       
-      // Add neuroscience fact
-      y += 10;
-      if (neuroscienceFacts.length > 0) {
-        doc.text('Brain Fact of the Day:', 10, y);
-        y += 10;
-        // Split long text into multiple lines
-        const factLines = doc.splitTextToSize(neuroscienceFacts[currentFactIndex], 180);
-        factLines.forEach((line: string) => {
-          doc.text(line, 10, y);
-          y += 6;
-        });
-        y += 3;
-      }
-      
-      // Add notifications summary
-      if (userNotifications.length > 0) {
-        doc.text('Recent Notifications:', 10, y);
-        y += 10;
-        userNotifications.slice(0, 3).forEach((notification, i) => {
-          if (y > 280) {
-            doc.addPage();
-            y = 20;
-          }
-          const notificationText = notification.text.substring(0, 50) + (notification.text.length > 50 ? '...' : '');
-          doc.text(`${i+1}. ${notificationText}`, 10, y);
-          y += 8;
-        });
-      }
-      
-      // Add course history if available
-      if (courseHistory.length > 0) {
-        doc.text('Completed Courses:', 10, y);
-        y += 10;
-        courseHistory.forEach(course => {
-          if (y > 280) {
-            doc.addPage();
-            y = 20;
-          }
-          doc.text(`- ${course.topicTitle}: ${Math.round(course.finalScore || 0)}% ${course.passed ? '(Passed)' : '(Not Passed)'}`, 10, y);
-          y += 8;
-        });
-      }
-      
-      // Add assessment feedback if available
-      y += 10;
-      if (assessmentFeedback.length > 0) {
-        doc.text('Recent Assessment Feedback:', 10, y);
-        y += 10;
-        assessmentFeedback.slice(0, 3).forEach(feedback => {
-          if (y > 280) {
-            doc.addPage();
-            y = 20;
-          }
-          doc.text(`- ${feedback.assessmentTitle}: ${feedback.score}%`, 10, y);
-          y += 8;
-          if (feedback.feedback) {
-            const feedbackText = feedback.feedback.substring(0, 50) + (feedback.feedback.length > 50 ? '...' : '');
-            doc.text(`  Feedback: ${feedbackText}`, 10, y);
-            y += 8;
-          }
-        });
-      }
-      
+      // Save the PDF
       doc.save(`${user.username}_progress_report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -732,54 +778,9 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const refreshData = async (force = false) => {
-    console.log('🔄 Refreshing student dashboard...');
-    
-    // Show loading states for what we're refreshing
-    setLoadingStates({
-      essential: true,
-      notifications: force,
-      assessments: true,
-      performance: true,
-      courseHistory: false,
-      announcements: force
-    });
-    
-    try {
-      await loadEssentialData();
-      
-      if (force) {
-        // Clear cache and reload everything
-        setPerformanceCache({});
-        await Promise.all([
-          loadUserNotifications(),
-          loadPerformanceData(true),
-          loadAnnouncements()
-        ]);
-      } else {
-        // Just reload performance data
-        await loadPerformanceData();
-      }
-      
-      console.log('✅ Refresh complete');
-    } catch (error) {
-      console.error('❌ Error during refresh:', error);
-    }
-  };
-
-  // Debug function
-  const debugScoreCalculation = async () => {
-    try {
-      console.log('🔍 DEBUG: Starting score calculation analysis...');
-      
-      const checkpointScores = await getStudentCheckpointScores(user.username);
-      console.log('📊 Checkpoint scores by subject:', checkpointScores);
-      
-    } catch (error) {
-      console.error('❌ Debug error:', error);
-    }
-  };
-
+  // =====================================================
+  // QUICK START FEATURES
+  // =====================================================
   const features = [
     { 
       title: "Critical Questions", 
@@ -804,7 +805,9 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   ];
 
-  // Show skeleton loader only for essential data
+  // =====================================================
+  // RENDER LOADING STATE
+  // =====================================================
   if (loadingStates.essential) {
     return (
       <div className="max-w-7xl mx-auto space-y-8">
@@ -863,11 +866,14 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     );
   }
 
+  // =====================================================
+  // MAIN RENDER
+  // =====================================================
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
-          {/* Header Section - Shows immediately */}
+          {/* Header Section */}
           <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-white/10 p-8 rounded-2xl flex items-center justify-between">
             <div>
               <h2 className="text-4xl font-bold text-white mb-2">Welcome Back, {user.username}</h2>
@@ -903,7 +909,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Quick Start Guide - Shows immediately */}
+          {/* Quick Start Guide */}
           <div className="mb-6">
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-4 rounded-xl">
               <div className="flex items-center gap-3 mb-3">
@@ -950,7 +956,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Notifications Section - Lazy loaded */}
+          {/* Notifications Section */}
           {loadingStates.notifications ? (
             <div className="bg-white/5 border border-white/10 p-4 rounded-xl mb-6">
               <div className="flex items-center justify-between mb-3">
@@ -983,7 +989,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               </div>
               
               <div className="space-y-2">
-                {userNotifications.slice(0, 3).map((notification, index) => (
+                {userNotifications.map((notification, index) => (
                   <div 
                     key={index}
                     onClick={() => handleNotificationClick(notification)}
@@ -1012,13 +1018,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                 ))}
                 
-                {userNotifications.length > 3 && (
+                {userNotifications.length > 5 && (
                   <div className="text-center pt-2">
                     <Link 
                       to="/notifications" 
                       className="text-xs text-cyan-400 hover:text-cyan-300"
                     >
-                      View all {userNotifications.length} notifications →
+                      View all notifications →
                     </Link>
                   </div>
                 )}
@@ -1026,7 +1032,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          {/* Neuroscience Facts Section - Shows immediately */}
+          {/* Neuroscience Facts Section */}
           {neuroscienceFacts.length > 0 && (
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-white/10 p-6 rounded-2xl">
               <div className="flex items-start gap-4">
@@ -1068,7 +1074,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          {/* AI Advisor - Shows immediately (uses cached data when available) */}
+          {/* AI Advisor */}
           <div className="bg-gradient-to-r from-purple-900/40 to-cyan-900/40 border border-white/10 p-6 rounded-2xl flex gap-4 items-start">
             <div className="bg-white/10 p-3 rounded-full">
               <Brain className="text-cyan-300" size={24}/>
@@ -1079,7 +1085,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Announcements - Lazy loaded */}
+          {/* Announcements */}
           {loadingStates.announcements ? (
             <div className="bg-yellow-500/10 border border-yellow-500/30 p-6 rounded-2xl">
               <div className="h-6 w-48 bg-yellow-500/20 rounded mb-4 animate-pulse"></div>
@@ -1102,7 +1108,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <Megaphone size={20}/> Important Updates
               </h3>
               <div className="space-y-4">
-                {announcements.slice(0, 2).map(ann => {
+                {announcements.map(ann => {
                   const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
                   const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
                   
@@ -1128,7 +1134,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           )}
 
-          {/* Pending Assessments - Shows immediately (loaded in essential phase) */}
+          {/* Pending Assessments */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1159,7 +1165,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Feature Cards - Shows immediately */}
+          {/* Feature Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {features.map((f, i) => (
               <Link 
@@ -1179,7 +1185,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
         {/* Right Column */}
         <div className="space-y-6">
-          {/* Performance Chart - Shows loading state if data not ready */}
+          {/* Performance Chart */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-64 flex flex-col items-center justify-center">
             <div className="w-full">
               <h3 className="text-white font-bold mb-4 self-start">Subject Performance</h3>
@@ -1226,7 +1232,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             </div>
           </div>
           
-          {/* Quick Stats - Shows immediately with placeholders for loading data */}
+          {/* Quick Stats */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-white font-bold mb-4">Quick Stats</h3>
             <div className="space-y-4">
@@ -1325,7 +1331,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
       
-      {/* Grade History Section - Lazy loaded */}
+      {/* Grade History Section */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1366,7 +1372,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                 <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Completed Courses</h4>
                 <div className="space-y-2">
-                  {courseHistory.slice(0, 5).map((course, index) => (
+                  {courseHistory.map((course, index) => (
                     <div key={index} className="bg-black/20 p-3 rounded-lg hover:bg-black/30 transition-colors">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-white font-medium">{course.topicTitle}</span>
@@ -1378,7 +1384,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                       <div className="flex justify-between text-xs text-white/60">
                         <span>{course.subject} • Grade {course.gradeLevel}</span>
-                        <span>{course.checkpoints.filter(cp => cp.passed).length}/{course.checkpoints.length} checkpoints</span>
+                        <span>{course.checkpoints?.filter((cp: any) => cp.passed).length || 0}/{course.checkpoints?.length || 0} checkpoints</span>
                       </div>
                     </div>
                   ))}
@@ -1392,12 +1398,12 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               </div>
             )}
             
-            {/* Assessment Feedback - Lazy loaded */}
+            {/* Assessment Feedback */}
             {assessmentFeedback.length > 0 && (
               <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                 <h4 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Recent Feedback</h4>
                 <div className="space-y-3">
-                  {assessmentFeedback.slice(0, 3).map((feedback, index) => (
+                  {assessmentFeedback.map((feedback, index) => (
                     <div key={index} className="bg-black/20 p-3 rounded-lg hover:bg-black/30 transition-colors">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-white font-medium text-sm">{feedback.assessmentTitle}</span>
@@ -1759,7 +1765,7 @@ export const AdminDashboard: React.FC = () => {
 
 
 // =====================================================
-// TEACHER DASHBOARD COMPONENT - UPDATED WITH COURSE TRACKING
+// TEACHER DASHBOARD COMPONENT - OPTIMIZED VERSION
 // =====================================================
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [students, setStudents] = useState<StudentStats[]>([]);
@@ -1772,21 +1778,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   
   // Student tracking states
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [studentCourseData, setStudentCourseData] = useState<{
-    coursePerformance: Record<string, CoursePerformance>;
-    courseHistory: any[];
-    username: string;
-    overallStats: {
-      totalTopics: number;
-      overallAverage: number;
-      strongestTopic: string;
-      weakestTopic: string;
-      totalCheckpoints: number;
-      passedCheckpoints: number;
-      completionRate: number;
-    };
-  } | null>(null);
-  
+  const [studentCourseData, setStudentCourseData] = useState<any>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [showTrackingSection, setShowTrackingSection] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string>('');
@@ -1794,16 +1786,27 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [sortBy, setSortBy] = useState<'name' | 'score' | 'grade'>('name');
   const [filterGrade, setFilterGrade] = useState<string>('all');
 
-  // Refresh all data
+  // Cache for student data (2-minute cache)
+  const [studentDataCache, setStudentDataCache] = useState<Record<string, any>>({});
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // =====================================================
+  // OPTIMIZATION 1: PARALLEL DATA LOADING
+  // =====================================================
   const refreshData = async () => {
+    console.log('🔄 Refreshing teacher dashboard...');
     setLoading(true);
+    
     try {
+      // OPTIMIZATION: Load all data in parallel
       const [studentsData, assessmentsData, announcementsData, overviewData] = await Promise.all([
         getAllStudentStats(),
         getAssessments(),
         getAnnouncements(),
         getClassOverview()
       ]);
+      
+      console.log(`✅ Loaded: ${studentsData.length} students, ${assessmentsData.length} assessments, ${announcementsData.length} announcements`);
       
       // Filter students for this teacher's grade level if specified
       const gradeFiltered = studentsData.filter(s => 
@@ -1812,69 +1815,43 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       setStudents(gradeFiltered);
       setFilteredStudents(gradeFiltered);
-      setAssessments(assessmentsData);
-      setAnnouncements(announcementsData);
+      setAssessments(assessmentsData.slice(0, 5)); // Only keep 5 latest assessments
+      setAnnouncements(announcementsData.slice(0, 3)); // Only keep 3 latest announcements
       setClassOverview(overviewData);
       
       // Auto-select first student if none selected
       if (gradeFiltered.length > 0 && !selectedStudent) {
         setSelectedStudent(gradeFiltered[0].username);
       }
+      
     } catch (error) {
-      console.error('Error refreshing teacher dashboard:', error);
+      console.error('❌ Error refreshing teacher dashboard:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter and sort students
-  useEffect(() => {
-    let result = [...students];
+  // =====================================================
+  // OPTIMIZATION 2: CACHED STUDENT COURSE DATA LOADING
+  // =====================================================
+  const loadStudentCourseData = async (username: string, forceRefresh = false) => {
+    // Check cache first (2-minute cache)
+    const cacheKey = username;
+    const now = Date.now();
+    const cacheEntry = studentDataCache[cacheKey];
+    const isCacheValid = cacheEntry && (now - cacheEntry.timestamp < 2 * 60 * 1000) && !forceRefresh;
     
-    // Apply search filter
-    if (searchTerm) {
-      result = result.filter(student => 
-        student.username.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    if (isCacheValid) {
+      console.log(`📊 Using cached student data for ${username}`);
+      setStudentCourseData(cacheEntry.data);
+      return;
     }
     
-    // Apply grade filter
-    if (filterGrade !== 'all') {
-      result = result.filter(student => student.gradeLevel === filterGrade);
-    }
-    
-    // Apply sorting
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'score':
-          return b.avgScore - a.avgScore;
-        case 'grade':
-          return parseInt(a.gradeLevel) - parseInt(b.gradeLevel);
-        case 'name':
-        default:
-          return a.username.localeCompare(b.username);
-      }
-    });
-    
-    setFilteredStudents(result);
-  }, [students, searchTerm, sortBy, filterGrade]);
-
-  // Initial data load
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  // Load student course data when selected student changes
-  useEffect(() => {
-    if (selectedStudent) {
-      loadStudentCourseData(selectedStudent);
-    }
-  }, [selectedStudent]);
-
-  const loadStudentCourseData = async (username: string) => {
+    console.log(`📊 Loading course data for ${username}...`);
     setTrackingLoading(true);
+    
     try {
-      // Get detailed course performance (with proper checkpoint averaging)
+      // Get detailed course performance
       const coursePerformance = await getStudentDetailedCoursePerformance(username);
       
       // Get student's course history
@@ -1889,9 +1866,11 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       let weakestTopic = { name: '', score: 100 };
       
       Object.values(coursePerformance).forEach(topic => {
-        totalCheckpoints += topic.checkpointCount;
-        passedCheckpoints += topic.checkpoints.filter(cp => cp.passed).length;
-        totalScore += topic.averageScore;
+        if (!topic) return;
+        
+        totalCheckpoints += topic.checkpointCount || 0;
+        passedCheckpoints += topic.checkpoints?.filter((cp: any) => cp.passed).length || 0;
+        totalScore += topic.averageScore || 0;
         topicCount++;
         
         if (topic.averageScore > strongestTopic.score) {
@@ -1905,7 +1884,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       const overallAverage = topicCount > 0 ? Math.round(totalScore / topicCount) : 0;
       const completionRate = totalCheckpoints > 0 ? Math.round((passedCheckpoints / totalCheckpoints) * 100) : 0;
       
-      setStudentCourseData({
+      const studentData = {
         coursePerformance,
         courseHistory,
         username,
@@ -1918,7 +1897,18 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
           passedCheckpoints,
           completionRate
         }
-      });
+      };
+      
+      // Update cache
+      setStudentDataCache(prev => ({
+        ...prev,
+        [cacheKey]: {
+          data: studentData,
+          timestamp: now
+        }
+      }));
+      
+      setStudentCourseData(studentData);
       
       // Auto-select first topic if available
       const topics = Object.keys(coursePerformance);
@@ -1927,97 +1917,65 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       }
       
     } catch (error) {
-      console.error('Error loading student course data:', error);
+      console.error('❌ Error loading student course data:', error);
       setStudentCourseData(null);
     } finally {
       setTrackingLoading(false);
     }
   };
 
-  // Format course data for display
-  const formatCourseData = useMemo(() => {
-    if (!studentCourseData || Object.keys(studentCourseData.coursePerformance).length === 0) {
-      return [];
-    }
-    
-    return Object.entries(studentCourseData.coursePerformance).map(([key, topic]) => ({
-      key,
-      topicTitle: topic.topicTitle,
-      subject: topic.subject,
-      averageScore: topic.averageScore,
-      checkpointCount: topic.checkpointCount,
-      passed: topic.passed,
-      status: topic.averageScore >= 80 ? 'Excellent' : 
-              topic.averageScore >= 60 ? 'Good' : 'Needs Improvement',
-      color: topic.averageScore >= 80 ? 'text-green-400' : 
-             topic.averageScore >= 60 ? 'text-yellow-400' : 'text-red-400',
-      bgColor: topic.averageScore >= 80 ? 'bg-green-500/20' : 
-               topic.averageScore >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20',
-      checkpoints: topic.checkpoints
-    }));
-  }, [studentCourseData]);
-
-  // Get selected topic details
-  const selectedTopicDetails = useMemo(() => {
-    if (!studentCourseData || !selectedTopic || !studentCourseData.coursePerformance[selectedTopic]) {
-      return null;
-    }
-    
-    return studentCourseData.coursePerformance[selectedTopic];
-  }, [studentCourseData, selectedTopic]);
-
-  // Create announcement
-  const createAnnouncement = async () => {
-    if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
-      alert('Please fill in both title and content');
-      return;
-    }
-
-    try {
-      await saveAnnouncement({
-        id: Date.now().toString(),
-        title: newAnnouncement.title,
-        content: newAnnouncement.content,
-        timestamp: Date.now(),
-        author: user.username,
-        expiresAt: Date.now() + (48 * 60 * 60 * 1000) // 48 hours
+  // =====================================================
+  // OPTIMIZATION 3: EFFICIENT FILTERING & SORTING WITH DEBOUNCE
+  // =====================================================
+  useEffect(() => {
+    // Debounce filter operations (150ms)
+    const timeoutId = setTimeout(() => {
+      let result = [...students];
+      
+      // Apply search filter
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        result = result.filter(student => 
+          student.username.toLowerCase().includes(term)
+        );
+      }
+      
+      // Apply grade filter
+      if (filterGrade !== 'all') {
+        result = result.filter(student => student.gradeLevel === filterGrade);
+      }
+      
+      // Apply sorting
+      result.sort((a, b) => {
+        switch (sortBy) {
+          case 'score':
+            return b.avgScore - a.avgScore;
+          case 'grade':
+            return parseInt(a.gradeLevel) - parseInt(b.gradeLevel);
+          case 'name':
+          default:
+            return a.username.localeCompare(b.username);
+        }
       });
       
-      setNewAnnouncement({ title: '', content: '' });
-      refreshData();
-      alert('Announcement created successfully!');
-    } catch (error) {
-      console.error('Error creating announcement:', error);
-      alert('Failed to create announcement');
+      setFilteredStudents(result);
+    }, 150);
+    
+    return () => clearTimeout(timeoutId);
+  }, [students, searchTerm, sortBy, filterGrade]);
+
+  // =====================================================
+  // OPTIMIZATION 4: LAZY LOAD STUDENT DATA WHEN NEEDED
+  // =====================================================
+  useEffect(() => {
+    if (selectedStudent && showTrackingSection) {
+      loadStudentCourseData(selectedStudent);
     }
-  };
+  }, [selectedStudent, showTrackingSection]);
 
-  // Export student performance data
-  const exportStudentData = () => {
-    if (!selectedStudent || !studentCourseData) {
-      alert('No student data to export');
-      return;
-    }
-
-    const data = {
-      student: selectedStudent,
-      exportDate: new Date().toISOString(),
-      overallStats: studentCourseData.overallStats,
-      coursePerformance: studentCourseData.coursePerformance,
-      courseHistory: studentCourseData.courseHistory
-    };
-
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedStudent}_performance_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Calculate class statistics
+  // =====================================================
+  // OPTIMIZATION 5: MEMOIZED CLASS STATISTICS
+  // =====================================================
   const classStats = useMemo(() => {
     if (students.length === 0) return null;
     
@@ -2048,25 +2006,165 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       strugglingPercentage: Math.round((strugglingStudents.length / totalStudents) * 100),
       performanceLevels,
       avgStreak,
-      avgCompletionRate,
-      topPerformer: students.reduce((top, current) => 
-        current.avgScore > top.avgScore ? current : top
-      ),
-      mostActive: students.reduce((most, current) => 
-        current.streak > most.streak ? current : most
-      )
+      avgCompletionRate
     };
   }, [students]);
 
+  // =====================================================
+  // OPTIMIZATION 6: FORMAT COURSE DATA WITH MEMOIZATION
+  // =====================================================
+  const formatCourseData = useMemo(() => {
+    if (!studentCourseData || Object.keys(studentCourseData.coursePerformance).length === 0) {
+      return [];
+    }
+    
+    return Object.entries(studentCourseData.coursePerformance).map(([key, topic]: [string, any]) => ({
+      key,
+      topicTitle: topic.topicTitle,
+      subject: topic.subject,
+      averageScore: topic.averageScore,
+      checkpointCount: topic.checkpointCount,
+      passed: topic.passed,
+      status: topic.averageScore >= 80 ? 'Excellent' : 
+              topic.averageScore >= 60 ? 'Good' : 'Needs Improvement',
+      color: topic.averageScore >= 80 ? 'text-green-400' : 
+             topic.averageScore >= 60 ? 'text-yellow-400' : 'text-red-400',
+      bgColor: topic.averageScore >= 80 ? 'bg-green-500/20' : 
+               topic.averageScore >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20',
+      checkpoints: topic.checkpoints || []
+    }));
+  }, [studentCourseData]);
+
+  // Selected topic details
+  const selectedTopicDetails = useMemo(() => {
+    if (!studentCourseData || !selectedTopic || !studentCourseData.coursePerformance[selectedTopic]) {
+      return null;
+    }
+    
+    return studentCourseData.coursePerformance[selectedTopic];
+  }, [studentCourseData, selectedTopic]);
+
+  // =====================================================
+  // INITIAL DATA LOAD
+  // =====================================================
+  useEffect(() => {
+    refreshData();
+  }, [refreshTrigger]);
+
+  // =====================================================
+  // HANDLER FUNCTIONS
+  // =====================================================
+  const createAnnouncement = async () => {
+    if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
+      alert('Please fill in both title and content');
+      return;
+    }
+
+    try {
+      await saveAnnouncement({
+        id: Date.now().toString(),
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        timestamp: Date.now(),
+        author: user.username,
+        expiresAt: Date.now() + (48 * 60 * 60 * 1000) // 48 hours
+      });
+      
+      setNewAnnouncement({ title: '', content: '' });
+      setRefreshTrigger(prev => prev + 1);
+      alert('Announcement created successfully!');
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      alert('Failed to create announcement');
+    }
+  };
+
+  const exportStudentData = () => {
+    if (!selectedStudent || !studentCourseData) {
+      alert('No student data to export');
+      return;
+    }
+
+    const data = {
+      student: selectedStudent,
+      exportDate: new Date().toISOString(),
+      overallStats: studentCourseData.overallStats,
+      coursePerformance: studentCourseData.coursePerformance,
+      courseHistory: studentCourseData.courseHistory
+    };
+
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedStudent}_performance_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // =====================================================
+  // LOADING STATE
+  // =====================================================
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
-        <p className="mt-4 text-white/60">Loading teacher dashboard...</p>
+      <div className="max-w-7xl mx-auto p-8 space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-10 w-64 bg-white/10 rounded-lg animate-pulse"></div>
+            <div className="h-4 w-96 bg-white/5 rounded animate-pulse"></div>
+          </div>
+          <div className="flex gap-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-10 w-28 bg-white/10 rounded-lg animate-pulse"></div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white/5 p-6 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-white/10 rounded animate-pulse"></div>
+                  <div className="h-8 w-16 bg-white/10 rounded animate-pulse"></div>
+                </div>
+                <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Main Content Skeleton */}
+        <div className="bg-white/5 p-6 rounded-2xl">
+          <div className="h-8 w-48 bg-white/10 rounded mb-6 animate-pulse"></div>
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex items-center justify-between p-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-white/10 rounded-full animate-pulse"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-32 bg-white/10 rounded animate-pulse"></div>
+                    <div className="h-3 w-24 bg-white/5 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-8 w-20 bg-white/10 rounded animate-pulse"></div>
+                  <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
+  // =====================================================
+  // MAIN RENDER
+  // =====================================================
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -2077,7 +2175,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
         <div className="flex gap-3">
           <button 
-            onClick={refreshData} 
+            onClick={() => setRefreshTrigger(prev => prev + 1)} 
             className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
           >
             <RefreshCw size={16} /> Refresh
@@ -2097,7 +2195,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Class Overview */}
+      {/* Class Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
@@ -2172,8 +2270,8 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
           <>
             {/* Student Selection and Filters */}
             <div className="mb-6 space-y-4">
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
+              <div className="flex gap-3 flex-wrap">
+                <div className="flex-1 min-w-[200px] relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" size={18} />
                   <input
                     type="text"
@@ -2186,7 +2284,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <select
                   value={filterGrade}
                   onChange={(e) => setFilterGrade(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-w-[120px]"
                 >
                   <option value="all">All Grades</option>
                   <option value="9">Grade 9</option>
@@ -2197,7 +2295,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-w-[140px]"
                 >
                   <option value="name">Sort by Name</option>
                   <option value="score">Sort by Score</option>
@@ -2205,21 +2303,21 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </select>
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 <select
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="flex-1 min-w-[200px] bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Choose a student...</option>
                   {filteredStudents.map(student => (
                     <option key={student.username} value={student.username}>
-                      {student.username} (Grade {student.gradeLevel}) - Avg: {Math.round(student.avgScore)}% - Streak: {student.streak} days
+                      {student.username} (Grade {student.gradeLevel}) - {Math.round(student.avgScore)}%
                     </option>
                   ))}
                 </select>
                 <button
-                  onClick={() => selectedStudent && loadStudentCourseData(selectedStudent)}
+                  onClick={() => selectedStudent && loadStudentCourseData(selectedStudent, true)}
                   disabled={!selectedStudent || trackingLoading}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -2326,7 +2424,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                               </div>
                             </div>
                             
-                            {/* Progress bar for overall topic score */}
+                            {/* Progress bar */}
                             <div className="mt-4">
                               <div className="flex justify-between text-xs text-white/60 mb-1">
                                 <span>Topic Progress</span>
@@ -2428,7 +2526,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                           </div>
                           
                           <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                            {selectedTopicDetails?.checkpoints.map((checkpoint, index) => (
+                            {selectedTopicDetails?.checkpoints.map((checkpoint: any, index: number) => (
                               <div 
                                 key={checkpoint.id} 
                                 className={`bg-black/30 p-3 rounded-lg border ${
@@ -2471,11 +2569,11 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                             <div className="flex justify-between items-center mt-2">
                               <span className="text-white/60 text-sm">Checkpoint Pass Rate</span>
                               <span className="text-cyan-400 font-bold">
-                                {selectedTopicDetails?.checkpoints.filter(cp => cp.passed).length}/
+                                {selectedTopicDetails?.checkpoints.filter((cp: any) => cp.passed).length}/
                                 {selectedTopicDetails?.checkpoints.length}
                                 <span className="text-white/60 text-sm ml-1">
                                   ({selectedTopicDetails?.checkpoints.length > 0 
-                                    ? Math.round((selectedTopicDetails?.checkpoints.filter(cp => cp.passed).length / selectedTopicDetails?.checkpoints.length) * 100) 
+                                    ? Math.round((selectedTopicDetails?.checkpoints.filter((cp: any) => cp.passed).length / selectedTopicDetails?.checkpoints.length) * 100) 
                                     : 0}%)
                                 </span>
                               </span>
@@ -2527,7 +2625,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                             <div className="flex justify-between text-xs text-white/60">
                               <span>Completed</span>
-                              <span>{course.completedAt ? new Date(course.completedAt).toLocaleDateString() : 'N/A'}</span>
+                              <span>{course.completedDate ? new Date(course.completedDate).toLocaleDateString() : 'N/A'}</span>
                             </div>
                           </div>
                         </div>
@@ -2617,7 +2715,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredStudents.map(student => (
+              {filteredStudents.slice(0, 10).map(student => (
                 <tr 
                   key={student.username} 
                   className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
@@ -2652,7 +2750,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                         student.avgScore >= 60 ? 'text-yellow-400' :
                         'text-red-400'
                       }`}>
-                        {student.avgScore.toFixed(1)}%
+                        {Math.round(student.avgScore)}%
                       </span>
                     </div>
                   </td>
@@ -2767,40 +2865,40 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             <Megaphone className="text-orange-400" /> Active Announcements
           </h3>
           <div className="space-y-4">
-            {announcements.slice(0, 3).map(ann => {
-              const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
-              const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
-              const isExpiring = hoursLeft <= 24;
-              const isUrgent = hoursLeft <= 6;
-              
-              return (
-                <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-white font-medium">{ann.title}</p>
-                    {isExpiring && (
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        isUrgent 
-                          ? 'bg-red-500/20 text-red-300' 
-                          : 'bg-yellow-500/20 text-yellow-300'
-                      }`}>
-                        {hoursLeft}h left
+            {announcements.length > 0 ? (
+              announcements.map(ann => {
+                const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+                const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
+                const isExpiring = hoursLeft <= 24;
+                const isUrgent = hoursLeft <= 6;
+                
+                return (
+                  <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-white font-medium">{ann.title}</p>
+                      {isExpiring && (
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          isUrgent 
+                            ? 'bg-red-500/20 text-red-300' 
+                            : 'bg-yellow-500/20 text-yellow-300'
+                        }`}>
+                          {hoursLeft}h left
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-white/60 text-sm mb-2 line-clamp-2">{ann.content}</p>
+                    <div className="flex justify-between text-white/30 text-xs">
+                      <span className="flex items-center gap-1">
+                        <UsersIcon size={10} /> By: {ann.author}
                       </span>
-                    )}
+                      <span className="flex items-center gap-1">
+                        <Calendar size={10} /> {new Date(ann.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-white/60 text-sm mb-2 line-clamp-2">{ann.content}</p>
-                  <div className="flex justify-between text-white/30 text-xs">
-                    <span className="flex items-center gap-1">
-                      <UsersIcon size={10} /> By: {ann.author}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar size={10} /> {new Date(ann.timestamp).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-            
-            {announcements.length === 0 && (
+                );
+              })
+            ) : (
               <div className="text-center py-8">
                 <Megaphone className="text-white/20 mx-auto mb-3" size={32} />
                 <p className="text-white/40">No active announcements</p>
@@ -2815,27 +2913,27 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
             <ClipboardList className="text-cyan-400" /> Recent Assessments
           </h3>
           <div className="space-y-3">
-            {assessments.slice(0, 3).map(assessment => (
-              <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-white font-medium">{assessment.title}</p>
-                  <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
-                    {assessment.questions?.length || 0} Questions
-                  </span>
+            {assessments.length > 0 ? (
+              assessments.map(assessment => (
+                <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-white font-medium">{assessment.title}</p>
+                    <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                      {assessment.questions?.length || 0} Questions
+                    </span>
+                  </div>
+                  <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
+                  <div className="flex justify-between text-white/30 text-xs">
+                    <span className="flex items-center gap-1">
+                      <UsersIcon size={10} /> Grade: {assessment.targetGrade}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={10} /> By: {assessment.createdBy}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
-                <div className="flex justify-between text-white/30 text-xs">
-                  <span className="flex items-center gap-1">
-                    <UsersIcon size={10} /> Grade: {assessment.targetGrade}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar size={10} /> By: {assessment.createdBy}
-                  </span>
-                </div>
-              </div>
-            ))}
-            
-            {assessments.length === 0 && (
+              ))
+            ) : (
               <div className="text-center py-8">
                 <ClipboardList className="text-white/20 mx-auto mb-3" size={32} />
                 <p className="text-white/40">No assessments created yet</p>

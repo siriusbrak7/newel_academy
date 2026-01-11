@@ -1,8 +1,37 @@
-// services/checkpointService.ts
+// services/checkpointService.ts - OPTIMIZED VERSION
 import { supabase } from './supabaseClient';
 import { Checkpoint, Question } from '../types';
 
+// Cache for checkpoint questions (5-minute cache)
+const checkpointCache = new Map<string, {
+  questions: Question[];
+  timestamp: number;
+  checkpointNumber: number;
+}>();
+
+// Cache for topic checkpoints (2-minute cache)
+const topicCheckpointsCache = new Map<string, {
+  checkpoints: Checkpoint[];
+  timestamp: number;
+}>();
+
+// =====================================================
+// OPTIMIZATION 1: GET TOPIC CHECKPOINTS WITH CACHING
+// =====================================================
 export const getTopicCheckpoints = async (topicId: string): Promise<Checkpoint[]> => {
+  const cacheKey = `topic_${topicId}_checkpoints`;
+  const now = Date.now();
+  const cacheDuration = 2 * 60 * 1000; // 2 minutes
+  
+  // Check cache first
+  const cached = topicCheckpointsCache.get(cacheKey);
+  if (cached && (now - cached.timestamp < cacheDuration)) {
+    console.log(`📦 Using cached checkpoints for topic ${topicId}`);
+    return cached.checkpoints;
+  }
+  
+  console.time(`getTopicCheckpoints-${topicId}`);
+  
   try {
     const { data, error } = await supabase
       .from('checkpoints')
@@ -15,15 +44,42 @@ export const getTopicCheckpoints = async (topicId: string): Promise<Checkpoint[]
       throw error;
     }
     
-    console.log(`✅ Found ${data?.length || 0} checkpoints for topic ${topicId}`);
-    return data || [];
+    const checkpoints = data || [];
+    
+    // Update cache
+    topicCheckpointsCache.set(cacheKey, {
+      checkpoints,
+      timestamp: now
+    });
+    
+    console.timeEnd(`getTopicCheckpoints-${topicId}`);
+    console.log(`✅ Found ${checkpoints.length} checkpoints for topic ${topicId}`);
+    
+    return checkpoints;
   } catch (error) {
     console.error('❌ getTopicCheckpoints error:', error);
+    console.timeEnd(`getTopicCheckpoints-${topicId}`);
     return [];
   }
 };
 
+// =====================================================
+// OPTIMIZATION 2: GET CHECKPOINT BY TOPIC AND NUMBER
+// =====================================================
 export const getCheckpointByTopicAndNumber = async (topicId: string, checkpointNumber: number) => {
+  const cacheKey = `topic_${topicId}_checkpoint_${checkpointNumber}`;
+  const now = Date.now();
+  const cacheDuration = 5 * 60 * 1000; // 5 minutes
+  
+  // Check cache first
+  const cached = checkpointCache.get(cacheKey);
+  if (cached && (now - cached.timestamp < cacheDuration)) {
+    console.log(`📦 Using cached checkpoint ${checkpointNumber} for topic ${topicId}`);
+    return cached;
+  }
+  
+  console.time(`getCheckpointByTopicAndNumber-${topicId}-${checkpointNumber}`);
+  
   try {
     const { data, error } = await supabase
       .from('checkpoints')
@@ -38,100 +94,230 @@ export const getCheckpointByTopicAndNumber = async (topicId: string, checkpointN
       throw error;
     }
     
-    return data?.[0] || null;
+    const result = data?.[0] || null;
+    
+    console.timeEnd(`getCheckpointByTopicAndNumber-${topicId}-${checkpointNumber}`);
+    
+    return result;
   } catch (error) {
     console.error('Error getting checkpoint:', error);
+    console.timeEnd(`getCheckpointByTopicAndNumber-${topicId}-${checkpointNumber}`);
     return null;
   }
 };
 
+// =====================================================
+// OPTIMIZATION 3: GET CHECKPOINT QUESTIONS WITH CACHING
+// =====================================================
 export const getCheckpointQuestions = async (checkpointId: string): Promise<Question[]> => {
+  const cacheKey = `checkpoint_${checkpointId}_questions`;
+  const now = Date.now();
+  const cacheDuration = 10 * 60 * 1000; // 10 minutes for questions
+  
+  // Check cache first
+  const cached = checkpointCache.get(cacheKey);
+  if (cached && (now - cached.timestamp < cacheDuration)) {
+    console.log(`📦 Using cached questions for checkpoint ${checkpointId}`);
+    return cached.questions;
+  }
+  
+  console.time(`getCheckpointQuestions-${checkpointId}`);
   console.log('🔍 getCheckpointQuestions for:', checkpointId);
   
   try {
-    // First, get checkpoint info to know its type
-    const { data: checkpointData, error: checkpointError } = await supabase
-      .from('checkpoints')
-      .select('checkpoint_number')
-      .eq('id', checkpointId)
-      .single();
+    // OPTIMIZATION: Get checkpoint info and questions in parallel
+    const [checkpointInfo, questionsData] = await Promise.all([
+      // Get checkpoint info
+      supabase
+        .from('checkpoints')
+        .select('checkpoint_number')
+        .eq('id', checkpointId)
+        .single(),
+      
+      // Get questions using a more efficient query
+      supabase
+        .from('checkpoint_questions')
+        .select(`
+          id,
+          sort_order,
+          question:questions (
+            id, 
+            text, 
+            type, 
+            difficulty, 
+            correct_answer, 
+            options, 
+            model_answer,
+            explanation
+          )
+        `)
+        .eq('checkpoint_id', checkpointId)
+        .order('sort_order', { ascending: true })
+        .limit(30) // Limit to 30 questions max per checkpoint
+    ]);
+
+    const checkpointError = checkpointInfo.error;
+    const questionsError = questionsData.error;
 
     if (checkpointError) {
       console.error('❌ Error fetching checkpoint info:', checkpointError);
       throw checkpointError;
     }
 
-    const checkpointNumber = checkpointData?.checkpoint_number;
-    console.log(`📊 Checkpoint ${checkpointId} is checkpoint number: ${checkpointNumber}`);
-
-    // Format 1: With join
-    const { data, error } = await supabase
-      .from('checkpoint_questions')
-      .select(`
-        question_id,
-        questions (
-          id, text, type, difficulty, correct_answer, options, model_answer
-        )
-      `)
-      .eq('checkpoint_id', checkpointId)
-      .order('sort_order', { ascending: true });
-
-    if (error) {
-      console.error('❌ Supabase error:', error);
-      throw error;
+    if (questionsError) {
+      console.error('❌ Error fetching questions:', questionsError);
+      throw questionsError;
     }
-    
-    console.log('📊 Raw data:', data);
-    
-    if (!data || data.length === 0) {
+
+    const checkpointNumber = checkpointInfo.data?.checkpoint_number;
+    console.log(`📊 Checkpoint ${checkpointId} is number: ${checkpointNumber}`);
+
+    // Process questions data
+    if (!questionsData.data || questionsData.data.length === 0) {
       console.warn('⚠️ No questions found for checkpoint:', checkpointId);
+      
+      // Cache empty result to prevent repeated queries
+      checkpointCache.set(cacheKey, {
+        questions: [],
+        timestamp: now,
+        checkpointNumber: checkpointNumber || 0
+      });
+      
       return [];
     }
     
-    // Map data correctly - adjust based on actual structure
-    const questions = data.map(item => {
-      const q = Array.isArray(item.questions) ? item.questions[0] : item.questions;
-      if (!q) {
-        // Return a fallback question if q is null/undefined
+    // Map questions efficiently
+    const questions = questionsData.data
+      .map(item => {
+        const q = Array.isArray(item.question) ? item.question[0] : item.question;
+        if (!q) {
+          // Return a simple fallback question
+          return {
+            id: `fallback-${item.id}`,
+            text: 'Question not available',
+            type: 'MCQ' as const,
+            difficulty: 'IGCSE' as const,
+            topic: 'General',
+            correctAnswer: '',
+            options: [] as string[],
+            modelAnswer: '',
+            explanation: ''
+          } as Question;
+        }
+        
         return {
-          id: `fallback-${Math.random()}`,
-          text: 'Question not available',
-          type: 'MCQ' as const,
-          difficulty: 'IGCSE' as const,
-          correctAnswer: '',
-          options: [] as string[],
-          modelAnswer: ''
+          id: q.id,
+          text: q.text || 'Question text not available',
+          type: (q.type as 'MCQ' | 'THEORY') || 'MCQ',
+          difficulty: (q.difficulty as 'IGCSE' | 'AS' | 'A_LEVEL') || 'IGCSE',
+          topic: 'General', // Will be set by parent component
+          correctAnswer: q.correct_answer || '',
+          options: q.options || [] as string[],
+          modelAnswer: q.model_answer || '',
+          explanation: q.explanation || ''
         } as Question;
-      }
-      
-      return {
-        id: q.id,
-        text: q.text || 'Question text not available',
-        type: (q.type as 'MCQ' | 'THEORY') || 'MCQ',
-        difficulty: (q.difficulty as 'IGCSE' | 'AS' | 'A_LEVEL') || 'IGCSE',
-        correctAnswer: q.correct_answer || '',
-        options: q.options || [] as string[],
-        modelAnswer: q.model_answer || ''
-      } as Question;
+      })
+      .filter((q): q is Question => q !== null);
+
+    console.log(`✅ Processed ${questions.length} questions for checkpoint ${checkpointId}`);
+
+    // Cache the result
+    checkpointCache.set(cacheKey, {
+      questions,
+      timestamp: now,
+      checkpointNumber: checkpointNumber || 0
     });
 
-    console.log(`✅ Returning ${questions.length} questions for checkpoint ${checkpointId}`);
+    console.timeEnd(`getCheckpointQuestions-${checkpointId}`);
+    
     return questions;
   } catch (error) {
     console.error('❌ getCheckpointQuestions error:', error);
+    console.timeEnd(`getCheckpointQuestions-${checkpointId}`);
+    
+    // Return cached data if available (even if stale)
+    const cached = checkpointCache.get(cacheKey);
+    if (cached) {
+      console.log('🔄 Returning stale cache due to error');
+      return cached.questions;
+    }
+    
     return [];
   }
 };
 
+// =====================================================
+// OPTIMIZATION 4: GET RANDOM CHECKPOINT QUESTIONS (FOR QUIZZES)
+// =====================================================
+export const getRandomCheckpointQuestions = async (
+  checkpointId: string, 
+  count: number = 5
+): Promise<Question[]> => {
+  const cacheKey = `checkpoint_${checkpointId}_random_${count}`;
+  const now = Date.now();
+  const cacheDuration = 5 * 60 * 1000; // 5 minutes
+  
+  // Check cache first
+  const cached = checkpointCache.get(cacheKey);
+  if (cached && (now - cached.timestamp < cacheDuration)) {
+    console.log(`📦 Using cached random questions for checkpoint ${checkpointId}`);
+    return cached.questions;
+  }
+  
+  console.time(`getRandomCheckpointQuestions-${checkpointId}`);
+  
+  try {
+    // Get all questions first
+    const allQuestions = await getCheckpointQuestions(checkpointId);
+    
+    if (allQuestions.length === 0) {
+      console.timeEnd(`getRandomCheckpointQuestions-${checkpointId}`);
+      return [];
+    }
+    
+    // If we need fewer questions than available, randomize
+    let selectedQuestions = allQuestions;
+    if (allQuestions.length > count) {
+      // Fisher-Yates shuffle
+      const shuffled = [...allQuestions];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      selectedQuestions = shuffled.slice(0, count);
+    }
+    
+    // Cache the randomized result
+    checkpointCache.set(cacheKey, {
+      questions: selectedQuestions,
+      timestamp: now,
+      checkpointNumber: 0 // Not needed for random cache
+    });
+    
+    console.timeEnd(`getRandomCheckpointQuestions-${checkpointId}`);
+    console.log(`✅ Selected ${selectedQuestions.length} random questions for checkpoint ${checkpointId}`);
+    
+    return selectedQuestions;
+  } catch (error) {
+    console.error('❌ getRandomCheckpointQuestions error:', error);
+    console.timeEnd(`getRandomCheckpointQuestions-${checkpointId}`);
+    return [];
+  }
+};
+
+// =====================================================
+// OPTIMIZATION 5: SAVE CHECKPOINT PROGRESS WITH BATCH
+// =====================================================
 export const saveCheckpointProgress = async (
   userId: string,
   checkpointId: string,
   score: number,
   passed: boolean
 ): Promise<void> => {
+  console.time(`saveCheckpointProgress-${checkpointId}`);
+  console.log(`💾 Saving checkpoint progress: user=${userId}, checkpoint=${checkpointId}, score=${score}, passed=${passed}`);
+  
   try {
-    console.log(`💾 Saving checkpoint progress: user=${userId}, checkpoint=${checkpointId}, score=${score}, passed=${passed}`);
-    
     const { error } = await supabase
       .from('student_checkpoint_progress')
       .upsert({
@@ -147,28 +333,54 @@ export const saveCheckpointProgress = async (
       throw error;
     }
     
+    // Clear relevant caches
+    const progressCacheKey = `progress_${userId}_*`;
+    clearUserProgressCache(userId);
+    
+    console.timeEnd(`saveCheckpointProgress-${checkpointId}`);
     console.log(`✅ Checkpoint progress saved successfully`);
   } catch (error) {
     console.error('❌ saveCheckpointProgress error:', error);
+    console.timeEnd(`saveCheckpointProgress-${checkpointId}`);
     throw error;
   }
 };
 
+// =====================================================
+// OPTIMIZATION 6: UNLOCK FINAL ASSESSMENT WITH CACHE
+// =====================================================
 export const unlockFinalAssessment = async (
   userId: string,
   topicId: string
 ): Promise<boolean> => {
+  const cacheKey = `final_unlock_${userId}_${topicId}`;
+  const now = Date.now();
+  const cacheDuration = 60 * 1000; // 1 minute cache
+  
+  // Check cache first
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    const { unlocked, timestamp } = JSON.parse(cached);
+    if (now - timestamp < cacheDuration) {
+      console.log(`📦 Using cached unlock status for user ${userId}, topic ${topicId}`);
+      return unlocked;
+    }
+  }
+  
+  console.time(`unlockFinalAssessment-${topicId}`);
+  console.log(`🔓 Checking if final assessment can be unlocked for user ${userId}, topic ${topicId}`);
+  
   try {
-    console.log(`🔓 Checking if final assessment can be unlocked for user ${userId}, topic ${topicId}`);
+    // Get checkpoints for this topic
+    const checkpoints = await getTopicCheckpoints(topicId);
+    const checkpointIds = checkpoints.map(cp => cp.id);
     
-    // Check if student passed required number of checkpoints
+    // Get progress for these checkpoints
     const { data: progress, error } = await supabase
       .from('student_checkpoint_progress')
       .select('checkpoint_id, passed, score')
       .eq('user_id', userId)
-      .in('checkpoint_id', 
-        (await supabase.from('checkpoints').select('id').eq('topic_id', topicId)).data?.map(c => c.id) || []
-      );
+      .in('checkpoint_id', checkpointIds);
 
     if (error) {
       console.error('❌ Error fetching checkpoint progress:', error);
@@ -176,6 +388,8 @@ export const unlockFinalAssessment = async (
     }
 
     const passedCheckpoints = (progress || []).filter(p => p.passed).length;
+    
+    // Get required checkpoints from topic or use default
     const { data: topic } = await supabase
       .from('topics')
       .select('checkpoints_required')
@@ -200,32 +414,56 @@ export const unlockFinalAssessment = async (
       console.log(`✅ Final assessment unlocked for user ${userId}, topic ${topicId}`);
     }
 
+    // Cache the result
+    sessionStorage.setItem(cacheKey, JSON.stringify({
+      unlocked: canUnlock,
+      timestamp: now
+    }));
+    
+    console.timeEnd(`unlockFinalAssessment-${topicId}`);
+    
     return canUnlock;
   } catch (error) {
     console.error('❌ unlockFinalAssessment error:', error);
+    console.timeEnd(`unlockFinalAssessment-${topicId}`);
     return false;
   }
 };
 
-// Helper function to get checkpoint completion status
+// =====================================================
+// OPTIMIZATION 7: GET CHECKPOINT COMPLETION STATUS
+// =====================================================
 export const getCheckpointCompletionStatus = async (
   userId: string,
   topicId: string
 ): Promise<{completed: number, total: number, percentage: number}> => {
+  const cacheKey = `completion_${userId}_${topicId}`;
+  const now = Date.now();
+  const cacheDuration = 2 * 60 * 1000; // 2 minutes
+  
+  // Check cache first
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (now - timestamp < cacheDuration) {
+      return data;
+    }
+  }
+  
+  console.time(`getCheckpointCompletionStatus-${topicId}`);
+  
   try {
-    // Get all checkpoints for this topic (only checkpoints 1-4 now)
-    const { data: checkpoints } = await supabase
-      .from('checkpoints')
-      .select('id, checkpoint_number')
-      .eq('topic_id', topicId)
-      .lte('checkpoint_number', 4) // Only include checkpoints 1-4
-      .order('checkpoint_number', { ascending: true });
-
-    if (!checkpoints || checkpoints.length === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
+    // Get checkpoints 1-4 for this topic
+    const checkpoints = await getTopicCheckpoints(topicId);
+    const standardCheckpoints = checkpoints.filter(cp => cp.checkpoint_number <= 4);
+    
+    if (!standardCheckpoints || standardCheckpoints.length === 0) {
+      const result = { completed: 0, total: 0, percentage: 0 };
+      sessionStorage.setItem(cacheKey, JSON.stringify({ data: result, timestamp: now }));
+      return result;
     }
 
-    const checkpointIds = checkpoints.map(cp => cp.id);
+    const checkpointIds = standardCheckpoints.map(cp => cp.id);
     
     // Get progress for these checkpoints
     const { data: progressData } = await supabase
@@ -235,36 +473,61 @@ export const getCheckpointCompletionStatus = async (
       .in('checkpoint_id', checkpointIds);
 
     const completedCheckpoints = (progressData || []).filter(p => p.passed).length;
-    const totalCheckpoints = checkpoints.length;
+    const totalCheckpoints = standardCheckpoints.length;
     const percentage = totalCheckpoints > 0 ? (completedCheckpoints / totalCheckpoints) * 100 : 0;
 
-    return {
+    const result = {
       completed: completedCheckpoints,
       total: totalCheckpoints,
       percentage: Math.round(percentage)
     };
+    
+    // Cache the result
+    sessionStorage.setItem(cacheKey, JSON.stringify({
+      data: result,
+      timestamp: now
+    }));
+    
+    console.timeEnd(`getCheckpointCompletionStatus-${topicId}`);
+    
+    return result;
   } catch (error) {
     console.error('❌ getCheckpointCompletionStatus error:', error);
+    console.timeEnd(`getCheckpointCompletionStatus-${topicId}`);
     return { completed: 0, total: 0, percentage: 0 };
   }
 };
 
-// Check if topic is completed (checkpoint 4 passed)
+// =====================================================
+// OPTIMIZATION 8: CHECK IF TOPIC IS COMPLETED
+// =====================================================
 export const isTopicCompleted = async (
   userId: string,
   topicId: string
 ): Promise<boolean> => {
+  const cacheKey = `topic_completed_${userId}_${topicId}`;
+  const now = Date.now();
+  const cacheDuration = 5 * 60 * 1000; // 5 minutes
+  
+  // Check cache first
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    const { completed, timestamp } = JSON.parse(cached);
+    if (now - timestamp < cacheDuration) {
+      return completed;
+    }
+  }
+  
+  console.time(`isTopicCompleted-${topicId}`);
+  
   try {
     // Get checkpoint 4 for this topic
-    const { data: checkpoint4 } = await supabase
-      .from('checkpoints')
-      .select('id')
-      .eq('topic_id', topicId)
-      .eq('checkpoint_number', 4)
-      .single();
+    const checkpoints = await getTopicCheckpoints(topicId);
+    const checkpoint4 = checkpoints.find(cp => cp.checkpoint_number === 4);
 
     if (!checkpoint4) {
       console.log(`⚠️ No checkpoint 4 found for topic ${topicId}`);
+      sessionStorage.setItem(cacheKey, JSON.stringify({ completed: false, timestamp: now }));
       return false;
     }
 
@@ -278,32 +541,58 @@ export const isTopicCompleted = async (
 
     const isPassed = progress?.passed || false;
     const hasHighScore = progress?.score >= 80;
+    const isCompleted = isPassed && hasHighScore;
     
-    console.log(`📊 Topic ${topicId} completion check: passed=${isPassed}, score=${progress?.score}%, completed=${isPassed && hasHighScore}`);
+    console.log(`📊 Topic ${topicId} completion check: passed=${isPassed}, score=${progress?.score}%, completed=${isCompleted}`);
     
-    return isPassed && hasHighScore;
+    // Cache the result
+    sessionStorage.setItem(cacheKey, JSON.stringify({
+      completed: isCompleted,
+      timestamp: now
+    }));
+    
+    console.timeEnd(`isTopicCompleted-${topicId}`);
+    
+    return isCompleted;
   } catch (error) {
     console.error('❌ isTopicCompleted error:', error);
+    console.timeEnd(`isTopicCompleted-${topicId}`);
     return false;
   }
 };
 
-// Get user's latest checkpoint attempt for a specific checkpoint number
+// =====================================================
+// OPTIMIZATION 9: GET LATEST CHECKPOINT ATTEMPT
+// =====================================================
 export const getLatestCheckpointAttempt = async (
   userId: string,
   topicId: string,
   checkpointNumber: number
 ): Promise<any> => {
+  const cacheKey = `latest_attempt_${userId}_${topicId}_${checkpointNumber}`;
+  const now = Date.now();
+  const cacheDuration = 60 * 1000; // 1 minute
+  
+  // Check cache first
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (now - timestamp < cacheDuration) {
+      return data;
+    }
+  }
+  
+  console.time(`getLatestCheckpointAttempt-${topicId}-${checkpointNumber}`);
+  
   try {
     // Get checkpoint ID for this number
-    const { data: checkpoint } = await supabase
-      .from('checkpoints')
-      .select('id')
-      .eq('topic_id', topicId)
-      .eq('checkpoint_number', checkpointNumber)
-      .single();
+    const checkpoints = await getTopicCheckpoints(topicId);
+    const checkpoint = checkpoints.find(cp => cp.checkpoint_number === checkpointNumber);
 
-    if (!checkpoint) return null;
+    if (!checkpoint) {
+      console.timeEnd(`getLatestCheckpointAttempt-${topicId}-${checkpointNumber}`);
+      return null;
+    }
 
     // Get latest attempt for this checkpoint
     const { data: progress } = await supabase
@@ -314,9 +603,74 @@ export const getLatestCheckpointAttempt = async (
       .order('completed_at', { ascending: false })
       .limit(1);
 
-    return progress?.[0] || null;
+    const result = progress?.[0] || null;
+    
+    // Cache the result
+    sessionStorage.setItem(cacheKey, JSON.stringify({
+      data: result,
+      timestamp: now
+    }));
+    
+    console.timeEnd(`getLatestCheckpointAttempt-${topicId}-${checkpointNumber}`);
+    
+    return result;
   } catch (error) {
     console.error('❌ getLatestCheckpointAttempt error:', error);
+    console.timeEnd(`getLatestCheckpointAttempt-${topicId}-${checkpointNumber}`);
     return null;
   }
+};
+
+// =====================================================
+// HELPER FUNCTIONS
+// =====================================================
+
+// Clear user progress cache
+const clearUserProgressCache = (userId: string) => {
+  // Clear all session storage items for this user
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && key.includes(`progress_${userId}`)) {
+      keysToRemove.push(key);
+    }
+  }
+  
+  keysToRemove.forEach(key => sessionStorage.removeItem(key));
+  console.log(`🧹 Cleared ${keysToRemove.length} cache items for user ${userId}`);
+};
+
+// Clear all caches (for development/debugging)
+export const clearAllCheckpointCaches = () => {
+  checkpointCache.clear();
+  topicCheckpointsCache.clear();
+  
+  // Clear session storage items related to checkpoints
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && (
+      key.includes('checkpoint_') || 
+      key.includes('topic_') ||
+      key.includes('progress_') ||
+      key.includes('completion_') ||
+      key.includes('final_unlock_') ||
+      key.includes('topic_completed_') ||
+      key.includes('latest_attempt_')
+    )) {
+      keysToRemove.push(key);
+    }
+  }
+  
+  keysToRemove.forEach(key => sessionStorage.removeItem(key));
+  console.log(`🧹 Cleared all checkpoint caches: ${checkpointCache.size} memory, ${keysToRemove.length} session`);
+};
+
+// Get cache statistics (for debugging)
+export const getCacheStats = () => {
+  return {
+    memoryCacheSize: checkpointCache.size,
+    topicCheckpointsCacheSize: topicCheckpointsCache.size,
+    sessionStorageItems: sessionStorage.length
+  };
 };
