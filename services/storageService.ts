@@ -1683,8 +1683,6 @@ export const getStudentCheckpointScores = async (username: string): Promise<Reco
 // Add to storageService.ts (after getStudentTopicPerformance function)
 // In storageService.ts, REPLACE the getStudentSubjectPerformance function with:
 // storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
-// storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
-// storageService.ts - CORRECTED VERSION of getStudentSubjectPerformance
 export const getStudentSubjectPerformance = async (username: string): Promise<Record<string, number>> => {
   try {
     console.log(`📊 Getting subject performance for ${username}`);
@@ -1767,6 +1765,61 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
   } catch (error) {
     console.error('❌ CRITICAL ERROR in getStudentSubjectPerformance:', error);
     return {};
+  }
+};
+
+// Add this function to storageService.ts
+export const getStudentCourseProgress = async (username: string): Promise<any[]> => {
+  try {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) return [];
+
+    // Get topics with progress
+    const { data: topicsProgress } = await supabase
+      .from('user_progress')
+      .select(`
+        *,
+        topic:topics (
+          id,
+          title,
+          grade_level,
+          subject:subject_id (name)
+        )
+      `)
+      .eq('user_id', userData.id);
+
+    if (!topicsProgress) return [];
+
+    return topicsProgress.map(progress => {
+      const topic = progress.topic;
+      let subjectName = 'General';
+      
+      if (topic?.subject) {
+        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+          subjectName = topic.subject[0]?.name || 'General';
+        } else if (typeof topic.subject === 'object') {
+          subjectName = (topic.subject as any)?.name || 'General';
+        }
+      }
+
+      return {
+        topicId: progress.topic_id,
+        topicTitle: topic?.title || 'Unknown',
+        subject: subjectName,
+        gradeLevel: topic?.grade_level || 'N/A',
+        mainAssessmentScore: progress.main_assessment_score,
+        mainAssessmentPassed: progress.main_assessment_passed,
+        lastAccessed: progress.last_accessed
+      };
+    });
+  } catch (error) {
+    console.error('Error getting course progress:', error);
+    return [];
   }
 };
 // =======================

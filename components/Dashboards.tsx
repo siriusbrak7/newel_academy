@@ -86,6 +86,7 @@ import {
 // Fixed Chart.js imports
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { supabase } from '@/services/supabaseClient';
 
 // Register Chart.js components
 ChartJS.register(
@@ -143,57 +144,113 @@ interface CoursePerformance {
 // FIX: Implement missing function with proper return type
 // FIX: Implement missing function with proper return type
 // FIX: Implement missing function with proper return type
+// FIX: Replace the entire getStudentDetailedCoursePerformance function with this corrected version
 const getStudentDetailedCoursePerformance = async (username: string): Promise<Record<string, CoursePerformance>> => {
   try {
-    // Get all courses
-    const courses = await getCourses();
-    const studentCourseHistory = await getStudentCourseHistory(username);
-    const studentCheckpointScores = await getStudentCheckpointScores(username);
+    console.log(`📊 Getting detailed course performance for ${username}`);
     
+    // Get user ID first
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (!userData) {
+      console.log('❌ User not found');
+      return {};
+    }
+
+    // Get all topics the student has progress on
+    const { data: topicsProgress } = await supabase
+      .from('user_progress')
+      .select(`
+        *,
+        topic:topics (
+          id,
+          title,
+          grade_level,
+          subject:subject_id (name)
+        )
+      `)
+      .eq('user_id', userData.id);
+
+    console.log(`📚 Found ${topicsProgress?.length || 0} topics with progress`);
+
+    if (!topicsProgress || topicsProgress.length === 0) {
+      return {};
+    }
+
     const performance: Record<string, CoursePerformance> = {};
     
-    // Process each course - courses is CourseStructure type
-    Object.entries(courses).forEach(([courseId, course]) => {
-      // course is any type from CourseStructure
-      const courseHistory = studentCourseHistory.find(ch => ch.courseId === courseId);
+    // Process each topic
+    for (const progress of topicsProgress) {
+      const topic = progress.topic;
+      if (!topic || !topic.id) continue;
       
-      // FIX: Handle case where studentCheckpointScores might not be an array
-      let courseCheckpoints: any[] = [];
-      if (studentCheckpointScores && Array.isArray(studentCheckpointScores)) {
-        courseCheckpoints = studentCheckpointScores.filter((cp: any) => cp.courseId === courseId);
+      // Get checkpoints for this topic
+      const { data: checkpoints } = await supabase
+        .from('checkpoints')
+        .select('id, checkpoint_number, title, required_score')
+        .eq('topic_id', topic.id)
+        .order('checkpoint_number', { ascending: true });
+
+      if (!checkpoints || checkpoints.length === 0) continue;
+      
+      const checkpointIds = checkpoints.map(c => c.id);
+      
+      // Get student's progress on these checkpoints
+      const { data: checkpointProgress } = await supabase
+        .from('student_checkpoint_progress')
+        .select('checkpoint_id, score, passed, completed_at')
+        .eq('user_id', userData.id)
+        .in('checkpoint_id', checkpointIds);
+
+      // Calculate performance metrics
+      const checkpointScores = checkpointProgress?.map(cp => cp.score || 0) || [];
+      const averageScore = checkpointScores.length > 0 
+        ? Math.round(checkpointScores.reduce((a, b) => a + b, 0) / checkpointScores.length)
+        : 0;
+      
+      // Get subject name safely
+      let subjectName = 'General';
+      if (topic.subject) {
+        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+          subjectName = topic.subject[0]?.name || 'General';
+        } else if (typeof topic.subject === 'object') {
+          subjectName = (topic.subject as any)?.name || 'General';
+        }
       }
-      
-      if (courseCheckpoints.length > 0) {
-        const checkpointScores = courseCheckpoints.map(cp => cp.score || 0);
-        const averageScore = checkpointScores.length > 0 
-          ? Math.round(checkpointScores.reduce((a, b) => a + b, 0) / checkpointScores.length) 
-          : 0;
-        
-        // FIX: Safely extract string values from course object
-        const courseObj = course as any;
-        performance[courseId] = {
-          topicTitle: courseObj?.title?.toString() || 'Untitled Course',
-          subject: courseObj?.subject?.toString() || 'General',
-          gradeLevel: courseObj?.gradeLevel?.toString() || '9',
-          checkpointCount: courseCheckpoints.length,
-          checkpointScores,
-          averageScore,
-          passed: averageScore >= 60,
-          completedAt: courseHistory?.completedAt,
-          checkpoints: courseCheckpoints.map(cp => ({
-            id: cp.checkpointId?.toString() || Date.now().toString(),
-            title: cp.checkpointTitle?.toString() || `Checkpoint`,
+
+      performance[topic.id] = {
+        topicTitle: topic.title,
+        subject: subjectName,
+        gradeLevel: topic.grade_level || '9',
+        checkpointCount: checkpointProgress?.length || 0,
+        checkpointScores,
+        averageScore,
+        passed: averageScore >= 60, // Adjust threshold as needed
+        completedAt: checkpointProgress?.length > 0 
+          ? Math.max(...checkpointProgress.map(cp => new Date(cp.completed_at || 0).getTime()))
+          : undefined,
+        checkpoints: checkpointProgress?.map(cp => {
+          const checkpoint = checkpoints.find(c => c.id === cp.checkpoint_id);
+          return {
+            id: cp.checkpoint_id,
+            title: checkpoint?.title || `Checkpoint ${cp.checkpoint_id}`,
             score: cp.score || 0,
-            passed: (cp.score || 0) >= 60,
-            completedAt: cp.completedAt || Date.now()
-          }))
-        };
-      }
-    });
-    
+            passed: cp.passed || false,
+            completedAt: new Date(cp.completed_at || 0).getTime()
+          };
+        }) || []
+      };
+    }
+
+    console.log(`✅ Course performance data: ${Object.keys(performance).length} topics`);
     return performance;
+    
   } catch (error) {
-    console.error('Error getting detailed course performance:', error);
+    console.error('❌ Error getting detailed course performance:', error);
     return {};
   }
 };
@@ -2157,7 +2214,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <option value="">Choose a student...</option>
                   {filteredStudents.map(student => (
                     <option key={student.username} value={student.username}>
-                      {student.username} (Grade {student.gradeLevel}) - Avg: {student.avgScore.toFixed(1)}%
+                      {student.username} (Grade {student.gradeLevel}) - Avg: {Math.round(student.avgScore)}% - Streak: {student.streak} days
                     </option>
                   ))}
                 </select>

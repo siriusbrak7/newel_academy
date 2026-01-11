@@ -1,4 +1,3 @@
-// components/CourseSystem/CheckpointQuiz.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Question } from '../../types';
 import { Timer, Loader2, CheckCircle, XCircle, AlertCircle, Info } from 'lucide-react';
@@ -163,13 +162,14 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
             const isCorrect = selectedAnswer === correctOptionText;
             if (isCorrect) correctCount++;
 
+            // UPDATED: Ensure explanation is included in the result object
             gradingResults.push({
               questionText: q.text,
               userAnswer: selectedAnswer,
               correctAnswer: correctOptionText,
               isCorrect: isCorrect,
               options: q.options,
-              explanation: q.explanation
+              explanation: q.explanation 
             });
           }
         });
@@ -184,7 +184,7 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
           setShowConfetti(true);
         }
 
-        // NEW: Pass results to parent component
+        // Pass results to parent component
         onComplete(finalScore, finalScore >= passThreshold, gradingResults);
       }
     } catch (err: any) {
@@ -279,11 +279,15 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
                             </div>
                           )}
 
+                          {/* UPDATED: New Explanation UI */}
                           {res.explanation && (
-                             <div className="mt-2 p-2 rounded bg-white/5 border border-white/10 text-white/70 italic">
-                               <span className="font-bold not-italic text-cyan-400 block mb-1">Explanation:</span>
-                               {res.explanation}
-                             </div>
+                            <div className="mt-3 p-3 rounded bg-cyan-900/20 border border-cyan-500/30">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Info className="text-cyan-400" size={14} />
+                                <span className="text-cyan-300 text-xs font-medium">Explanation</span>
+                              </div>
+                              <p className="text-white/80 text-sm italic">{res.explanation}</p>
+                            </div>
                           )}
                         </div>
                       </div>
