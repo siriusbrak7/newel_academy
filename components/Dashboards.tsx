@@ -40,7 +40,7 @@ import {
   notifyCourseMaterialAdded,
   getCoursesLight,
   getStudentSubjectPerformance,
-  getStudentCheckpointScores // ADD THIS IMPORT
+  getStudentCheckpointScores
 } from '../services/storageService';
 import { 
   Check, 
@@ -73,7 +73,14 @@ import {
   Bug,
   Plus,
   Bell,
-  Info
+  Info,
+  // FIXED: Added all missing icon imports
+  Search,
+  MoreVertical,
+  Award,
+  Calendar,
+  Activity,
+  TrendingDown
 } from 'lucide-react';
 
 // Fixed Chart.js imports
@@ -106,6 +113,90 @@ try {
     save() { console.log('PDF export disabled - install jspdf') }
   };
 }
+
+// =====================================================
+// TYPE DEFINITIONS
+// =====================================================
+
+interface CoursePerformance {
+  topicTitle: string;
+  subject: string;
+  gradeLevel: string;
+  checkpointCount: number;
+  checkpointScores: number[];
+  averageScore: number;
+  passed: boolean;
+  completedAt?: number;
+  checkpoints: Array<{
+    id: string;
+    title: string;
+    score: number;
+    passed: boolean;
+    completedAt: number;
+  }>;
+}
+
+// =====================================================
+// HELPER FUNCTIONS
+// =====================================================
+
+// FIX: Implement missing function with proper return type
+// FIX: Implement missing function with proper return type
+// FIX: Implement missing function with proper return type
+const getStudentDetailedCoursePerformance = async (username: string): Promise<Record<string, CoursePerformance>> => {
+  try {
+    // Get all courses
+    const courses = await getCourses();
+    const studentCourseHistory = await getStudentCourseHistory(username);
+    const studentCheckpointScores = await getStudentCheckpointScores(username);
+    
+    const performance: Record<string, CoursePerformance> = {};
+    
+    // Process each course - courses is CourseStructure type
+    Object.entries(courses).forEach(([courseId, course]) => {
+      // course is any type from CourseStructure
+      const courseHistory = studentCourseHistory.find(ch => ch.courseId === courseId);
+      
+      // FIX: Handle case where studentCheckpointScores might not be an array
+      let courseCheckpoints: any[] = [];
+      if (studentCheckpointScores && Array.isArray(studentCheckpointScores)) {
+        courseCheckpoints = studentCheckpointScores.filter((cp: any) => cp.courseId === courseId);
+      }
+      
+      if (courseCheckpoints.length > 0) {
+        const checkpointScores = courseCheckpoints.map(cp => cp.score || 0);
+        const averageScore = checkpointScores.length > 0 
+          ? Math.round(checkpointScores.reduce((a, b) => a + b, 0) / checkpointScores.length) 
+          : 0;
+        
+        // FIX: Safely extract string values from course object
+        const courseObj = course as any;
+        performance[courseId] = {
+          topicTitle: courseObj?.title?.toString() || 'Untitled Course',
+          subject: courseObj?.subject?.toString() || 'General',
+          gradeLevel: courseObj?.gradeLevel?.toString() || '9',
+          checkpointCount: courseCheckpoints.length,
+          checkpointScores,
+          averageScore,
+          passed: averageScore >= 60,
+          completedAt: courseHistory?.completedAt,
+          checkpoints: courseCheckpoints.map(cp => ({
+            id: cp.checkpointId?.toString() || Date.now().toString(),
+            title: cp.checkpointTitle?.toString() || `Checkpoint`,
+            score: cp.score || 0,
+            passed: (cp.score || 0) >= 60,
+            completedAt: cp.completedAt || Date.now()
+          }))
+        };
+      }
+    });
+    
+    return performance;
+  } catch (error) {
+    console.error('Error getting detailed course performance:', error);
+    return {};
+  }
+};
 
 // =====================================================
 // STUDENT DASHBOARD COMPONENT - OPTIMIZED VERSION
@@ -155,8 +246,15 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
   // Load Neuroscience Facts (immediate, no API)
   useEffect(() => {
-    if (window.neuroscienceFacts && window.neuroscienceFacts.length > 0) {
-      setNeuroscienceFacts(window.neuroscienceFacts);
+    // Declare window type augmentation
+    interface WindowWithFacts {
+      neuroscienceFacts?: string[];
+    }
+    
+    const windowWithFacts = window as unknown as WindowWithFacts;
+    
+    if (windowWithFacts.neuroscienceFacts && windowWithFacts.neuroscienceFacts.length > 0) {
+      setNeuroscienceFacts(windowWithFacts.neuroscienceFacts);
     } else {
       // Fallback facts if not loaded from index.html
       const defaultFacts = [
@@ -420,7 +518,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  // Optimized chart data with memoization
+  // Optimized chart data with memoization - FIXED VERSION
   const chartData = useMemo(() => {
     if (subjectLabels.length === 0 || subjectScores.length === 0) {
       return {
@@ -436,19 +534,40 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       };
     }
     
+    // Generate consistent colors based on number of subjects
+    const generateColors = (count: number) => {
+      const baseColors = [
+        'rgba(6, 182, 212, 0.6)',    // cyan
+        'rgba(168, 85, 247, 0.6)',   // purple
+        'rgba(236, 72, 153, 0.6)',   // pink
+        'rgba(34, 197, 94, 0.6)',    // green
+        'rgba(245, 158, 11, 0.6)',   // yellow
+        'rgba(239, 68, 68, 0.6)',    // red
+        'rgba(59, 130, 246, 0.6)',   // blue
+        'rgba(139, 92, 246, 0.6)',   // violet
+        'rgba(20, 184, 166, 0.6)',   // teal
+        'rgba(249, 115, 22, 0.6)'    // orange
+      ];
+      
+      if (count <= baseColors.length) {
+        return baseColors.slice(0, count);
+      }
+      
+      // Generate more colors if needed
+      const colors = [...baseColors];
+      for (let i = baseColors.length; i < count; i++) {
+        const hue = (i * 137.508) % 360; // Golden angle approximation
+        colors.push(`hsla(${hue}, 70%, 60%, 0.6)`);
+      }
+      return colors;
+    };
+    
     return {
       labels: subjectLabels,
       datasets: [{
         label: 'Average Score (%)',
         data: subjectScores,
-        backgroundColor: [
-          'rgba(6, 182, 212, 0.6)',
-          'rgba(168, 85, 247, 0.6)',
-          'rgba(236, 72, 153, 0.6)',
-          'rgba(34, 197, 94, 0.6)',
-          'rgba(245, 158, 11, 0.6)',
-          'rgba(239, 68, 68, 0.6)'
-        ],
+        backgroundColor: generateColors(subjectLabels.length),
         borderColor: 'transparent',
         hoverOffset: 12,
         borderWidth: 0
@@ -491,8 +610,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       if (neuroscienceFacts.length > 0) {
         doc.text('Brain Fact of the Day:', 10, y);
         y += 10;
-        doc.text(neuroscienceFacts[currentFactIndex], 10, y, { maxWidth: 180 });
-        y += 15;
+        // Split long text into multiple lines
+        const factLines = doc.splitTextToSize(neuroscienceFacts[currentFactIndex], 180);
+        factLines.forEach((line: string) => {
+          doc.text(line, 10, y);
+          y += 6;
+        });
+        y += 3;
       }
       
       // Add notifications summary
@@ -504,7 +628,8 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
             doc.addPage();
             y = 20;
           }
-          doc.text(`${i+1}. ${notification.text.substring(0, 50)}...`, 10, y);
+          const notificationText = notification.text.substring(0, 50) + (notification.text.length > 50 ? '...' : '');
+          doc.text(`${i+1}. ${notificationText}`, 10, y);
           y += 8;
         });
       }
@@ -536,7 +661,8 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
           doc.text(`- ${feedback.assessmentTitle}: ${feedback.score}%`, 10, y);
           y += 8;
           if (feedback.feedback) {
-            doc.text(`  Feedback: ${feedback.feedback.substring(0, 50)}...`, 10, y);
+            const feedbackText = feedback.feedback.substring(0, 50) + (feedback.feedback.length > 50 ? '...' : '');
+            doc.text(`  Feedback: ${feedbackText}`, 10, y);
             y += 8;
           }
         });
@@ -1574,198 +1700,216 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
+
 // =====================================================
-// TEACHER DASHBOARD COMPONENT - OPTIMIZED VERSION
+// TEACHER DASHBOARD COMPONENT - UPDATED WITH COURSE TRACKING
 // =====================================================
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [students, setStudents] = useState<StudentStats[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<StudentStats[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [classOverview, setClassOverview] = useState<any>({});
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
   
   // Student tracking states
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [studentCheckpointData, setStudentCheckpointData] = useState<{
-    checkpointScores: Record<string, number>;
+  const [studentCourseData, setStudentCourseData] = useState<{
+    coursePerformance: Record<string, CoursePerformance>;
     courseHistory: any[];
-    subjectPerformance: any;
     username: string;
+    overallStats: {
+      totalTopics: number;
+      overallAverage: number;
+      strongestTopic: string;
+      weakestTopic: string;
+      totalCheckpoints: number;
+      passedCheckpoints: number;
+      completionRate: number;
+    };
   } | null>(null);
   
-  // Loading states for progressive loading
-  const [loadingStates, setLoadingStates] = useState({
-    mainData: true,
-    classOverview: false,
-    studentTracking: false,
-    assessments: false,
-    announcements: false
-  });
-  
+  const [trackingLoading, setTrackingLoading] = useState(false);
   const [showTrackingSection, setShowTrackingSection] = useState(false);
-  
-  // Cache for student data to avoid repeated API calls
-  const [studentDataCache, setStudentDataCache] = useState<Record<string, any>>({});
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'score' | 'grade'>('name');
+  const [filterGrade, setFilterGrade] = useState<string>('all');
 
-  // Load critical data first (students and class overview)
-  const loadCriticalData = async () => {
+  // Refresh all data
+  const refreshData = async () => {
+    setLoading(true);
     try {
-      // Load students first (most important)
-      const studentsData = await getAllStudentStats();
-      const filteredStudents = studentsData.filter(s => 
+      const [studentsData, assessmentsData, announcementsData, overviewData] = await Promise.all([
+        getAllStudentStats(),
+        getAssessments(),
+        getAnnouncements(),
+        getClassOverview()
+      ]);
+      
+      // Filter students for this teacher's grade level if specified
+      const gradeFiltered = studentsData.filter(s => 
         !user.gradeLevel || s.gradeLevel === user.gradeLevel
       );
-      setStudents(filteredStudents);
       
-      // Auto-select first student
-      if (filteredStudents.length > 0 && !selectedStudent) {
-        setSelectedStudent(filteredStudents[0].username);
-      }
-      
-      // Load class overview
-      const overviewData = await getClassOverview();
-      setClassOverview(overviewData);
-      
-      // Update loading state
-      setLoadingStates(prev => ({ ...prev, mainData: false, classOverview: false }));
-      
-    } catch (error) {
-      console.error('Error loading critical data:', error);
-      setLoadingStates(prev => ({ ...prev, mainData: false, classOverview: false }));
-    }
-  };
-
-  // Load secondary data (assessments and announcements) after critical data
-  const loadSecondaryData = async () => {
-    try {
-      const [assessmentsData, announcementsData] = await Promise.all([
-        getAssessments(),
-        getAnnouncements()
-      ]);
-      
+      setStudents(gradeFiltered);
+      setFilteredStudents(gradeFiltered);
       setAssessments(assessmentsData);
       setAnnouncements(announcementsData);
+      setClassOverview(overviewData);
       
-      setLoadingStates(prev => ({ ...prev, assessments: false, announcements: false }));
+      // Auto-select first student if none selected
+      if (gradeFiltered.length > 0 && !selectedStudent) {
+        setSelectedStudent(gradeFiltered[0].username);
+      }
     } catch (error) {
-      console.error('Error loading secondary data:', error);
-      setLoadingStates(prev => ({ ...prev, assessments: false, announcements: false }));
+      console.error('Error refreshing teacher dashboard:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Filter and sort students
   useEffect(() => {
-    // Load critical data immediately
-    loadCriticalData();
+    let result = [...students];
     
-    // Load secondary data after a short delay
-    const secondaryDataTimer = setTimeout(() => {
-      loadSecondaryData();
-    }, 500); // Half second delay
+    // Apply search filter
+    if (searchTerm) {
+      result = result.filter(student => 
+        student.username.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
     
-    return () => clearTimeout(secondaryDataTimer);
+    // Apply grade filter
+    if (filterGrade !== 'all') {
+      result = result.filter(student => student.gradeLevel === filterGrade);
+    }
+    
+    // Apply sorting
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'score':
+          return b.avgScore - a.avgScore;
+        case 'grade':
+          return parseInt(a.gradeLevel) - parseInt(b.gradeLevel);
+        case 'name':
+        default:
+          return a.username.localeCompare(b.username);
+      }
+    });
+    
+    setFilteredStudents(result);
+  }, [students, searchTerm, sortBy, filterGrade]);
+
+  // Initial data load
+  useEffect(() => {
+    refreshData();
   }, []);
 
-  // Optimized student checkpoint data loading with caching
-  const loadStudentCheckpointData = useCallback(async (username: string) => {
-    // Check cache first
-    if (studentDataCache[username]) {
-      setStudentCheckpointData(studentDataCache[username]);
-      return;
-    }
-    
-    setLoadingStates(prev => ({ ...prev, studentTracking: true }));
-    
-    try {
-      // Load all student data in parallel
-      const [checkpointScores, courseHistory, subjectPerformance] = await Promise.all([
-        getStudentCheckpointScores(username),
-        getStudentCourseHistory(username),
-        getStudentSubjectPerformance(username)
-      ]);
-      
-      const studentData = {
-        checkpointScores,
-        courseHistory,
-        subjectPerformance,
-        username
-      };
-      
-      // Update cache
-      setStudentDataCache(prev => ({
-        ...prev,
-        [username]: studentData
-      }));
-      
-      setStudentCheckpointData(studentData);
-    } catch (error) {
-      console.error('Error loading student checkpoint data:', error);
-      setStudentCheckpointData(null);
-    } finally {
-      setLoadingStates(prev => ({ ...prev, studentTracking: false }));
-    }
-  }, [studentDataCache]);
-
-  // Debounced student selection to avoid rapid API calls
+  // Load student course data when selected student changes
   useEffect(() => {
-    if (!selectedStudent) return;
-    
-    const timer = setTimeout(() => {
-      loadStudentCheckpointData(selectedStudent);
-    }, 300); // 300ms debounce
-    
-    return () => clearTimeout(timer);
-  }, [selectedStudent, loadStudentCheckpointData]);
+    if (selectedStudent) {
+      loadStudentCourseData(selectedStudent);
+    }
+  }, [selectedStudent]);
 
-  // Optimized formatCheckpointData with memoization
-  const formatCheckpointData = useCallback((checkpointScores: Record<string, number>) => {
-    if (!checkpointScores || Object.keys(checkpointScores).length === 0) {
+  const loadStudentCourseData = async (username: string) => {
+    setTrackingLoading(true);
+    try {
+      // Get detailed course performance (with proper checkpoint averaging)
+      const coursePerformance = await getStudentDetailedCoursePerformance(username);
+      
+      // Get student's course history
+      const courseHistory = await getStudentCourseHistory(username);
+      
+      // Calculate overall statistics
+      let totalCheckpoints = 0;
+      let passedCheckpoints = 0;
+      let totalScore = 0;
+      let topicCount = 0;
+      let strongestTopic = { name: '', score: 0 };
+      let weakestTopic = { name: '', score: 100 };
+      
+      Object.values(coursePerformance).forEach(topic => {
+        totalCheckpoints += topic.checkpointCount;
+        passedCheckpoints += topic.checkpoints.filter(cp => cp.passed).length;
+        totalScore += topic.averageScore;
+        topicCount++;
+        
+        if (topic.averageScore > strongestTopic.score) {
+          strongestTopic = { name: topic.topicTitle, score: topic.averageScore };
+        }
+        if (topic.averageScore < weakestTopic.score) {
+          weakestTopic = { name: topic.topicTitle, score: topic.averageScore };
+        }
+      });
+      
+      const overallAverage = topicCount > 0 ? Math.round(totalScore / topicCount) : 0;
+      const completionRate = totalCheckpoints > 0 ? Math.round((passedCheckpoints / totalCheckpoints) * 100) : 0;
+      
+      setStudentCourseData({
+        coursePerformance,
+        courseHistory,
+        username,
+        overallStats: {
+          totalTopics: topicCount,
+          overallAverage,
+          strongestTopic: strongestTopic.name || 'N/A',
+          weakestTopic: weakestTopic.name || 'N/A',
+          totalCheckpoints,
+          passedCheckpoints,
+          completionRate
+        }
+      });
+      
+      // Auto-select first topic if available
+      const topics = Object.keys(coursePerformance);
+      if (topics.length > 0 && !selectedTopic) {
+        setSelectedTopic(topics[0]);
+      }
+      
+    } catch (error) {
+      console.error('Error loading student course data:', error);
+      setStudentCourseData(null);
+    } finally {
+      setTrackingLoading(false);
+    }
+  };
+
+  // Format course data for display
+  const formatCourseData = useMemo(() => {
+    if (!studentCourseData || Object.keys(studentCourseData.coursePerformance).length === 0) {
       return [];
     }
     
-    return Object.entries(checkpointScores).map(([subject, score]) => ({
-      subject,
-      score,
-      status: score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs Improvement',
-      color: score >= 80 ? 'text-green-400' : score >= 60 ? 'text-yellow-400' : 'text-red-400',
-      bgColor: score >= 80 ? 'bg-green-500/20' : score >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+    return Object.entries(studentCourseData.coursePerformance).map(([key, topic]) => ({
+      key,
+      topicTitle: topic.topicTitle,
+      subject: topic.subject,
+      averageScore: topic.averageScore,
+      checkpointCount: topic.checkpointCount,
+      passed: topic.passed,
+      status: topic.averageScore >= 80 ? 'Excellent' : 
+              topic.averageScore >= 60 ? 'Good' : 'Needs Improvement',
+      color: topic.averageScore >= 80 ? 'text-green-400' : 
+             topic.averageScore >= 60 ? 'text-yellow-400' : 'text-red-400',
+      bgColor: topic.averageScore >= 80 ? 'bg-green-500/20' : 
+               topic.averageScore >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20',
+      checkpoints: topic.checkpoints
     }));
-  }, []);
+  }, [studentCourseData]);
 
-  // Optimized refresh function
-  const refreshData = async (force = false) => {
-    setLoadingStates({
-      mainData: true,
-      classOverview: true,
-      studentTracking: false,
-      assessments: true,
-      announcements: true
-    });
-    
-    try {
-      if (force) {
-        // Force refresh everything
-        await loadCriticalData();
-        await loadSecondaryData();
-      } else {
-        // Just refresh critical data
-        await loadCriticalData();
-      }
-      
-      // Refresh selected student data
-      if (selectedStudent) {
-        // Clear cache for this student
-        setStudentDataCache(prev => {
-          const newCache = { ...prev };
-          delete newCache[selectedStudent];
-          return newCache;
-        });
-        await loadStudentCheckpointData(selectedStudent);
-      }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
+  // Get selected topic details
+  const selectedTopicDetails = useMemo(() => {
+    if (!studentCourseData || !selectedTopic || !studentCourseData.coursePerformance[selectedTopic]) {
+      return null;
     }
-  };
+    
+    return studentCourseData.coursePerformance[selectedTopic];
+  }, [studentCourseData, selectedTopic]);
 
+  // Create announcement
   const createAnnouncement = async () => {
     if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
       alert('Please fill in both title and content');
@@ -1783,9 +1927,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
       });
       
       setNewAnnouncement({ title: '', content: '' });
-      // Only refresh announcements
-      const announcementsData = await getAnnouncements();
-      setAnnouncements(announcementsData);
+      refreshData();
       alert('Announcement created successfully!');
     } catch (error) {
       console.error('Error creating announcement:', error);
@@ -1793,50 +1935,84 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  // Show minimal loading state - only for critical data
-  if (loadingStates.mainData) {
+  // Export student performance data
+  const exportStudentData = () => {
+    if (!selectedStudent || !studentCourseData) {
+      alert('No student data to export');
+      return;
+    }
+
+    const data = {
+      student: selectedStudent,
+      exportDate: new Date().toISOString(),
+      overallStats: studentCourseData.overallStats,
+      coursePerformance: studentCourseData.coursePerformance,
+      courseHistory: studentCourseData.courseHistory
+    };
+
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedStudent}_performance_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Calculate class statistics
+  const classStats = useMemo(() => {
+    if (students.length === 0) return null;
+    
+    const totalStudents = students.length;
+    const totalScore = students.reduce((sum, student) => sum + student.avgScore, 0);
+    const classAverage = Math.round(totalScore / totalStudents);
+    
+    // Find struggling students (below 60%)
+    const strugglingStudents = students.filter(s => s.avgScore < 60);
+    
+    // Count students by performance level
+    const performanceLevels = {
+      excellent: students.filter(s => s.avgScore >= 80).length,
+      good: students.filter(s => s.avgScore >= 60 && s.avgScore < 80).length,
+      needsHelp: students.filter(s => s.avgScore < 60).length
+    };
+    
+    // Calculate average streak
+    const avgStreak = Math.round(students.reduce((sum, student) => sum + student.streak, 0) / totalStudents);
+    
+    // Calculate average completion rate
+    const avgCompletionRate = Math.round(students.reduce((sum, student) => sum + student.completionRate, 0) / totalStudents);
+    
+    return {
+      totalStudents,
+      classAverage,
+      strugglingStudents: strugglingStudents.length,
+      strugglingPercentage: Math.round((strugglingStudents.length / totalStudents) * 100),
+      performanceLevels,
+      avgStreak,
+      avgCompletionRate,
+      topPerformer: students.reduce((top, current) => 
+        current.avgScore > top.avgScore ? current : top
+      ),
+      mostActive: students.reduce((most, current) => 
+        current.streak > most.streak ? current : most
+      )
+    };
+  }, [students]);
+
+  if (loading) {
     return (
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Skeleton loader for header */}
-        <div className="flex justify-between items-center">
-          <div className="space-y-3">
-            <div className="h-10 w-64 bg-white/10 rounded-lg animate-pulse"></div>
-            <div className="h-4 w-48 bg-white/5 rounded animate-pulse"></div>
-          </div>
-          <div className="flex gap-3">
-            <div className="h-10 w-32 bg-white/10 rounded-lg animate-pulse"></div>
-            <div className="h-10 w-40 bg-white/10 rounded-lg animate-pulse"></div>
-            <div className="h-10 w-40 bg-white/10 rounded-lg animate-pulse"></div>
-          </div>
-        </div>
-
-        {/* Skeleton for class overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="h-4 w-24 bg-white/10 rounded animate-pulse"></div>
-                  <div className="h-8 w-16 bg-white/10 rounded animate-pulse"></div>
-                </div>
-                <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Progress indicator */}
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
-          <p className="mt-4 text-white/60">Loading essential data...</p>
-          <p className="text-white/40 text-sm mt-2">Students and class overview</p>
-        </div>
+      <div className="max-w-7xl mx-auto p-8 text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+        <p className="mt-4 text-white/60">Loading teacher dashboard...</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-4xl font-bold text-white">Teacher Dashboard</h1>
@@ -1844,20 +2020,10 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
         <div className="flex gap-3">
           <button 
-            onClick={() => refreshData(false)}
-            disabled={loadingStates.assessments || loadingStates.announcements}
-            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={refreshData} 
+            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
           >
-            {loadingStates.assessments || loadingStates.announcements ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={16} /> Refresh
-              </>
-            )}
+            <RefreshCw size={16} /> Refresh
           </button>
           <Link 
             to="/courses" 
@@ -1874,55 +2040,67 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Class Overview - Show immediately after loading */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+      {/* Class Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/60 text-sm">Total Students</p>
-              <p className="text-3xl font-bold text-white">{classOverview.totalStudents || students.length || 0}</p>
+              <p className="text-3xl font-bold text-white">{classStats?.totalStudents || 0}</p>
             </div>
             <UsersIcon className="text-cyan-400" size={32} />
           </div>
-          <p className="text-white/40 text-sm mt-2">In your class</p>
+          <p className="text-white/40 text-sm mt-2">
+            {user.gradeLevel ? `Grade ${user.gradeLevel}` : 'All Grades'}
+          </p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/60 text-sm">Class Average</p>
-              {loadingStates.classOverview ? (
-                <div className="h-12 w-24 bg-white/10 rounded animate-pulse"></div>
-              ) : (
-                <p className="text-3xl font-bold text-white">{classOverview.classAverage || 0}%</p>
-              )}
+              <p className="text-3xl font-bold text-white">{classStats?.classAverage || 0}%</p>
             </div>
             <TrendingUp className="text-green-400" size={32} />
           </div>
-          <p className="text-white/40 text-sm mt-2">Overall performance</p>
+          <p className="text-white/40 text-sm mt-2">
+            {classStats && classStats.classAverage >= 70 ? 'Excellent performance' : 
+             classStats && classStats.classAverage >= 50 ? 'Good progress' : 'Needs attention'}
+          </p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+        <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/60 text-sm">Weakest Topic</p>
-              {loadingStates.classOverview ? (
-                <div className="h-12 w-32 bg-white/10 rounded animate-pulse mt-2"></div>
-              ) : (
-                <p className="text-3xl font-bold text-white truncate">{classOverview.weakestTopic || 'N/A'}</p>
-              )}
+              <p className="text-white/60 text-sm">Struggling Students</p>
+              <p className="text-3xl font-bold text-white">{classStats?.strugglingStudents || 0}</p>
             </div>
             <AlertCircle className="text-yellow-400" size={32} />
           </div>
-          <p className="text-white/40 text-sm mt-2">Needs attention</p>
+          <p className="text-white/40 text-sm mt-2">
+            {classStats?.strugglingPercentage || 0}% need attention
+          </p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/60 text-sm">Avg Completion Rate</p>
+              <p className="text-3xl font-bold text-white">{classStats?.avgCompletionRate || 0}%</p>
+            </div>
+            <BarChart3 className="text-purple-400" size={32} />
+          </div>
+          <p className="text-white/40 text-sm mt-2">
+            Average course completion
+          </p>
         </div>
       </div>
 
-      {/* Student Checkpoint Tracking Section */}
+      {/* Student Course Tracking Section */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Target className="text-purple-400" /> Student Checkpoint Tracking
+            <Target className="text-purple-400" /> Student Course Tracking
           </h2>
           <button
             onClick={() => setShowTrackingSection(!showTrackingSection)}
@@ -1935,9 +2113,41 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         
         {showTrackingSection && (
           <>
-            {/* Student Selection */}
-            <div className="mb-6">
-              <label className="block text-white/60 text-sm mb-2">Select Student to Track</label>
+            {/* Student Selection and Filters */}
+            <div className="mb-6 space-y-4">
+              <div className="flex gap-3">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" size={18} />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search students..."
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <select
+                  value={filterGrade}
+                  onChange={(e) => setFilterGrade(e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="all">All Grades</option>
+                  <option value="9">Grade 9</option>
+                  <option value="10">Grade 10</option>
+                  <option value="11">Grade 11</option>
+                  <option value="12">Grade 12</option>
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="name">Sort by Name</option>
+                  <option value="score">Sort by Score</option>
+                  <option value="grade">Sort by Grade</option>
+                </select>
+              </div>
+              
               <div className="flex gap-3">
                 <select
                   value={selectedStudent}
@@ -1945,18 +2155,18 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                   className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">Choose a student...</option>
-                  {students.map(student => (
+                  {filteredStudents.map(student => (
                     <option key={student.username} value={student.username}>
                       {student.username} (Grade {student.gradeLevel}) - Avg: {student.avgScore.toFixed(1)}%
                     </option>
                   ))}
                 </select>
                 <button
-                  onClick={() => selectedStudent && loadStudentCheckpointData(selectedStudent)}
-                  disabled={!selectedStudent || loadingStates.studentTracking}
+                  onClick={() => selectedStudent && loadStudentCourseData(selectedStudent)}
+                  disabled={!selectedStudent || trackingLoading}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loadingStates.studentTracking ? (
+                  {trackingLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
                       Loading...
@@ -1967,127 +2177,301 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                     </>
                   )}
                 </button>
+                {selectedStudent && studentCourseData && (
+                  <button
+                    onClick={exportStudentData}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <Download size={16} /> Export
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Student Performance Data */}
-            {selectedStudent && studentCheckpointData ? (
+            {/* Student Course Performance Data */}
+            {selectedStudent && studentCourseData ? (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-white/10 p-6 rounded-2xl">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h3 className="text-xl font-bold text-white">Checkpoint Performance: {selectedStudent}</h3>
-                      <p className="text-white/60 text-sm">
-                        Grade {students.find(s => s.username === selectedStudent)?.gradeLevel || 'N/A'} • 
-                        Overall Average: {students.find(s => s.username === selectedStudent)?.avgScore.toFixed(1) || '0'}%
-                      </p>
+                      <h3 className="text-2xl font-bold text-white">Course Performance: {selectedStudent}</h3>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="text-white/60 flex items-center gap-1">
+                          <UsersIcon size={14} /> Grade {students.find(s => s.username === selectedStudent)?.gradeLevel || 'N/A'}
+                        </span>
+                        <span className="text-white/60 flex items-center gap-1">
+                          <Award size={14} /> Overall: {students.find(s => s.username === selectedStudent)?.avgScore.toFixed(1) || '0'}%
+                        </span>
+                        <span className="text-white/60 flex items-center gap-1">
+                          <Clock size={14} /> Last Active: {students.find(s => s.username === selectedStudent)?.lastActive || 'N/A'}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-white/60 text-sm">Last Updated</p>
-                      <p className="text-white">{new Date().toLocaleTimeString()}</p>
+                      <p className="text-white/60 text-sm">Analysis Generated</p>
+                      <p className="text-white">{new Date().toLocaleDateString()}</p>
+                      <p className="text-white/40 text-xs">{new Date().toLocaleTimeString()}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Subject Performance */}
-                {studentCheckpointData.checkpointScores && Object.keys(studentCheckpointData.checkpointScores).length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                      <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <BookOpen size={18} /> Subject Performance
-                      </h4>
+                {/* Course/Topic Performance */}
+                {Object.keys(studentCourseData.coursePerformance).length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Topic List */}
+                    <div className="lg:col-span-2">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                          <BookOpen size={18} /> Topics & Courses
+                        </h4>
+                        <span className="text-white/60 text-sm">
+                          {Object.keys(studentCourseData.coursePerformance).length} topics completed
+                        </span>
+                      </div>
+                      
                       <div className="space-y-3">
-                        {formatCheckpointData(studentCheckpointData.checkpointScores).map((item, index) => (
-                          <div key={index} className="flex justify-between items-center">
-                            <div>
-                              <p className="text-white font-medium">{item.subject}</p>
-                              <p className={`text-xs px-2 py-1 rounded mt-1 inline-block ${item.bgColor} ${item.color}`}>
-                                {item.status}
-                              </p>
+                        {formatCourseData.map((topic) => (
+                          <div 
+                            key={topic.key}
+                            className={`bg-white/5 p-4 rounded-xl border transition-all duration-300 ${
+                              selectedTopic === topic.key 
+                                ? 'border-cyan-500/50 bg-gradient-to-r from-cyan-500/10 to-transparent' 
+                                : 'border-white/10 hover:border-white/20'
+                            } hover:bg-white/10 cursor-pointer group`}
+                            onClick={() => setSelectedTopic(topic.key)}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${topic.bgColor}`}>
+                                    <BookOpen size={16} className={topic.color} />
+                                  </div>
+                                  <div>
+                                    <p className="text-white font-medium group-hover:text-cyan-300 transition-colors">
+                                      {topic.topicTitle}
+                                    </p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      <span className="text-white/60 text-sm">{topic.subject}</span>
+                                      <span className={`text-xs px-2 py-1 rounded ${topic.bgColor} ${topic.color}`}>
+                                        {topic.status}
+                                      </span>
+                                      <span className="text-white/40 text-xs">
+                                        {topic.checkpointCount} checkpoint{topic.checkpointCount !== 1 ? 's' : ''}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className={`text-2xl font-bold ${topic.color}`}>{topic.averageScore}%</p>
+                                <p className="text-white/40 text-xs">Topic Average</p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className={`text-xl font-bold ${item.color}`}>{item.score}%</p>
-                              <p className="text-white/40 text-xs">Checkpoint Avg</p>
+                            
+                            {/* Progress bar for overall topic score */}
+                            <div className="mt-4">
+                              <div className="flex justify-between text-xs text-white/60 mb-1">
+                                <span>Topic Progress</span>
+                                <span>{topic.averageScore}% • {topic.passed ? 'Passed ✓' : 'Not Passed ✗'}</span>
+                              </div>
+                              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all duration-1000 ${
+                                    topic.averageScore >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 
+                                    topic.averageScore >= 60 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' : 
+                                    'bg-gradient-to-r from-red-500 to-pink-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, topic.averageScore)}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    {/* Overall Statistics */}
-                    <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-                      <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <BarChart3 size={18} /> Overall Statistics
-                      </h4>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-white/60">Subjects Tracked</span>
-                          <span className="text-white font-bold">
-                            {Object.keys(studentCheckpointData.checkpointScores).length}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-white/60">Overall Average</span>
-                          <span className="text-green-400 font-bold">
-                            {Object.values<number>(studentCheckpointData.checkpointScores).length > 0 
-                              ? Math.round(
-                                  Object.values<number>(studentCheckpointData.checkpointScores)
-                                    .reduce((a: number, b: number) => a + b, 0) / 
-                                  Object.keys(studentCheckpointData.checkpointScores).length
-                                )
-                              : 0}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-white/60">Strongest Subject</span>
-                          <span className="text-green-400 font-bold">
-                            {Object.entries(studentCheckpointData.checkpointScores)
-                              .sort((a: [string, number], b: [string, number]) => b[1] - a[1])[0]?.[0] || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-white/60">Weakest Subject</span>
-                          <span className="text-red-400 font-bold">
-                            {Object.entries(studentCheckpointData.checkpointScores)
-                              .sort((a: [string, number], b: [string, number]) => a[1] - b[1])[0]?.[0] || 'N/A'}
-                          </span>
+                    {/* Overall Statistics and Selected Topic Details */}
+                    <div className="space-y-6">
+                      {/* Overall Statistics */}
+                      <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10 p-5 rounded-2xl">
+                        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                          <BarChart3 size={18} /> Overall Statistics
+                        </h4>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/60 flex items-center gap-2">
+                              <BookOpen size={14} /> Topics Completed
+                            </span>
+                            <span className="text-white font-bold">
+                              {studentCourseData.overallStats.totalTopics}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/60 flex items-center gap-2">
+                              <CheckCircle size={14} /> Checkpoints Attempted
+                            </span>
+                            <span className="text-white font-bold">
+                              {studentCourseData.overallStats.totalCheckpoints}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/60 flex items-center gap-2">
+                              <Award size={14} /> Checkpoints Passed
+                            </span>
+                            <span className="text-green-400 font-bold">
+                              {studentCourseData.overallStats.passedCheckpoints} 
+                              <span className="text-white/60 text-sm ml-1">
+                                ({studentCourseData.overallStats.completionRate}%)
+                              </span>
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/60 flex items-center gap-2">
+                              <TrendingUp size={14} /> Overall Average
+                            </span>
+                            <span className={`text-xl font-bold ${
+                              studentCourseData.overallStats.overallAverage >= 80 ? 'text-green-400' :
+                              studentCourseData.overallStats.overallAverage >= 60 ? 'text-yellow-400' :
+                              'text-red-400'
+                            }`}>
+                              {studentCourseData.overallStats.overallAverage}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/60 flex items-center gap-2">
+                              <Activity size={14} /> Strongest Topic
+                            </span>
+                            <span className="text-green-400 font-bold">
+                              {studentCourseData.overallStats.strongestTopic}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-white/60 flex items-center gap-2">
+                              <TrendingDown size={14} /> Needs Improvement
+                            </span>
+                            <span className="text-red-400 font-bold">
+                              {studentCourseData.overallStats.weakestTopic}
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Selected Topic Details */}
+                      {selectedTopicDetails && (
+                        <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border border-cyan-500/20 p-5 rounded-2xl">
+                          <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <CheckCircle size={18} /> Checkpoint Details
+                          </h4>
+                          <div className="mb-4">
+                            <p className="text-white font-medium">{selectedTopicDetails?.topicTitle}</p>
+                            <p className="text-white/60 text-sm">
+                              {selectedTopicDetails?.subject} • Grade {selectedTopicDetails?.gradeLevel}
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                            {selectedTopicDetails?.checkpoints.map((checkpoint, index) => (
+                              <div 
+                                key={checkpoint.id} 
+                                className={`bg-black/30 p-3 rounded-lg border ${
+                                  checkpoint.passed ? 'border-green-500/20' : 'border-red-500/20'
+                                }`}
+                              >
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-white text-sm flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      checkpoint.passed ? 'bg-green-500' : 'bg-red-500'
+                                    }`} />
+                                    Checkpoint {index + 1}
+                                  </span>
+                                  <span className={`px-2 py-1 rounded text-xs ${
+                                    checkpoint.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {checkpoint.score}% {checkpoint.passed ? '✓' : '✗'}
+                                  </span>
+                                </div>
+                                <p className="text-white/70 text-xs truncate">{checkpoint.title}</p>
+                                <p className="text-white/40 text-xs mt-1 flex items-center gap-1">
+                                  <Calendar size={10} />
+                                  {new Date(checkpoint.completedAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <div className="mt-4 pt-4 border-t border-white/10">
+                            <div className="flex justify-between items-center">
+                              <span className="text-white/60 text-sm">Topic Average</span>
+                              <span className={`font-bold ${
+                                selectedTopicDetails?.averageScore >= 80 ? 'text-green-400' :
+                                selectedTopicDetails?.averageScore >= 60 ? 'text-yellow-400' :
+                                'text-red-400'
+                              }`}>
+                                {selectedTopicDetails?.averageScore}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center mt-2">
+                              <span className="text-white/60 text-sm">Checkpoint Pass Rate</span>
+                              <span className="text-cyan-400 font-bold">
+                                {selectedTopicDetails?.checkpoints.filter(cp => cp.passed).length}/
+                                {selectedTopicDetails?.checkpoints.length}
+                                <span className="text-white/60 text-sm ml-1">
+                                  ({selectedTopicDetails?.checkpoints.length > 0 
+                                    ? Math.round((selectedTopicDetails?.checkpoints.filter(cp => cp.passed).length / selectedTopicDetails?.checkpoints.length) * 100) 
+                                    : 0}%)
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Target className="text-white/20 mx-auto mb-4" size={48} />
-                    <p className="text-white/40">No checkpoint data available</p>
-                    <p className="text-white/30 text-sm mt-1">
-                      {selectedStudent} hasn't completed any checkpoints yet
+                  <div className="text-center py-12">
+                    <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <BookOpen className="text-white/20" size={48} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">No Course Data Available</h3>
+                    <p className="text-white/60">
+                      {selectedStudent} hasn't completed any courses or checkpoints yet
+                    </p>
+                    <p className="text-white/40 text-sm mt-2">
+                      Course data will appear here once the student starts learning
                     </p>
                   </div>
                 )}
 
                 {/* Course History */}
-                {studentCheckpointData.courseHistory && studentCheckpointData.courseHistory.length > 0 && (
-                  <div className="bg-white/5 p-4 rounded-lg border border-white/10">
+                {studentCourseData.courseHistory && studentCourseData.courseHistory.length > 0 && (
+                  <div className="bg-white/5 border border-white/10 p-5 rounded-2xl">
                     <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                      <CheckCircle size={18} /> Completed Courses
+                      <CheckCircle size={18} /> Course Completion History
                     </h4>
-                    <div className="space-y-3">
-                      {studentCheckpointData.courseHistory.slice(0, 5).map((course: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center bg-black/20 p-3 rounded-lg">
-                          <div>
-                            <p className="text-white font-medium">{course.topicTitle}</p>
-                            <p className="text-white/60 text-sm">{course.subject} • Grade {course.gradeLevel}</p>
-                          </div>
-                          <div className="text-right">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {studentCourseData.courseHistory.slice(0, 6).map((course: any, index: number) => (
+                        <div key={index} className="bg-black/20 p-4 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <p className="text-white font-medium">{course.topicTitle}</p>
+                              <p className="text-white/60 text-sm">{course.subject} • Grade {course.gradeLevel}</p>
+                            </div>
                             <span className={`px-2 py-1 rounded text-xs ${
                               course.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                             }`}>
                               {course.finalScore}% {course.passed ? '✓' : '✗'}
                             </span>
-                            <p className="text-white/40 text-xs mt-1">
-                              {course.checkpoints?.filter((cp: any) => cp.passed).length}/{course.checkpoints?.length} checkpoints
-                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs text-white/60">
+                              <span>Checkpoints</span>
+                              <span>{course.checkpoints?.filter((cp: any) => cp.passed).length}/{course.checkpoints?.length} passed</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-white/60">
+                              <span>Completed</span>
+                              <span>{course.completedAt ? new Date(course.completedAt).toLocaleDateString() : 'N/A'}</span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -2096,30 +2480,187 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                 )}
               </div>
             ) : selectedStudent ? (
-              <div className="text-center py-8">
-                {loadingStates.studentTracking ? (
+              <div className="text-center py-12">
+                {trackingLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-                    <p className="text-white/60">Loading checkpoint data for {selectedStudent}...</p>
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto mb-6"></div>
+                    <h3 className="text-xl font-bold text-white mb-2">Loading Course Data</h3>
+                    <p className="text-white/60">Analyzing performance data for {selectedStudent}...</p>
+                    <p className="text-white/40 text-sm mt-2">This may take a few moments</p>
                   </>
                 ) : (
                   <>
-                    <Target className="text-white/20 mx-auto mb-4" size={48} />
-                    <p className="text-white/40">No checkpoint data available</p>
-                    <p className="text-white/30 text-sm mt-1">
-                      {selectedStudent} hasn't completed any checkpoints or there was an error loading data
+                    <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <UsersIcon className="text-white/20" size={48} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Select a Student</h3>
+                    <p className="text-white/60">
+                      Choose a student from the dropdown menu to track their course performance
+                    </p>
+                    <p className="text-white/40 text-sm mt-2">
+                      You can search, filter, and sort students using the controls above
                     </p>
                   </>
                 )}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
-                <p className="text-white/40">Select a student to track their checkpoint performance</p>
-                <p className="text-white/30 text-sm mt-1">Choose from the dropdown menu above</p>
+              <div className="text-center py-12">
+                <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Target className="text-white/20" size={48} />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Student Course Tracking</h3>
+                <p className="text-white/60">
+                  Track individual student performance across all courses and checkpoints
+                </p>
+                <p className="text-white/40 text-sm mt-2">
+                  View topic averages, checkpoint details, and overall statistics
+                </p>
               </div>
             )}
           </>
+        )}
+      </div>
+
+      {/* Student Performance Table */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-white">Student Performance</h2>
+          <div className="flex items-center gap-4">
+            <span className="text-white/60 text-sm">
+              {filteredStudents.length} students • Avg: {classStats?.classAverage || 0}%
+            </span>
+            {classStats && (
+              <div className="flex gap-2">
+                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded">
+                  {classStats.performanceLevels.excellent} Excellent
+                </span>
+                <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
+                  {classStats.performanceLevels.good} Good
+                </span>
+                <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded">
+                  {classStats.performanceLevels.needsHelp} Needs Help
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-white/80">
+            <thead className="text-xs text-white/60 border-b border-white/10">
+              <tr>
+                <th className="py-3 px-4">Student</th>
+                <th className="py-3 px-4">Grade Level</th>
+                <th className="py-3 px-4">Average Score</th>
+                <th className="py-3 px-4">Completion Rate</th>
+                <th className="py-3 px-4">Last Active</th>
+                <th className="py-3 px-4">Streak</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStudents.map(student => (
+                <tr 
+                  key={student.username} 
+                  className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
+                    selectedStudent === student.username ? 'bg-cyan-500/10' : ''
+                  }`}
+                >
+                  <td className="py-3 px-4 font-medium">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+                        <span className="text-white text-sm font-bold">
+                          {student.username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      {student.username}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-1 rounded bg-white/5 text-xs">
+                      Grade {student.gradeLevel}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
+                          style={{ width: `${Math.min(100, student.avgScore)}%` }}
+                        />
+                      </div>
+                      <span className={`font-bold min-w-[50px] ${
+                        student.avgScore >= 80 ? 'text-green-400' :
+                        student.avgScore >= 60 ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {student.avgScore.toFixed(1)}%
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      student.completionRate >= 80 ? 'bg-green-500/20 text-green-400' :
+                      student.completionRate >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {student.completionRate}%
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      <Clock size={12} className="text-white/40" />
+                      {student.lastActive}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`flex items-center gap-2 ${
+                      student.streak > 0 ? 'text-yellow-400' : 'text-white/60'
+                    }`}>
+                      <Zap size={12} /> {student.streak} days
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      student.avgScore >= 80 ? 'bg-green-500/20 text-green-400' :
+                      student.avgScore >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {student.avgScore >= 80 ? 'Excellent' :
+                       student.avgScore >= 60 ? 'Good' : 'Needs Help'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedStudent(student.username);
+                          setShowTrackingSection(true);
+                        }}
+                        className="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 px-3 py-1 rounded transition-colors"
+                      >
+                        Track Courses
+                      </button>
+                      <button className="text-xs bg-white/5 hover:bg-white/10 text-white/60 px-2 py-1 rounded">
+                        <MoreVertical size={12} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredStudents.length === 0 && (
+          <div className="text-center py-12">
+            <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
+            <p className="text-white/40">No students found</p>
+            <p className="text-white/30 text-sm mt-1">
+              {searchTerm ? 'Try a different search term' : 'Students will appear here once they start using the platform'}
+            </p>
+          </div>
         )}
       </div>
 
@@ -2148,10 +2689,13 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
               placeholder="Share important information with your students..."
             />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
+            <div className="text-white/40 text-xs">
+              Announcements expire after 48 hours
+            </div>
             <button
               onClick={createAnnouncement}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
             >
               <Send size={16} /> Publish Announcement
             </button>
@@ -2159,173 +2703,89 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Student Performance Table - Loads immediately with student data */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">Student Performance</h2>
-          <span className="text-white/60 text-sm">
-            {students.length} students • Avg: {classOverview.classAverage || 0}%
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-white/80">
-            <thead className="text-xs text-white/60 border-b border-white/10">
-              <tr>
-                <th className="py-3 px-4">Student</th>
-                <th className="py-3 px-4">Grade Level</th>
-                <th className="py-3 px-4">Average Score</th>
-                <th className="py-3 px-4">Completion Rate</th>
-                <th className="py-3 px-4">Last Active</th>
-                <th className="py-3 px-4">Streak</th>
-                <th className="py-3 px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map(student => (
-                <tr key={student.username} className="border-b border-white/5 hover:bg-white/5">
-                  <td className="py-3 px-4 font-medium">{student.username}</td>
-                  <td className="py-3 px-4">{student.gradeLevel}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
-                          style={{ width: `${Math.min(100, student.avgScore)}%` }}
-                        />
-                      </div>
-                      <span className={`font-bold ${
-                        student.avgScore >= 80 ? 'text-green-400' :
-                        student.avgScore >= 60 ? 'text-yellow-400' :
-                        'text-red-400'
-                      }`}>
-                        {student.avgScore.toFixed(1)}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      student.completionRate >= 80 ? 'bg-green-500/20 text-green-400' :
-                      student.completionRate >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {student.completionRate}%
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">{student.lastActive}</td>
-                  <td className="py-3 px-4">
-                    <span className={`flex items-center gap-1 ${
-                      student.streak > 0 ? 'text-yellow-400' : 'text-white/60'
-                    }`}>
-                      <Zap size={12} /> {student.streak} days
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <button
-                      onClick={() => {
-                        setSelectedStudent(student.username);
-                        setShowTrackingSection(true);
-                      }}
-                      className="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 px-3 py-1 rounded transition-colors"
-                    >
-                      Track Checkpoints
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {students.length === 0 && (
-          <div className="text-center py-12">
-            <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
-            <p className="text-white/40">No students found</p>
-            <p className="text-white/30 text-sm mt-1">Students will appear here once they start using the platform</p>
-          </div>
-        )}
-      </div>
-
-      {/* Active Announcements - Lazy loaded */}
+      {/* Active Announcements & Recent Assessments */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Megaphone className="text-orange-400" /> Active Announcements
           </h3>
-          {loadingStates.announcements ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white/5 p-4 rounded-lg border border-white/10">
-                  <div className="h-4 w-48 bg-white/10 rounded animate-pulse mb-2"></div>
-                  <div className="h-3 w-full bg-white/5 rounded animate-pulse mb-2"></div>
-                  <div className="h-3 w-32 bg-white/5 rounded animate-pulse"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {announcements.slice(0, 3).map(ann => {
-                const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
-                const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
-                
-                return (
-                  <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-white font-medium">{ann.title}</p>
-                      {hoursLeft <= 24 && (
-                        <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
-                          {hoursLeft}h left
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-white/60 text-sm mb-2">{ann.content}</p>
-                    <div className="flex justify-between text-white/30 text-xs">
-                      <span>By: {ann.author}</span>
-                      <span>{new Date(ann.timestamp).toLocaleDateString()}</span>
-                    </div>
+          <div className="space-y-4">
+            {announcements.slice(0, 3).map(ann => {
+              const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+              const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
+              const isExpiring = hoursLeft <= 24;
+              const isUrgent = hoursLeft <= 6;
+              
+              return (
+                <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-white font-medium">{ann.title}</p>
+                    {isExpiring && (
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        isUrgent 
+                          ? 'bg-red-500/20 text-red-300' 
+                          : 'bg-yellow-500/20 text-yellow-300'
+                      }`}>
+                        {hoursLeft}h left
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <p className="text-white/60 text-sm mb-2 line-clamp-2">{ann.content}</p>
+                  <div className="flex justify-between text-white/30 text-xs">
+                    <span className="flex items-center gap-1">
+                      <UsersIcon size={10} /> By: {ann.author}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={10} /> {new Date(ann.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {announcements.length === 0 && (
+              <div className="text-center py-8">
+                <Megaphone className="text-white/20 mx-auto mb-3" size={32} />
+                <p className="text-white/40">No active announcements</p>
+                <p className="text-white/30 text-sm mt-1">Create your first announcement above</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <ClipboardList className="text-cyan-400" /> Recent Assessments
           </h3>
-          {loadingStates.assessments ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white/5 p-4 rounded-lg border border-white/10">
-                  <div className="h-4 w-56 bg-white/10 rounded animate-pulse mb-2"></div>
-                  <div className="h-3 w-32 bg-white/5 rounded animate-pulse mb-3"></div>
-                  <div className="flex justify-between">
-                    <div className="h-3 w-20 bg-white/5 rounded animate-pulse"></div>
-                    <div className="h-3 w-24 bg-white/5 rounded animate-pulse"></div>
-                  </div>
+          <div className="space-y-3">
+            {assessments.slice(0, 3).map(assessment => (
+              <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-white font-medium">{assessment.title}</p>
+                  <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                    {assessment.questions?.length || 0} Questions
+                  </span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {assessments.slice(0, 3).map(assessment => (
-                <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-white font-medium">{assessment.title}</p>
-                    <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
-                      {assessment.questions?.length || 0} Questions
-                    </span>
-                  </div>
-                  <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
-                  <div className="flex justify-between text-white/30 text-xs">
-                    <span>Grade: {assessment.targetGrade}</span>
-                    <span>By: {assessment.createdBy}</span>
-                  </div>
+                <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
+                <div className="flex justify-between text-white/30 text-xs">
+                  <span className="flex items-center gap-1">
+                    <UsersIcon size={10} /> Grade: {assessment.targetGrade}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar size={10} /> By: {assessment.createdBy}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+            
+            {assessments.length === 0 && (
+              <div className="text-center py-8">
+                <ClipboardList className="text-white/20 mx-auto mb-3" size={32} />
+                <p className="text-white/40">No assessments created yet</p>
+                <p className="text-white/30 text-sm mt-1">Create assessments to assign to students</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
