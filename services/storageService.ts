@@ -689,7 +689,7 @@ export const saveTopic = async (subject: string, topic: Topic): Promise<Topic> =
 // PROGRESS MANAGEMENT
 // =====================================================
 export const getProgress = async (username: string): Promise<UserProgress> => {
-  
+  console.log(`📊 Getting progress for: ${username}`);
   
   try {
     // Get user ID
@@ -700,25 +700,57 @@ export const getProgress = async (username: string): Promise<UserProgress> => {
       .single();
 
     if (userError || !userData) {
-    
+      console.log('📭 No user found or error');
       return {};
     }
 
+    // Get progress WITHOUT ambiguous join
     const { data, error } = await supabase
       .from('user_progress')
-      .select('*, topic:topics(title, subject:subject_id(name))')
+      .select('*')
       .eq('user_id', userData.id);
 
     if (error) throw error;
 
+    if (!data || data.length === 0) {
+      console.log('📭 No progress found');
+      return {};
+    }
+
+    // Get topic details separately
+    const topicIds = data.map(item => item.topic_id).filter(Boolean);
+    
+    const { data: topicsData } = await supabase
+      .from('topics')
+      .select('id, title, subject_id')
+      .in('id', topicIds);
+    
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('id, name');
+    
+    // Create lookup maps
+    const topicMap = new Map();
+    const subjectMap = new Map();
+    
+    topicsData?.forEach(t => topicMap.set(t.id, t));
+    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
+
     const progress: UserProgress = {};
+    
     data.forEach(item => {
-      const subject = item.topic?.subject?.name || 'General';
-      if (!progress[subject]) {
-        progress[subject] = {};
+      const topic = topicMap.get(item.topic_id);
+      let subjectName = 'General';
+      
+      if (topic && topic.subject_id) {
+        subjectName = subjectMap.get(topic.subject_id) || 'General';
       }
       
-      progress[subject][item.topic_id] = {
+      if (!progress[subjectName]) {
+        progress[subjectName] = {};
+      }
+      
+      progress[subjectName][item.topic_id] = {
         subtopics: item.subtopics || {},
         checkpointScores: item.checkpoint_scores || {},
         mainAssessmentPassed: item.main_assessment_passed || false,
@@ -727,10 +759,11 @@ export const getProgress = async (username: string): Promise<UserProgress> => {
       };
     });
 
-    
+    console.log(`✅ Progress loaded for ${username}: ${Object.keys(progress).length} subjects`);
     return progress;
+    
   } catch (error) {
-    console.error('Get progress error:', error);
+    console.error('❌ Get progress error:', error);
     return {};
   }
 };
