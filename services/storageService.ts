@@ -423,7 +423,15 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
   console.log('🚀 Fetching light courses (no materials)...');
   
   try {
-    // Fetch only basic topic info, NO materials
+    // Get all subjects first to avoid ambiguous joins
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('id, name');
+    
+    const subjectMap = new Map();
+    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
+    
+    // Fetch topics WITHOUT ambiguous join
     const { data: topicsData, error } = await supabase
       .from('topics')
       .select(`
@@ -431,7 +439,7 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
         title,
         description,
         grade_level,
-        subject:subject_id (name),
+        subject_id,
         checkpoints_required
       `)
       .order('title', { ascending: true });
@@ -441,14 +449,7 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
     const courses: CourseStructure = {};
     
     topicsData?.forEach(topic => {
-      let subjectName = 'General';
-      if (topic.subject) {
-        if (Array.isArray(topic.subject)) {
-          subjectName = topic.subject[0]?.name || 'General';
-        } else {
-          subjectName = (topic.subject as any)?.name || 'General';
-        }
-      }
+      const subjectName = subjectMap.get(topic.subject_id) || 'General';
       
       if (!courses[subjectName]) {
         courses[subjectName] = {};
