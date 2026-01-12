@@ -328,6 +328,9 @@ export const deleteUser = async (username: string): Promise<void> => {
 // =====================================================
   // storageService.ts - OPTIMIZED getCourses function
 // REPLACE the entire getCourses function with this optimized version:
+// =====================================================
+// COURSE MANAGEMENT - OPTIMIZED WITH CACHING
+// =====================================================
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
   // Return cached data if valid (10 minutes cache)
   const now = Date.now();
@@ -340,7 +343,15 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
   console.log('🚀 Fetching courses (OPTIMIZED VERSION)...');
   
   try {
-    // OPTIMIZATION 1: Fetch only basic topic data (NO MATERIALS initially)
+    // OPTIMIZATION: Get all subjects first to avoid ambiguous joins
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('id, name');
+    
+    const subjectMap = new Map();
+    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
+    
+    // Get topics WITHOUT ambiguous join
     const { data: topicsData, error: topicsError } = await supabase
       .from('topics')
       .select(`
@@ -348,7 +359,7 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         title,
         description,
         grade_level,
-        subject:subject_id (name),
+        subject_id,
         checkpoints_required,
         checkpoint_pass_percentage,
         final_assessment_required
@@ -367,18 +378,9 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
 
     const courses: CourseStructure = {};
     
-    // OPTIMIZATION 2: Build courses structure WITHOUT materials initially
+    // Build courses structure WITHOUT materials initially
     topicsData.forEach(topic => {
-      let subjectName = 'General';
-      
-      // Safely extract subject name
-      if (topic.subject) {
-        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-          subjectName = topic.subject[0]?.name || 'General';
-        } else if (typeof topic.subject === 'object') {
-          subjectName = (topic.subject as any)?.name || 'General';
-        }
-      }
+      const subjectName = subjectMap.get(topic.subject_id) || 'General';
       
       if (!courses[subjectName]) {
         courses[subjectName] = {};
@@ -2985,10 +2987,20 @@ export const getStudentTopicPerformance = async (username: string, topicId: stri
 };
 
 // Get topics filtered by student grade level
+// Get topics filtered by student grade level
 export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStructure> => {
   console.log(`📊 Getting topics for grade level: "${gradeLevel}"`);
   
   try {
+    // Get all subjects first to avoid ambiguous joins
+    const { data: subjectsData } = await supabase
+      .from('subjects')
+      .select('id, name');
+    
+    const subjectMap = new Map();
+    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
+    
+    // Get topics WITHOUT ambiguous join
     const { data: topicsData, error } = await supabase
       .from('topics')
       .select(`
@@ -2997,9 +3009,7 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
         description,
         grade_level,
         sort_order,
-        subject:subject_id (name),
-        materials (*),
-        checkpoints (*)
+        subject_id
       `)
       .eq('grade_level', gradeLevel)
       .order('sort_order', { ascending: true })
@@ -3016,37 +3026,36 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
       console.log(`📊 No topics found for grade ${gradeLevel}. Checking all topics...`);
       const { data: allTopics } = await supabase
         .from('topics')
-        .select('*, subject:subject_id (name)')
+        .select('*, subject_id')
         .order('title');
       
       console.log('📊 All topics in database:', allTopics?.map(t => ({
         id: t.id,
         title: t.title,
         grade: t.grade_level,
-        subject: t.subject?.name
+        subject_id: t.subject_id
       })));
       
       return {};
     }
     
+    // Get materials for all topics (single query for efficiency)
+    const topicIds = topicsData.map(t => t.id);
+    const { data: allMaterials } = await supabase
+      .from('materials')
+      .select('*')
+      .in('topic_id', topicIds);
+    
+    // Get checkpoints for all topics (single query for efficiency)
+    const { data: allCheckpoints } = await supabase
+      .from('checkpoints')
+      .select('*')
+      .in('topic_id', topicIds);
+    
     const courses: CourseStructure = {};
     
     topicsData.forEach(topic => {
-      // Extract subject name safely
-      let subjectName = 'General';
-      
-      try {
-        if (topic.subject) {
-          if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-            subjectName = topic.subject[0]?.name || 'General';
-          } else if (typeof topic.subject === 'object' && topic.subject !== null) {
-            subjectName = (topic.subject as any)?.name || 'General';
-          }
-        }
-      } catch (error) {
-        console.warn('Could not extract subject name for topic:', topic.id);
-        subjectName = 'General';
-      }
+      const subjectName = subjectMap.get(topic.subject_id) || 'General';
       
       if (!courses[subjectName]) {
         courses[subjectName] = {};
@@ -3054,19 +3063,23 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
 
       console.log(`📊 Adding topic - Subject: ${subjectName}, Title: ${topic.title}`);
       
+      // Filter materials for this specific topic
+      const topicMaterials = allMaterials?.filter(m => m.topic_id === topic.id) || [];
+      const topicCheckpoints = allCheckpoints?.filter(c => c.topic_id === topic.id) || [];
+      
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
         gradeLevel: topic.grade_level,
         description: topic.description || '',
         subtopics: [],
-        materials: (topic.materials || []).map((m: any) => ({
+        materials: topicMaterials.map((m: any) => ({
           id: m.id,
           title: m.title,
           type: m.type,
           content: m.content || m.storage_path || ''
         })),
-        checkpoints: (topic.checkpoints || []).map((c: any) => ({
+        checkpoints: topicCheckpoints.map((c: any) => ({
           id: c.id,
           title: c.title,
           checkpointNumber: c.checkpoint_number,
