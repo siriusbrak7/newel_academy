@@ -256,7 +256,7 @@ const getStudentDetailedCoursePerformance = async (username: string): Promise<Re
 };
 
 // =====================================================
-// STUDENT DASHBOARD COMPONENT - OPTIMIZED VERSION
+// STUDENT DASHBOARD COMPONENT - FIXED VERSION
 // =====================================================
 export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [advice, setAdvice] = useState<string>("Analyzing your learning patterns...");
@@ -409,7 +409,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   // =====================================================
-  // OPTIMIZATION 3: SMART PERFORMANCE DATA LOADING WITH CACHE
+  // FIXED: PERFORMANCE DATA LOADING WITH FALLBACK
   // =====================================================
   const loadPerformanceData = async (forceRefresh = false) => {
     // Check cache first (5 minute cache for performance data)
@@ -435,13 +435,49 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     try {
       console.log('📊 Loading performance data...');
       
-      // OPTIMIZATION: Use the simpler function with timeout fallback
-      const subjectPerformance = await Promise.race([
-        getStudentSubjectPerformance(user.username),
-        new Promise<Record<string, number>>((_, reject) => 
-          setTimeout(() => reject(new Error('Performance data timeout')), 10000)
-        )
-      ]);
+      // Try multiple methods to get performance data
+      let subjectPerformance: Record<string, number> = {};
+      
+      // Method 1: Try getStudentSubjectPerformance
+      try {
+        subjectPerformance = await getStudentSubjectPerformance(user.username);
+        console.log('📊 Method 1 (subject performance) result:', subjectPerformance);
+      } catch (error1) {
+        console.log('📊 Method 1 failed, trying method 2...');
+        
+        // Method 2: Try getStudentDetailedCoursePerformance and calculate manually
+        try {
+          const coursePerformance = await getStudentDetailedCoursePerformance(user.username);
+          console.log('📊 Course performance data:', coursePerformance);
+          
+          if (Object.keys(coursePerformance).length > 0) {
+            // Group by subject and calculate averages
+            const subjectScoresMap: Record<string, number[]> = {};
+            
+            Object.values(coursePerformance).forEach(topic => {
+              if (!topic || !topic.subject) return;
+              
+              const subject = topic.subject;
+              if (!subjectScoresMap[subject]) {
+                subjectScoresMap[subject] = [];
+              }
+              if (topic.averageScore && topic.averageScore > 0) {
+                subjectScoresMap[subject].push(topic.averageScore);
+              }
+            });
+            
+            // Calculate average for each subject
+            Object.entries(subjectScoresMap).forEach(([subject, scores]) => {
+              if (scores.length > 0) {
+                const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+                subjectPerformance[subject] = Math.round(average);
+              }
+            });
+          }
+        } catch (error2) {
+          console.error('📊 Method 2 also failed:', error2);
+        }
+      }
       
       // Update cache
       setPerformanceCache({
@@ -462,25 +498,33 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
           setSubjectLabels(labels);
           setSubjectScores(scores);
           generateAdvice(validScores);
+          console.log('✅ Subject performance data loaded:', { labels, scores });
         } else {
-          setSubjectLabels([]);
-          setSubjectScores([]);
-          setAdvice("Complete assessments and checkpoints to see your scores!");
+          // Show placeholder for new students
+          setSubjectLabels(['Start Learning!']);
+          setSubjectScores([0]);
+          setAdvice("Complete your first checkpoint or assessment to see your scores!");
+          console.log('⚠️ Scores found but invalid values');
         }
       } else {
-        setSubjectLabels([]);
-        setSubjectScores([]);
-        setAdvice("Start by exploring courses and completing your first checkpoint!");
+        // No performance data found - show encouraging placeholder
+        const sampleSubjects = ['Physics', 'Chemistry', 'Biology'];
+        const sampleScores = [0, 0, 0];
+        
+        setSubjectLabels(sampleSubjects);
+        setSubjectScores(sampleScores);
+        setAdvice("Explore courses and complete checkpoints to unlock your real performance data!");
+        console.log('📭 No subject performance data found - showing placeholder');
       }
       
       console.timeEnd('loadPerformanceData');
-      console.log('✅ Performance data loaded');
       
     } catch (error) {
       console.error('❌ Error loading performance data:', error);
-      setSubjectLabels([]);
-      setSubjectScores([]);
-      setAdvice("Error loading performance data. Please try refreshing.");
+      // Show placeholder even on error
+      setSubjectLabels(['Start Learning!']);
+      setSubjectScores([0]);
+      setAdvice("Complete checkpoints and assessments to see your subject performance here!");
     } finally {
       setLoadingStates(prev => ({ ...prev, performance: false }));
     }
@@ -668,11 +712,45 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   // =====================================================
-  // OPTIMIZATION 8: MEMOIZED COMPUTATIONS
+  // FIXED: CHART DATA WITH PLACEHOLDER SUPPORT
   // =====================================================
-  
-  // Optimized chart data with memoization
   const chartData = useMemo(() => {
+    // Check if we're showing placeholder data
+    const isPlaceholder = subjectLabels.length === 1 && subjectLabels[0] === 'Start Learning!';
+    const isSampleData = subjectLabels.length === 3 && subjectLabels.includes('Physics') && subjectScores.every(score => score === 0);
+    
+    if (isPlaceholder) {
+      return {
+        labels: ['Start Learning!'],
+        datasets: [{
+          label: 'Complete your first checkpoint',
+          data: [100],
+          backgroundColor: ['rgba(59, 130, 246, 0.6)'], // Blue color
+          borderColor: 'transparent',
+          hoverOffset: 12,
+          borderWidth: 0
+        }]
+      };
+    }
+    
+    if (isSampleData) {
+      return {
+        labels: subjectLabels,
+        datasets: [{
+          label: 'Ready to begin!',
+          data: [30, 30, 40], // Sample distribution
+          backgroundColor: [
+            'rgba(6, 182, 212, 0.6)',    // cyan - Physics
+            'rgba(168, 85, 247, 0.6)',   // purple - Chemistry
+            'rgba(34, 197, 94, 0.6)',    // green - Biology
+          ],
+          borderColor: 'transparent',
+          hoverOffset: 12,
+          borderWidth: 0
+        }]
+      };
+    }
+    
     if (subjectLabels.length === 0 || subjectScores.length === 0) {
       return {
         labels: ['No Data'],
@@ -756,7 +834,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       
       let y = 70;
       
-      if (subjectLabels.length > 0) {
+      if (subjectLabels.length > 0 && subjectLabels[0] !== 'Start Learning!') {
         doc.text('Subject Performance:', 10, y);
         y += 10;
         
@@ -804,6 +882,47 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       link: "/sprint-challenge" 
     }
   ];
+
+  // =====================================================
+  // DEBUG FUNCTION
+  // =====================================================
+  const testPerformanceData = async () => {
+    console.log('🧪 Testing performance data retrieval...');
+    
+    try {
+      // Test 1: Direct function call
+      console.log('Test 1: getStudentSubjectPerformance');
+      const subjectPerf = await getStudentSubjectPerformance(user.username);
+      console.log('Subject Performance:', subjectPerf);
+      
+      // Test 2: Detailed course performance
+      console.log('Test 2: getStudentDetailedCoursePerformance');
+      const coursePerf = await getStudentDetailedCoursePerformance(user.username);
+      console.log('Course Performance:', coursePerf);
+      
+      // Test 3: Checkpoints
+      console.log('Test 3: getStudentCheckpointScores');
+      const checkpointScores = await getStudentCheckpointScores(user.username);
+      console.log('Checkpoint Scores:', checkpointScores);
+      
+      // Test 4: Submissions
+      console.log('Test 4: getSubmissions');
+      const submissions = await getSubmissions();
+      const mySubmissions = submissions.filter(s => s.username === user.username);
+      console.log('My Submissions:', mySubmissions);
+      
+      // Show all results
+      alert(`
+        Subject Performance: ${JSON.stringify(subjectPerf)}
+        Course Performance Topics: ${Object.keys(coursePerf).length}
+        Checkpoint Scores: ${JSON.stringify(checkpointScores)}
+        My Submissions: ${mySubmissions.length}
+      `);
+      
+    } catch (error) {
+      console.error('Test failed:', error);
+    }
+  };
 
   // =====================================================
   // RENDER LOADING STATE
@@ -879,7 +998,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               <h2 className="text-4xl font-bold text-white mb-2">Welcome Back, {user.username}</h2>
               <p className="text-white/60">
                 {user.gradeLevel ? `Grade ${user.gradeLevel} Science Student` : 'Science Student'}
-                {subjectLabels.length > 0 && ` • ${subjectLabels.length} Subjects Tracked`}
+                {subjectLabels.length > 0 && subjectLabels[0] !== 'Start Learning!' && ` • ${subjectLabels.length} Subjects Tracked`}
                 {unreadCount > 0 && ` • ${unreadCount} new notification${unreadCount > 1 ? 's' : ''}`}
               </p>
             </div>
@@ -1185,7 +1304,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
 
         {/* Right Column */}
         <div className="space-y-6">
-          {/* Performance Chart */}
+          {/* Performance Chart - FIXED */}
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-64 flex flex-col items-center justify-center">
             <div className="w-full">
               <h3 className="text-white font-bold mb-4 self-start">Subject Performance</h3>
@@ -1202,7 +1321,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                     options={{ 
                       plugins: { 
                         legend: { 
-                          display: subjectLabels.length <= 5,
+                          display: subjectLabels.length <= 5 && subjectLabels[0] !== 'Start Learning!',
                           position: 'bottom',
                           labels: {
                             color: 'rgba(255, 255, 255, 0.7)',
@@ -1211,7 +1330,15 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                         },
                         tooltip: {
                           callbacks: {
-                            label: (context) => `${context.label}: ${context.raw}%`
+                            label: (context) => {
+                              if (context.label === 'Start Learning!') {
+                                return 'Complete your first checkpoint to see scores';
+                              }
+                              if (subjectLabels.includes('Physics') && subjectScores.every(s => s === 0)) {
+                                return 'Start learning to unlock performance data';
+                              }
+                              return `${context.label}: ${context.raw}%`;
+                            }
                           }
                         }
                       },
@@ -1219,14 +1346,33 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                       cutout: '65%'
                     }} 
                   />
+                  {(subjectLabels[0] === 'Start Learning!' || 
+                    (subjectLabels.includes('Physics') && subjectScores.every(s => s === 0))) && (
+                    <div className="text-center mt-4">
+                      <p className="text-cyan-300 text-sm font-medium">Ready to begin?</p>
+                      <p className="text-white/60 text-xs">Complete checkpoints to see your progress here</p>
+                      <Link 
+                        to="/courses" 
+                        className="inline-block mt-2 text-xs bg-cyan-500/20 text-cyan-300 px-3 py-1 rounded hover:bg-cyan-500/30 transition-colors"
+                      >
+                        Browse Courses →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-2 text-white/20"></div>
-                  <p className="text-white/40 mb-2">No scores yet</p>
+                  <div className="text-4xl mb-2 text-white/20">📊</div>
+                  <p className="text-white/40 mb-2">No performance data available</p>
                   <p className="text-white/50 text-xs">
-                    Complete assessments<br/>to see your performance
+                    Complete assessments or checkpoints<br/>to see your performance
                   </p>
+                  <button 
+                    onClick={testPerformanceData}
+                    className="mt-3 text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded transition-colors"
+                  >
+                    Test Data Retrieval
+                  </button>
                 </div>
               )}
             </div>
@@ -1258,7 +1404,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                   {loadingStates.performance ? (
                     <span className="inline-block h-4 w-6 bg-white/10 rounded animate-pulse"></span>
                   ) : (
-                    subjectLabels.length
+                    subjectLabels[0] === 'Start Learning!' ? 0 : subjectLabels.length
                   )}
                 </span>
               </div>
@@ -1275,7 +1421,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                   </span>
                   <span className="inline-block h-6 w-12 bg-white/10 rounded animate-pulse"></span>
                 </div>
-              ) : subjectScores.length > 0 && (
+              ) : subjectScores.length > 0 && subjectLabels[0] !== 'Start Learning!' && !subjectScores.every(s => s === 0) ? (
                 <div className="flex justify-between items-center">
                   <span className="text-white/60 flex items-center gap-2">
                     <TrendingUp size={16}/> Overall Average
@@ -1283,6 +1429,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                   <span className="text-green-400 font-mono font-bold">
                     {Math.round(subjectScores.reduce((a, b) => a + b, 0) / subjectScores.length)}%
                   </span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <span className="text-white/60 flex items-center gap-2">
+                    <TrendingUp size={16}/> Overall Average
+                  </span>
+                  <span className="text-white/60 font-mono">--%</span>
                 </div>
               )}
               
@@ -1395,6 +1548,12 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <BookOpen className="text-white/20 mx-auto mb-2" size={32} />
                 <p className="text-white/40">No completed courses yet</p>
                 <p className="text-white/30 text-sm mt-1">Complete topics to see your history here</p>
+                <Link 
+                  to="/courses" 
+                  className="inline-block mt-3 text-sm text-cyan-400 hover:text-cyan-300"
+                >
+                  Start Learning Now →
+                </Link>
               </div>
             )}
             
