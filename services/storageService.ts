@@ -2,6 +2,15 @@
 import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, dbToFrontendAnnouncement, Question } from '../types';
 import { supabase } from './supabaseClient';
 
+// Add this function at the TOP of storageService.ts, after imports
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Add caching variables at the TOP of the file (right after imports)
 let coursesCache: CourseStructure | null = null;
 let cacheTimestamp: number = 0;
@@ -570,20 +579,19 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
       }
     }
     
-    // 2. Save/Update the topic
-    // In storageService.ts, updated saveTopic function:
-const topicData = {
-  id: finalTopicId?.startsWith('temp_') ? undefined : finalTopicId,
-  subject_id: subjectId,
-  title: topic.title,
-  grade_level: topic.gradeLevel || topic.grade_level || '9',
-  description: topic.description || '',
-  // REMOVED: subtopics: Array.isArray(topic.subtopics) ? topic.subtopics : [],
-  checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired || 3,
-  checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage || 80,
-  final_assessment_required: topic.final_assessment_required !== undefined ? topic.final_assessment_required : true,
-  updated_at: new Date().toISOString()
-};
+    // 2. Save/Update the topic (REMOVED subtopics field)
+    const topicData = {
+      id: finalTopicId?.startsWith('temp_') ? undefined : finalTopicId,
+      subject_id: subjectId,
+      title: topic.title,
+      grade_level: topic.gradeLevel || topic.grade_level || '9',
+      description: topic.description || '',
+      // REMOVED: subtopics: Array.isArray(topic.subtopics) ? topic.subtopics : [],
+      checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired || 3,
+      checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage || 80,
+      final_assessment_required: topic.final_assessment_required !== undefined ? topic.final_assessment_required : true,
+      updated_at: new Date().toISOString()
+    };
     
     console.log('📤 Saving topic data:', topicData);
     
@@ -600,13 +608,13 @@ const topicData = {
     
     console.log('✅ Topic saved with ID:', savedTopic.id);
     
-    // 3. Save materials
+    // 3. Save materials - FIXED WITH UUID GENERATION
     if (topic.materials && topic.materials.length > 0 && savedTopic.id) {
       console.log(`📦 Processing ${topic.materials.length} materials...`);
       
-      // Prepare materials with correct topic_id
+      // Prepare materials with correct topic_id and proper UUIDs
       const materialsToSave = topic.materials.map((mat: any) => ({
-        id: mat.id?.startsWith('temp_') ? undefined : mat.id,
+        id: mat.id?.startsWith('temp_') ? generateUUID() : mat.id, // Generate UUID for new materials
         topic_id: savedTopic.id, // CRITICAL: Use the saved topic ID
         title: mat.title,
         type: mat.type,
@@ -615,7 +623,7 @@ const topicData = {
         updated_at: new Date().toISOString()
       }));
       
-      console.log('📝 Materials to save:', materialsToSave.length);
+      console.log('📝 Materials to save:', materialsToSave);
       
       // Delete existing materials for this topic first
       await supabase
