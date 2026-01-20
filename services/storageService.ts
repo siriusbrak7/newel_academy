@@ -579,14 +579,13 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
       }
     }
     
-    // 2. Save/Update the topic (REMOVED subtopics field)
+    // 2. Save/Update the topic
     const topicData = {
       id: finalTopicId?.startsWith('temp_') ? undefined : finalTopicId,
       subject_id: subjectId,
       title: topic.title,
       grade_level: topic.gradeLevel || topic.grade_level || '9',
       description: topic.description || '',
-      // REMOVED: subtopics: Array.isArray(topic.subtopics) ? topic.subtopics : [],
       checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired || 3,
       checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage || 80,
       final_assessment_required: topic.final_assessment_required !== undefined ? topic.final_assessment_required : true,
@@ -608,22 +607,31 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
     
     console.log('✅ Topic saved with ID:', savedTopic.id);
     
-    // 3. Save materials - FIXED WITH UUID GENERATION
+    // 3. Save materials
     if (topic.materials && topic.materials.length > 0 && savedTopic.id) {
       console.log(`📦 Processing ${topic.materials.length} materials...`);
       
-      // Prepare materials with correct topic_id and proper UUIDs
-      const materialsToSave = topic.materials.map((mat: any) => ({
-        id: mat.id?.startsWith('temp_') ? generateUUID() : mat.id, // Generate UUID for new materials
-        topic_id: savedTopic.id, // CRITICAL: Use the saved topic ID
-        title: mat.title,
-        type: mat.type,
-        content: mat.content,
-        created_at: mat.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      // Prepare materials with correct topic_id
+      const materialsToSave = topic.materials.map((mat: any) => {
+        const materialData: any = {
+          topic_id: savedTopic.id,
+          title: mat.title,
+          type: mat.type,
+          content: mat.content,
+          created_at: mat.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // ONLY include id if it's a valid UUID (not temp and not null)
+        if (mat.id && !mat.id.startsWith('temp_') && mat.id !== 'null' && mat.id !== null) {
+          materialData.id = mat.id;
+        }
+        // Otherwise, let the database generate the UUID via gen_random_uuid()
+        
+        return materialData;
+      });
       
-      console.log('📝 Materials to save:', materialsToSave);
+      console.log('📝 Materials to save:', materialsToSave.length);
       
       // Delete existing materials for this topic first
       await supabase
