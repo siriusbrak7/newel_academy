@@ -440,14 +440,31 @@ useEffect(() => {
 
   // Get filtered topics
   const allTopics = Object.values(courses[activeSubject] || {}) as Topic[];
-  const filteredTopics = allTopics.filter(topic => {
-    const matchesSearch = topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (topic.description && topic.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesGrade = filterGrade === 'all' || topic.gradeLevel === filterGrade;
-    
-    return matchesSearch && matchesGrade;
-  });
+  // In the filteredTopics calculation
+// In CourseManager.tsx, update the filteredTopics calculation:
+const filteredTopics = allTopics.filter(topic => {
+  const matchesSearch = topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (topic.description && topic.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  // ✅ FIX: Use topic.gradeLevel from the database (not from form)
+  // topic.gradeLevel should be a string '9', '10', '11', '12'
+  const topicGrade = topic.gradeLevel?.toString() || 'all';
+  const matchesGrade = filterGrade === 'all' || topicGrade === filterGrade;
+  
+  return matchesSearch && matchesGrade;
+});
+
+// Add debug logging to see what's happening
+console.log('🔍 Grade Filter Debug:', {
+  filterGrade,
+  allTopicsCount: allTopics.length,
+  filteredCount: filteredTopics.length,
+  sampleTopics: filteredTopics.slice(0, 3).map(t => ({
+    title: t.title,
+    grade: t.gradeLevel,
+    materials: t.materials?.length
+  }))
+});
 
   // Add this function to check specific topics
 const debugTopicMaterials = async (topicTitle: string) => {

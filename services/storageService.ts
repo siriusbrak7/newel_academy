@@ -333,16 +333,6 @@ export const deleteUser = async (username: string): Promise<void> => {
 // COURSE MANAGEMENT
 // =====================================================
 // storageService.ts - Updated getCourses function
-// Replace the entire getCourses function with this optimized version:
-// storageService.ts - REPLACE THE ENTIRE getCourses FUNCTION WITH THIS:
-
-
-
-// =====================================================
-// COURSE MANAGEMENT - OPTIMIZED WITH CACHING
-// =====================================================
-  // storageService.ts - OPTIMIZED getCourses function
-// REPLACE the entire getCourses function with this optimized version:
 // =====================================================
 // COURSE MANAGEMENT - OPTIMIZED WITH CACHING
 // =====================================================
@@ -350,7 +340,7 @@ export const deleteUser = async (username: string): Promise<void> => {
 // In storageService.ts
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
   try {
-    console.log('📚 Fetching all courses...');
+    console.log('📚 Fetching courses with grade levels preserved...');
     
     const { data: topics, error } = await supabase
       .from('topics')
@@ -358,6 +348,7 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         *,
         materials (*)
       `)
+      .order('grade_level', { ascending: true })  // Order by grade
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -365,33 +356,34 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
     const courses: CourseStructure = {};
     
     topics?.forEach((topic: any) => {
-      // Convert subject_id to subject name
       const subjectName = SUBJECT_NAMES[topic.subject_id];
       
       if (!subjectName) {
-        console.warn(`⚠️ Unknown subject_id: ${topic.subject_id} for topic: ${topic.title}`);
-        return; // Skip topics with unknown subject IDs
+        console.warn(`⚠️ Unknown subject_id: ${topic.subject_id}`);
+        return;
       }
       
       if (!courses[subjectName]) {
         courses[subjectName] = {};
       }
       
+      // Preserve all topic data including grade_level
       courses[subjectName][topic.id] = {
         ...topic,
+        gradeLevel: topic.grade_level,  // Ensure gradeLevel is set
         materials: topic.materials || []
       };
     });
 
-    // Debug log
-    console.log('📊 Course summary:', {
-      Biology: {
-        topics: Object.keys(courses['Biology'] || {}).length,
-        materials: Object.values(courses['Biology'] || {})
-          .reduce((sum, topic) => sum + (topic.materials?.length || 0), 0)
-      },
-      Physics: Object.keys(courses['Physics'] || {}).length,
-      Chemistry: Object.keys(courses['Chemistry'] || {}).length
+    // Log grade distribution
+    Object.keys(courses).forEach(subject => {
+      const gradeCounts: Record<string, number> = {};
+      Object.values(courses[subject]).forEach((topic: any) => {
+        const grade = topic.gradeLevel || 'unknown';
+        gradeCounts[grade] = (gradeCounts[grade] || 0) + 1;
+      });
+      
+      console.log(`📊 ${subject} grade distribution:`, gradeCounts);
     });
     
     return courses;
