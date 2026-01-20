@@ -4,6 +4,7 @@
 
 export type Role = 'admin' | 'teacher' | 'student';
 export type Theme = 'Cosmic' | 'Cyber-Dystopian';
+export type QuestionFormat = 'plain_text' | 'table' | 'image' | 'diagram' | 'code' | 'multipart';
 
 // =======================
 // USER & AUTH
@@ -49,7 +50,12 @@ export interface Question {
   difficulty: 'IGCSE' | 'AS' | 'A_LEVEL';
   topic: string;
   modelAnswer?: string;
-
+  
+  // NEW FIELDS FOR FORMAT SUPPORT
+  format?: QuestionFormat;
+  metadata?: any; // JSON for table headers, image URLs, etc.
+  content?: string; // HTML/rich content
+  
   // DB compatibility
   topic_id?: string;
   subtopic_name?: string;
@@ -201,7 +207,7 @@ export interface LeaderboardEntry {
   username: string;
   score: number;
   gradeLevel?: string;
-   type?: 'academic' | 'challenge' | 'assessments'; // Make it optional
+  type?: 'academic' | 'challenge' | 'assessments';
 }
 
 export interface StudentStats {
@@ -214,8 +220,10 @@ export interface StudentStats {
   activeDays: number;
 }
 
-// Add to your existing interfaces in types.ts
-// Add to your TheorySubmission interface in types.ts:
+// =======================
+// THEORY SUBMISSIONS
+// =======================
+
 export interface TheorySubmission {
   id: string;
   user_id: string;
@@ -230,7 +238,6 @@ export interface TheorySubmission {
   submitted_at: string;
   graded_at?: string;
   status: 'pending' | 'ai_graded' | 'teacher_graded' | 'approved';
-  // Add these for the joined data
   user?: { username: string };
   graded_by_user?: { username: string };
   topic?: { title: string };
@@ -238,23 +245,59 @@ export interface TheorySubmission {
 }
 
 // =======================
-// ANNOUNCEMENTS & NOTIFICATIONS
+// ANNOUNCEMENTS & NOTIFICATIONS - UPDATED TO MATCH DATABASE
 // =======================
 
+// FRONTEND INTERFACE (what your components use)
 export interface Announcement {
-  expiresAt: number;
   id: string;
   title: string;
   content: string;
-  timestamp: number;
-  author: string;
+  author_name: string;
+  expires_at: string;
+  created_at: string; // ISO string from database
+  // Optional fields
+  author?: string;      // UUID from database (optional)
+  updated_at?: string;  // ISO string from database
 }
 
-// Update the existing Notification interface:
+// DATABASE INTERFACE (what matches your Supabase schema)
+export interface DbAnnouncement {
+  id: string;
+  title: string;
+  content: string;
+  author?: string;       // UUID (nullable)
+  author_name?: string;  // Display name (nullable)
+  created_at?: string;
+  updated_at?: string;
+  expires_at?: string;   // Added to match your column
+}
+
+// HELPER: Convert DbAnnouncement to Announcement
+export const dbToFrontendAnnouncement = (dbAnn: DbAnnouncement): Announcement => ({
+  id: dbAnn.id,
+  title: dbAnn.title,
+  content: dbAnn.content,
+  author_name: dbAnn.author_name || 'System',
+  created_at: dbAnn.created_at || new Date().toISOString(),
+  expires_at: dbAnn.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+  author: dbAnn.author,
+  updated_at: dbAnn.updated_at
+});
+
+// HELPER: Convert Announcement to DbAnnouncement for saving
+export const frontendToDbAnnouncement = (ann: Partial<Announcement>): Partial<DbAnnouncement> => ({
+  title: ann.title,
+  content: ann.content,
+  author_name: ann.author_name,
+  expires_at: ann.expires_at
+  // Don't send id, created_at, updated_at - let database handle
+});
+
 export interface Notification {
   id: string;
   text: string;
-  type: 'info' | 'success' | 'warning' | 'alert'; // Added 'alert'
+  type: 'info' | 'success' | 'warning' | 'alert';
   read: boolean;
   timestamp: number;
   metadata?: {
@@ -265,12 +308,11 @@ export interface Notification {
     checkpointId?: string;
     assessmentId?: string;
     score?: number;
-    actionUrl?: string; // URL to navigate when clicked
+    actionUrl?: string;
   };
-  expiresAt?: number; // Auto-expire notifications
+  expiresAt?: number;
 }
 
-// Add a new interface for notification preferences
 export interface NotificationPreferences {
   userId: string;
   courseUpdates: boolean;
@@ -342,6 +384,12 @@ export interface DbQuestion {
   model_answer?: string;
   explanation?: string;
   sort_order?: number;
+  
+  // NEW FIELDS FOR FORMAT SUPPORT
+  format?: QuestionFormat;
+  metadata?: any;
+  content?: string;
+  
   created_at?: string;
 }
 
@@ -394,16 +442,6 @@ export interface DbLeaderboard {
   grade_level?: string;
   metadata?: any;
   recorded_at?: string;
-}
-
-export interface DbAnnouncement {
-  id: string;
-  title: string;
-  content: string;
-  author?: string;
-  author_name?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
 export interface DbNotification {

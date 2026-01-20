@@ -1,5 +1,5 @@
 ﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
-import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification } from '../types';
+import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, dbToFrontendAnnouncement } from '../types';
 import { supabase } from './supabaseClient';
 
 // Add caching variables at the TOP of the file (right after imports)
@@ -331,6 +331,7 @@ export const deleteUser = async (username: string): Promise<void> => {
 // =====================================================
 // COURSE MANAGEMENT - OPTIMIZED WITH CACHING
 // =====================================================
+// FIXED VERSION - Remove ambiguous join
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
   // Return cached data if valid (10 minutes cache)
   const now = Date.now();
@@ -340,10 +341,10 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
   }
   
   console.time('getCourses');
-  console.log('🚀 Fetching courses (OPTIMIZED VERSION)...');
+  console.log('🚀 Fetching courses (FIXED VERSION - NO AMBIGUOUS JOIN)...');
   
   try {
-    // OPTIMIZATION: Get all subjects first to avoid ambiguous joins
+    // OPTIMIZATION: Get all subjects first
     const { data: subjectsData } = await supabase
       .from('subjects')
       .select('id, name');
@@ -362,7 +363,8 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         subject_id,
         checkpoints_required,
         checkpoint_pass_percentage,
-        final_assessment_required
+        final_assessment_required,
+        created_at
       `)
       .order('title', { ascending: true });
 
@@ -374,11 +376,11 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
       return {};
     }
 
-    console.log(`📚 Found ${topicsData.length} topics (materials will load on demand)`);
+    console.log(`📚 Found ${topicsData.length} topics`);
 
     const courses: CourseStructure = {};
     
-    // Build courses structure WITHOUT materials initially
+    // Build courses structure
     topicsData.forEach(topic => {
       const subjectName = subjectMap.get(topic.subject_id) || 'General';
       
@@ -386,17 +388,16 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         courses[subjectName] = {};
       }
 
-      // Build topic object WITHOUT materials (load on demand)
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
         gradeLevel: topic.grade_level || '9',
         description: topic.description || '',
-        subtopics: [], // Load on demand only
-        materials: [], // CRITICAL: Empty array - load on demand
+        subtopics: [], // Load on demand
+        materials: [], // Load on demand
         checkpoints_required: topic.checkpoints_required || 3,
         checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
-        final_assessment_required: topic.final_assessment_required !== false
+        final_assessment_required: topic.final_assessment_required !== false,
       };
     });
 
@@ -513,40 +514,51 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
   // GET TOPIC QUESTIONS (ON DEMAND)
   // =====================================================
   export const getTopicQuestions = async (topicId: string): Promise<Record<string, any[]>> => {
-    try {
-      const { data: questionsData, error } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('topic_id', topicId);
+  try {
+    const { data: questionsData, error } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('topic_id', topicId);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      const subtopicQuestions: Record<string, any[]> = {};
+    const subtopicQuestions: Record<string, any[]> = {};
+    
+    (questionsData || []).forEach(q => {
+      const subtopic = q.subtopic_name || 'general';
+      if (!subtopicQuestions[subtopic]) {
+        subtopicQuestions[subtopic] = [];
+      }
       
-      (questionsData || []).forEach(q => {
-        const subtopic = q.subtopic_name || 'general';
-        if (!subtopicQuestions[subtopic]) {
-          subtopicQuestions[subtopic] = [];
-        }
+      subtopicQuestions[subtopic].push({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        difficulty: q.difficulty || 'IGCSE',
+        topic: q.topic_name || '',
+        options: q.options || [],
+        correctAnswer: q.correct_answer || '',
+        modelAnswer: q.model_answer,
         
-        subtopicQuestions[subtopic].push({
-          id: q.id,
-          text: q.text,
-          type: q.type,
-          difficulty: q.difficulty || 'IGCSE',
-          topic: q.topic_name || '',
-          options: q.options || [],
-          correctAnswer: q.correct_answer || '',
-          modelAnswer: q.model_answer
-        });
+        // NEW FIELDS
+        format: q.format || 'plain_text',
+        metadata: q.metadata || {},
+        content: q.content || '',
+        
+        // DB fields
+        topic_id: q.topic_id,
+        subtopic_name: q.subtopic_name,
+        explanation: q.explanation,
+        sort_order: q.sort_order
       });
+    });
 
-      return subtopicQuestions;
-    } catch (error) {
-      console.error('❌ Get topic questions error:', error);
-      return {};
-    }
-  };
+    return subtopicQuestions;
+  } catch (error) {
+    console.error('❌ Get topic questions error:', error);
+    return {};
+  }
+};
 
 // Add this function to load questions only when needed
 
@@ -834,7 +846,8 @@ export const updateTopicProgress = async (
 // ASSESSMENTS
 // =====================================================
 export const getAssessments = async (): Promise<Assessment[]> => {
- 
+  console.time('getAssessments');
+  console.log('📝 Fetching assessments...');
   
   try {
     const { data: assessmentsData, error: assessmentsError } = await supabase
@@ -844,7 +857,7 @@ export const getAssessments = async (): Promise<Assessment[]> => {
 
     if (assessmentsError) throw assessmentsError;
 
-    // Get questions
+    // Get questions for all assessments
     const assessments: Assessment[] = [];
     
     for (const item of assessmentsData || []) {
@@ -865,7 +878,18 @@ export const getAssessments = async (): Promise<Assessment[]> => {
           topic: item.subject || '',
           options: q.options || [],
           correctAnswer: q.correct_answer || '',
-          modelAnswer: q.model_answer
+          modelAnswer: q.model_answer,
+          
+          // NEW FIELDS
+          format: q.format || 'plain_text',
+          metadata: q.metadata || {},
+          content: q.content || '',
+          
+          // DB fields
+          topic_id: q.topic_id,
+          subtopic_name: q.subtopic_name,
+          explanation: q.explanation,
+          sort_order: q.sort_order
         })),
         assignedTo: item.assigned_to || [],
         targetGrade: item.target_grade || 'all',
@@ -873,10 +897,12 @@ export const getAssessments = async (): Promise<Assessment[]> => {
       });
     }
 
-    console.log(`Fetched ${assessments.length} assessments`);
+    console.timeEnd('getAssessments');
+    console.log(`✅ Fetched ${assessments.length} assessments`);
     return assessments;
   } catch (error) {
-    console.error('Get assessments error:', error);
+    console.error('❌ Get assessments error:', error);
+    console.timeEnd('getAssessments');
     return [];
   }
 };
@@ -1343,45 +1369,94 @@ const get48HourExpiry = (): number => {
   return Date.now() + (48 * 60 * 60 * 1000); // 48 hours from now
 };
 
+
+export const saveAnnouncement = async (announcement: Announcement): Promise<Announcement> => {
+  try {
+    console.log('📝 Saving announcement:', announcement);
+    
+    // Prepare database payload
+    const dbPayload = {
+      title: announcement.title,
+      content: announcement.content,
+      author: announcement.author || null, // UUID or null
+      author_name: announcement.author_name || 'System',
+      expires_at: announcement.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+      // Don't send id, created_at, updated_at - let database handle
+    };
+    
+    console.log('📤 Sending to database:', dbPayload);
+    
+    const { data, error } = await supabase
+      .from('announcements')
+      .insert([dbPayload])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Supabase insert error:', error);
+      throw error;
+    }
+    
+    console.log('✅ Announcement saved successfully:', data);
+    
+    // Return the saved announcement with all fields
+    return {
+      id: data.id,
+      title: data.title,
+      content: data.content,
+      author_name: data.author_name || 'System',
+      author: data.author,
+      created_at: data.created_at,
+      expires_at: data.expires_at,
+      updated_at: data.updated_at
+    };
+    
+  } catch (error) {
+    console.error('💥 Save announcement error:', error);
+    throw error;
+  }
+};
+
 export const getAnnouncements = async (): Promise<Announcement[]> => {
   try {
     const { data, error } = await supabase
       .from('announcements')
-      .select('*, author_user:users(username)')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
     
-    const now = Date.now();
+    const now = new Date();
     const announcements: Announcement[] = [];
     
     // Process and filter expired announcements
     for (const item of (data || [])) {
-      const createdTime = item.created_at ? new Date(item.created_at).getTime() : Date.now();
-      const expiresTime = item.expires_at ? new Date(item.expires_at).getTime() : createdTime + (48 * 60 * 60 * 1000);
-      
-      // Only include if not expired
-      if (now <= expiresTime) {
-        announcements.push({
-          id: item.id,
-          title: item.title,
-          content: item.content,
-          timestamp: createdTime,
-          author: item.author_user?.username || item.author_name || 'System',
-          expiresAt: expiresTime
-        });
-      } else {
-        // Delete expired announcement from database
+      // Check if announcement is expired
+      if (item.expires_at && new Date(item.expires_at) < now) {
+        // Delete expired announcement
         try {
           await supabase
             .from('announcements')
             .delete()
             .eq('id', item.id);
-          console.log(`Deleted expired announcement: ${item.title}`);
+          console.log(`🗑️ Deleted expired announcement: ${item.title}`);
         } catch (deleteError) {
           console.error('Error deleting expired announcement:', deleteError);
         }
+        continue; // Skip adding to list
       }
+      
+      // Convert to frontend format
+      announcements.push({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        author_name: item.author_name || 'System',
+        author: item.author,
+        created_at: item.created_at || new Date().toISOString(),
+        expires_at: item.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        updated_at: item.updated_at
+      });
     }
     
     return announcements;
@@ -1391,26 +1466,24 @@ export const getAnnouncements = async (): Promise<Announcement[]> => {
   }
 };
 
-export const saveAnnouncement = async (announcement: Announcement): Promise<void> => {
-  try {
-    const expiresAt = announcement.expiresAt || get48HourExpiry();
-    
-    const { error } = await supabase
-      .from('announcements')
-      .insert({
-        title: announcement.title,
-        content: announcement.content,
-        author_name: announcement.author,
-        expires_at: new Date(expiresAt).toISOString(), // ADD EXPIRY DATE
-        created_at: new Date().toISOString()
-      });
-    
-    if (error) throw error;
-    
-  } catch (error) {
-    console.error('Save announcement error:', error);
-    throw error;
-  }
+// Backward compatibility wrapper
+export const createAnnouncementLegacy = async (
+  title: string, 
+  content: string, 
+  authorName: string
+): Promise<Announcement> => {
+  const announcementData: Announcement = {
+    id: `temp-${Date.now()}`, // Temporary ID for frontend
+    title,
+    content,
+    author_name: authorName,
+    author: undefined, // No UUID
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
+    updated_at: undefined
+  };
+  
+  return await saveAnnouncement(announcementData);
 };
 
 // =====================================================

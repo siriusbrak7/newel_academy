@@ -1228,7 +1228,8 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               </h3>
               <div className="space-y-4">
                 {announcements.map(ann => {
-                  const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+                  const expiresDate = ann.expires_at ? new Date(ann.expires_at) : null;
+                  const timeLeft = expiresDate ? expiresDate.getTime() - Date.now() : null;
                   const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
                   
                   return (
@@ -1243,7 +1244,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                       <p className="text-white/60 text-sm">{ann.content}</p>
                       <div className="flex justify-between text-white/30 text-xs mt-2">
-                        <span>{new Date(ann.timestamp).toLocaleDateString()}</span>
+                        <span>{new Date(ann.created_at).toLocaleDateString()}</span>
                         <span>By: {ann.author}</span>
                       </div>
                     </div>
@@ -1924,7 +1925,7 @@ export const AdminDashboard: React.FC = () => {
 
 
 // =====================================================
-// TEACHER DASHBOARD COMPONENT - OPTIMIZED VERSION
+// TEACHER DASHBOARD COMPONENT - MOBILE OPTIMIZED VERSION
 // =====================================================
 export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   const [students, setStudents] = useState<StudentStats[]>([]);
@@ -2211,7 +2212,7 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   }, [refreshTrigger]);
 
   // =====================================================
-  // HANDLER FUNCTIONS
+  // HANDLER FUNCTIONS - FIXED ANNOUNCEMENT CREATION
   // =====================================================
   const createAnnouncement = async () => {
     if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
@@ -2220,13 +2221,14 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
     }
 
     try {
+      // Fixed: Use correct field names for the new interface
       await saveAnnouncement({
-        id: Date.now().toString(),
+        id: `temp-${Date.now()}`, // Temporary ID for frontend
         title: newAnnouncement.title,
         content: newAnnouncement.content,
-        timestamp: Date.now(),
-        author: user.username,
-        expiresAt: Date.now() + (48 * 60 * 60 * 1000) // 48 hours
+        author_name: user.username,
+        created_at: new Date().toISOString(), // Required field
+        expires_at: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString()
       });
       
       setNewAnnouncement({ title: '', content: '' });
@@ -2263,55 +2265,55 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   };
 
   // =====================================================
-  // LOADING STATE
+  // LOADING STATE - MOBILE OPTIMIZED
   // =====================================================
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-8 space-y-6">
+      <div className="px-4 py-8 max-w-7xl mx-auto space-y-6">
         {/* Header Skeleton */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="space-y-2">
             <div className="h-10 w-64 bg-white/10 rounded-lg animate-pulse"></div>
-            <div className="h-4 w-96 bg-white/5 rounded animate-pulse"></div>
+            <div className="h-4 w-48 sm:w-96 bg-white/5 rounded animate-pulse"></div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 flex-wrap">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-10 w-28 bg-white/10 rounded-lg animate-pulse"></div>
+              <div key={i} className="h-10 w-24 sm:w-28 bg-white/10 rounded-lg animate-pulse"></div>
             ))}
           </div>
         </div>
         
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Stats Cards Skeleton - Mobile Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white/5 p-6 rounded-2xl">
+            <div key={i} className="bg-white/5 p-4 sm:p-6 rounded-xl sm:rounded-2xl">
               <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="h-4 w-24 bg-white/10 rounded animate-pulse"></div>
-                  <div className="h-8 w-16 bg-white/10 rounded animate-pulse"></div>
+                <div className="space-y-1 sm:space-y-2">
+                  <div className="h-3 sm:h-4 w-16 sm:w-24 bg-white/10 rounded animate-pulse"></div>
+                  <div className="h-6 sm:h-8 w-12 sm:w-16 bg-white/10 rounded animate-pulse"></div>
                 </div>
-                <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
+                <div className="h-6 sm:h-8 w-6 sm:w-8 bg-white/10 rounded animate-pulse"></div>
               </div>
             </div>
           ))}
         </div>
         
         {/* Main Content Skeleton */}
-        <div className="bg-white/5 p-6 rounded-2xl">
-          <div className="h-8 w-48 bg-white/10 rounded mb-6 animate-pulse"></div>
-          <div className="space-y-4">
+        <div className="bg-white/5 p-4 sm:p-6 rounded-xl sm:rounded-2xl">
+          <div className="h-6 sm:h-8 w-32 sm:w-48 bg-white/10 rounded mb-4 sm:mb-6 animate-pulse"></div>
+          <div className="space-y-3 sm:space-y-4">
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="flex items-center justify-between p-4 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-white/10 rounded-full animate-pulse"></div>
-                  <div className="space-y-2">
-                    <div className="h-4 w-32 bg-white/10 rounded animate-pulse"></div>
-                    <div className="h-3 w-24 bg-white/5 rounded animate-pulse"></div>
+              <div key={i} className="flex items-center justify-between p-3 sm:p-4 border-b border-white/10">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="h-8 sm:h-10 w-8 sm:w-10 bg-white/10 rounded-full animate-pulse"></div>
+                  <div className="space-y-1 sm:space-y-2">
+                    <div className="h-3 sm:h-4 w-24 sm:w-32 bg-white/10 rounded animate-pulse"></div>
+                    <div className="h-2 sm:h-3 w-16 sm:w-24 bg-white/5 rounded animate-pulse"></div>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <div className="h-8 w-20 bg-white/10 rounded animate-pulse"></div>
-                  <div className="h-8 w-8 bg-white/10 rounded animate-pulse"></div>
+                <div className="flex gap-1 sm:gap-2">
+                  <div className="h-6 sm:h-8 w-16 sm:w-20 bg-white/10 rounded animate-pulse"></div>
+                  <div className="h-6 sm:h-8 w-6 sm:w-8 bg-white/10 rounded animate-pulse"></div>
                 </div>
               </div>
             ))}
@@ -2322,274 +2324,270 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   }
 
   // =====================================================
-  // MAIN RENDER
+  // MAIN RENDER - MOBILE OPTIMIZED
   // =====================================================
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="px-4 py-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
+      {/* Header - Mobile Responsive */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-4xl font-bold text-white">Teacher Dashboard</h1>
-          <p className="text-white/60">Welcome, {user.username}</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">Teacher Dashboard</h1>
+          <p className="text-white/60 text-sm sm:text-base">Welcome, {user.username}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3 flex-wrap">
           <button 
             onClick={() => setRefreshTrigger(prev => prev + 1)} 
-            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            className="bg-white/10 hover:bg-white/20 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm sm:text-base"
           >
-            <RefreshCw size={16} /> Refresh
+            <RefreshCw size={14} /> Refresh
           </button>
           <Link 
             to="/courses" 
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm sm:text-base"
           >
-            <BookOpen size={16} /> Manage Courses
+            <BookOpen size={14} /> Courses
           </Link>
           <Link 
             to="/assessments" 
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm sm:text-base"
           >
-            <PenTool size={16} /> Create Assessment
+            <PenTool size={14} /> Assessments
           </Link>
         </div>
       </div>
 
-      {/* Class Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 p-6 rounded-2xl">
+      {/* Class Overview Stats - Mobile Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6">
+        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 p-4 sm:p-6 rounded-xl sm:rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/60 text-sm">Total Students</p>
-              <p className="text-3xl font-bold text-white">{classStats?.totalStudents || 0}</p>
+              <p className="text-white/60 text-xs sm:text-sm">Total Students</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{classStats?.totalStudents || 0}</p>
             </div>
-            <UsersIcon className="text-cyan-400" size={32} />
+            <UsersIcon className="text-cyan-400" size={24} />
           </div>
-          <p className="text-white/40 text-sm mt-2">
+          <p className="text-white/40 text-xs sm:text-sm mt-1 sm:mt-2 truncate">
             {user.gradeLevel ? `Grade ${user.gradeLevel}` : 'All Grades'}
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 p-6 rounded-2xl">
+        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 p-4 sm:p-6 rounded-xl sm:rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/60 text-sm">Class Average</p>
-              <p className="text-3xl font-bold text-white">{classStats?.classAverage || 0}%</p>
+              <p className="text-white/60 text-xs sm:text-sm">Class Average</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{classStats?.classAverage || 0}%</p>
             </div>
-            <TrendingUp className="text-green-400" size={32} />
+            <TrendingUp className="text-green-400" size={24} />
           </div>
-          <p className="text-white/40 text-sm mt-2">
-            {classStats && classStats.classAverage >= 70 ? 'Excellent performance' : 
-             classStats && classStats.classAverage >= 50 ? 'Good progress' : 'Needs attention'}
+          <p className="text-white/40 text-xs sm:text-sm mt-1 sm:mt-2">
+            {classStats && classStats.classAverage >= 70 ? 'Excellent' : 
+             classStats && classStats.classAverage >= 50 ? 'Good' : 'Needs attention'}
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 p-6 rounded-2xl">
+        <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/20 p-4 sm:p-6 rounded-xl sm:rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/60 text-sm">Struggling Students</p>
-              <p className="text-3xl font-bold text-white">{classStats?.strugglingStudents || 0}</p>
+              <p className="text-white/60 text-xs sm:text-sm">Struggling</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{classStats?.strugglingStudents || 0}</p>
             </div>
-            <AlertCircle className="text-yellow-400" size={32} />
+            <AlertCircle className="text-yellow-400" size={24} />
           </div>
-          <p className="text-white/40 text-sm mt-2">
-            {classStats?.strugglingPercentage || 0}% need attention
+          <p className="text-white/40 text-xs sm:text-sm mt-1 sm:mt-2">
+            {classStats?.strugglingPercentage || 0}% need help
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-6 rounded-2xl">
+        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-4 sm:p-6 rounded-xl sm:rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white/60 text-sm">Avg Completion Rate</p>
-              <p className="text-3xl font-bold text-white">{classStats?.avgCompletionRate || 0}%</p>
+              <p className="text-white/60 text-xs sm:text-sm">Completion Rate</p>
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{classStats?.avgCompletionRate || 0}%</p>
             </div>
-            <BarChart3 className="text-purple-400" size={32} />
+            <BarChart3 className="text-purple-400" size={24} />
           </div>
-          <p className="text-white/40 text-sm mt-2">
-            Average course completion
+          <p className="text-white/40 text-xs sm:text-sm mt-1 sm:mt-2">
+            Average completion
           </p>
         </div>
       </div>
 
-      {/* Student Course Tracking Section */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Target className="text-purple-400" /> Student Course Tracking
+      {/* Student Course Tracking Section - Mobile Optimized */}
+      <div className="bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <div className="flex justify-between items-center mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+            <Target className="text-purple-400" size={18} /> Student Tracking
           </h2>
           <button
             onClick={() => setShowTrackingSection(!showTrackingSection)}
-            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+            className="text-xs sm:text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
           >
-            {showTrackingSection ? 'Hide Details' : 'Show Details'}
-            <ChevronDown className={`transform transition-transform ${showTrackingSection ? 'rotate-180' : ''}`} size={14} />
+            {showTrackingSection ? 'Hide' : 'Show'}
+            <ChevronDown className={`transform transition-transform ${showTrackingSection ? 'rotate-180' : ''}`} size={12} />
           </button>
         </div>
         
         {showTrackingSection && (
-          <>
-            {/* Student Selection and Filters */}
-            <div className="mb-6 space-y-4">
-              <div className="flex gap-3 flex-wrap">
-                <div className="flex-1 min-w-[200px] relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" size={18} />
+          <div className="space-y-4">
+            {/* Student Selection and Filters - Mobile Stacked */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" size={16} />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search students..."
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:border-cyan-500 text-sm"
                   />
                 </div>
-                <select
-                  value={filterGrade}
-                  onChange={(e) => setFilterGrade(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-w-[120px]"
-                >
-                  <option value="all">All Grades</option>
-                  <option value="9">Grade 9</option>
-                  <option value="10">Grade 10</option>
-                  <option value="11">Grade 11</option>
-                  <option value="12">Grade 12</option>
-                </select>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-w-[140px]"
-                >
-                  <option value="name">Sort by Name</option>
-                  <option value="score">Sort by Score</option>
-                  <option value="grade">Sort by Grade</option>
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={filterGrade}
+                    onChange={(e) => setFilterGrade(e.target.value)}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 text-sm"
+                  >
+                    <option value="all">All Grades</option>
+                    <option value="9">Grade 9</option>
+                    <option value="10">Grade 10</option>
+                    <option value="11">Grade 11</option>
+                    <option value="12">Grade 12</option>
+                  </select>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 text-sm"
+                  >
+                    <option value="name">Name</option>
+                    <option value="score">Score</option>
+                    <option value="grade">Grade</option>
+                  </select>
+                </div>
               </div>
               
-              <div className="flex gap-3 flex-wrap">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
-                  className="flex-1 min-w-[200px] bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 text-sm"
                 >
-                  <option value="">Choose a student...</option>
+                  <option value="">Choose student...</option>
                   {filteredStudents.map(student => (
                     <option key={student.username} value={student.username}>
-                      {student.username} (Grade {student.gradeLevel}) - {Math.round(student.avgScore)}%
+                      {student.username} (G{student.gradeLevel}) - {Math.round(student.avgScore)}%
                     </option>
                   ))}
                 </select>
-                <button
-                  onClick={() => selectedStudent && loadStudentCourseData(selectedStudent, true)}
-                  disabled={!selectedStudent || trackingLoading}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {trackingLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw size={16} /> Refresh Data
-                    </>
-                  )}
-                </button>
-                {selectedStudent && studentCourseData && (
+                <div className="flex gap-2">
                   <button
-                    onClick={exportStudentData}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                    onClick={() => selectedStudent && loadStudentCourseData(selectedStudent, true)}
+                    disabled={!selectedStudent || trackingLoading}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
-                    <Download size={16} /> Export
+                    {trackingLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={14} /> Refresh
+                      </>
+                    )}
                   </button>
-                )}
+                  {selectedStudent && studentCourseData && (
+                    <button
+                      onClick={exportStudentData}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                    >
+                      <Download size={14} /> Export
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Student Course Performance Data */}
             {selectedStudent && studentCourseData ? (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-white/10 p-6 rounded-2xl">
-                  <div className="flex justify-between items-center">
+                <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-white/10 p-4 rounded-xl">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div>
-                      <h3 className="text-2xl font-bold text-white">Course Performance: {selectedStudent}</h3>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="text-white/60 flex items-center gap-1">
-                          <UsersIcon size={14} /> Grade {students.find(s => s.username === selectedStudent)?.gradeLevel || 'N/A'}
+                      <h3 className="text-lg sm:text-xl font-bold text-white">{selectedStudent}</h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-white/60 text-xs flex items-center gap-1">
+                          <UsersIcon size={12} /> Grade {students.find(s => s.username === selectedStudent)?.gradeLevel || 'N/A'}
                         </span>
-                        <span className="text-white/60 flex items-center gap-1">
-                          <Award size={14} /> Overall: {students.find(s => s.username === selectedStudent)?.avgScore.toFixed(1) || '0'}%
-                        </span>
-                        <span className="text-white/60 flex items-center gap-1">
-                          <Clock size={14} /> Last Active: {students.find(s => s.username === selectedStudent)?.lastActive || 'N/A'}
+                        <span className="text-white/60 text-xs flex items-center gap-1">
+                          <Award size={12} /> {students.find(s => s.username === selectedStudent)?.avgScore.toFixed(1) || '0'}%
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-white/60 text-sm">Analysis Generated</p>
+                    <div className="text-right text-xs">
+                      <p className="text-white/60">Analysis</p>
                       <p className="text-white">{new Date().toLocaleDateString()}</p>
-                      <p className="text-white/40 text-xs">{new Date().toLocaleTimeString()}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Course/Topic Performance */}
+                {/* Course/Topic Performance - Mobile Stacked */}
                 {Object.keys(studentCourseData.coursePerformance).length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="space-y-4">
                     {/* Topic List */}
-                    <div className="lg:col-span-2">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                          <BookOpen size={18} /> Topics & Courses
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-base font-bold text-white flex items-center gap-2">
+                          <BookOpen size={16} /> Topics
                         </h4>
-                        <span className="text-white/60 text-sm">
-                          {Object.keys(studentCourseData.coursePerformance).length} topics completed
+                        <span className="text-white/60 text-xs">
+                          {Object.keys(studentCourseData.coursePerformance).length} topics
                         </span>
                       </div>
                       
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {formatCourseData.map((topic) => (
                           <div 
                             key={topic.key}
-                            className={`bg-white/5 p-4 rounded-xl border transition-all duration-300 ${
+                            className={`bg-white/5 p-3 rounded-lg border transition-all duration-300 ${
                               selectedTopic === topic.key 
                                 ? 'border-cyan-500/50 bg-gradient-to-r from-cyan-500/10 to-transparent' 
                                 : 'border-white/10 hover:border-white/20'
-                            } hover:bg-white/10 cursor-pointer group`}
+                            } hover:bg-white/10 cursor-pointer`}
                             onClick={() => setSelectedTopic(topic.key)}
                           >
-                            <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-start gap-2">
                               <div className="flex-1">
-                                <div className="flex items-center gap-3">
-                                  <div className={`p-2 rounded-lg ${topic.bgColor}`}>
-                                    <BookOpen size={16} className={topic.color} />
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-1.5 rounded ${topic.bgColor}`}>
+                                    <BookOpen size={14} className={topic.color} />
                                   </div>
-                                  <div>
-                                    <p className="text-white font-medium group-hover:text-cyan-300 transition-colors">
+                                  <div className="min-w-0">
+                                    <p className="text-white font-medium text-sm truncate">
                                       {topic.topicTitle}
                                     </p>
-                                    <div className="flex items-center gap-3 mt-1">
-                                      <span className="text-white/60 text-sm">{topic.subject}</span>
-                                      <span className={`text-xs px-2 py-1 rounded ${topic.bgColor} ${topic.color}`}>
+                                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                                      <span className="text-white/60 text-xs">{topic.subject}</span>
+                                      <span className={`text-xs px-1.5 py-0.5 rounded ${topic.bgColor} ${topic.color}`}>
                                         {topic.status}
-                                      </span>
-                                      <span className="text-white/40 text-xs">
-                                        {topic.checkpointCount} checkpoint{topic.checkpointCount !== 1 ? 's' : ''}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className={`text-2xl font-bold ${topic.color}`}>{topic.averageScore}%</p>
-                                <p className="text-white/40 text-xs">Topic Average</p>
+                                <p className={`text-lg font-bold ${topic.color}`}>{topic.averageScore}%</p>
                               </div>
                             </div>
                             
                             {/* Progress bar */}
-                            <div className="mt-4">
+                            <div className="mt-3">
                               <div className="flex justify-between text-xs text-white/60 mb-1">
-                                <span>Topic Progress</span>
-                                <span>{topic.averageScore}% • {topic.passed ? 'Passed ✓' : 'Not Passed ✗'}</span>
+                                <span>Progress</span>
+                                <span>{topic.averageScore}%</span>
                               </div>
-                              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                                 <div 
                                   className={`h-full transition-all duration-1000 ${
                                     topic.averageScore >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 
@@ -2605,118 +2603,79 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                     </div>
 
-                    {/* Overall Statistics and Selected Topic Details */}
-                    <div className="space-y-6">
+                    {/* Overall Statistics and Selected Topic Details - Mobile Stacked */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Overall Statistics */}
-                      <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10 p-5 rounded-2xl">
-                        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                          <BarChart3 size={18} /> Overall Statistics
+                      <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10 p-4 rounded-xl">
+                        <h4 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                          <BarChart3 size={16} /> Statistics
                         </h4>
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/60 flex items-center gap-2">
-                              <BookOpen size={14} /> Topics Completed
-                            </span>
-                            <span className="text-white font-bold">
-                              {studentCourseData.overallStats.totalTopics}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/60 flex items-center gap-2">
-                              <CheckCircle size={14} /> Checkpoints Attempted
-                            </span>
-                            <span className="text-white font-bold">
-                              {studentCourseData.overallStats.totalCheckpoints}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/60 flex items-center gap-2">
-                              <Award size={14} /> Checkpoints Passed
-                            </span>
-                            <span className="text-green-400 font-bold">
-                              {studentCourseData.overallStats.passedCheckpoints} 
-                              <span className="text-white/60 text-sm ml-1">
-                                ({studentCourseData.overallStats.completionRate}%)
+                        <div className="space-y-3">
+                          {[
+                            { label: 'Topics', value: studentCourseData.overallStats.totalTopics, icon: BookOpen },
+                            { label: 'Checkpoints', value: studentCourseData.overallStats.totalCheckpoints, icon: CheckCircle },
+                            { label: 'Passed', value: studentCourseData.overallStats.passedCheckpoints, icon: Award, color: 'text-green-400' },
+                            { label: 'Overall Avg', value: `${studentCourseData.overallStats.overallAverage}%`, icon: TrendingUp, 
+                              color: studentCourseData.overallStats.overallAverage >= 80 ? 'text-green-400' :
+                                     studentCourseData.overallStats.overallAverage >= 60 ? 'text-yellow-400' :
+                                     'text-red-400' },
+                            { label: 'Strongest', value: studentCourseData.overallStats.strongestTopic, icon: Activity, color: 'text-green-400' },
+                            { label: 'Needs Help', value: studentCourseData.overallStats.weakestTopic, icon: TrendingDown, color: 'text-red-400' }
+                          ].map((item, index) => (
+                            <div key={index} className="flex justify-between items-center">
+                              <span className="text-white/60 text-sm flex items-center gap-2">
+                                <item.icon size={12} /> {item.label}
                               </span>
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/60 flex items-center gap-2">
-                              <TrendingUp size={14} /> Overall Average
-                            </span>
-                            <span className={`text-xl font-bold ${
-                              studentCourseData.overallStats.overallAverage >= 80 ? 'text-green-400' :
-                              studentCourseData.overallStats.overallAverage >= 60 ? 'text-yellow-400' :
-                              'text-red-400'
-                            }`}>
-                              {studentCourseData.overallStats.overallAverage}%
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/60 flex items-center gap-2">
-                              <Activity size={14} /> Strongest Topic
-                            </span>
-                            <span className="text-green-400 font-bold">
-                              {studentCourseData.overallStats.strongestTopic}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-white/60 flex items-center gap-2">
-                              <TrendingDown size={14} /> Needs Improvement
-                            </span>
-                            <span className="text-red-400 font-bold">
-                              {studentCourseData.overallStats.weakestTopic}
-                            </span>
-                          </div>
+                              <span className={`font-medium ${item.color || 'text-white'}`}>
+                                {item.value}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
                       {/* Selected Topic Details */}
                       {selectedTopicDetails && (
-                        <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border border-cyan-500/20 p-5 rounded-2xl">
-                          <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <CheckCircle size={18} /> Checkpoint Details
+                        <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border border-cyan-500/20 p-4 rounded-xl">
+                          <h4 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                            <CheckCircle size={16} /> Checkpoints
                           </h4>
-                          <div className="mb-4">
-                            <p className="text-white font-medium">{selectedTopicDetails?.topicTitle}</p>
-                            <p className="text-white/60 text-sm">
+                          <div className="mb-3">
+                            <p className="text-white font-medium text-sm">{selectedTopicDetails?.topicTitle}</p>
+                            <p className="text-white/60 text-xs">
                               {selectedTopicDetails?.subject} • Grade {selectedTopicDetails?.gradeLevel}
                             </p>
                           </div>
                           
-                          <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
                             {selectedTopicDetails?.checkpoints.map((checkpoint: any, index: number) => (
                               <div 
                                 key={checkpoint.id} 
-                                className={`bg-black/30 p-3 rounded-lg border ${
+                                className={`bg-black/30 p-2 rounded-lg border text-sm ${
                                   checkpoint.passed ? 'border-green-500/20' : 'border-red-500/20'
                                 }`}
                               >
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="text-white text-sm flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${
+                                <div className="flex justify-between items-center">
+                                  <span className="text-white flex items-center gap-1">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${
                                       checkpoint.passed ? 'bg-green-500' : 'bg-red-500'
                                     }`} />
-                                    Checkpoint {index + 1}
+                                    CP {index + 1}
                                   </span>
-                                  <span className={`px-2 py-1 rounded text-xs ${
+                                  <span className={`px-1.5 py-0.5 rounded text-xs ${
                                     checkpoint.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                                   }`}>
                                     {checkpoint.score}% {checkpoint.passed ? '✓' : '✗'}
                                   </span>
                                 </div>
-                                <p className="text-white/70 text-xs truncate">{checkpoint.title}</p>
-                                <p className="text-white/40 text-xs mt-1 flex items-center gap-1">
-                                  <Calendar size={10} />
-                                  {new Date(checkpoint.completedAt).toLocaleDateString()}
-                                </p>
+                                <p className="text-white/70 text-xs truncate mt-1">{checkpoint.title}</p>
                               </div>
                             ))}
                           </div>
                           
-                          <div className="mt-4 pt-4 border-t border-white/10">
+                          <div className="mt-3 pt-3 border-t border-white/10">
                             <div className="flex justify-between items-center">
-                              <span className="text-white/60 text-sm">Topic Average</span>
+                              <span className="text-white/60 text-sm">Topic Avg</span>
                               <span className={`font-bold ${
                                 selectedTopicDetails?.averageScore >= 80 ? 'text-green-400' :
                                 selectedTopicDetails?.averageScore >= 60 ? 'text-yellow-400' :
@@ -2725,378 +2684,333 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
                                 {selectedTopicDetails?.averageScore}%
                               </span>
                             </div>
-                            <div className="flex justify-between items-center mt-2">
-                              <span className="text-white/60 text-sm">Checkpoint Pass Rate</span>
-                              <span className="text-cyan-400 font-bold">
-                                {selectedTopicDetails?.checkpoints.filter((cp: any) => cp.passed).length}/
-                                {selectedTopicDetails?.checkpoints.length}
-                                <span className="text-white/60 text-sm ml-1">
-                                  ({selectedTopicDetails?.checkpoints.length > 0 
-                                    ? Math.round((selectedTopicDetails?.checkpoints.filter((cp: any) => cp.passed).length / selectedTopicDetails?.checkpoints.length) * 100) 
-                                    : 0}%)
-                                </span>
-                              </span>
-                            </div>
                           </div>
                         </div>
                       )}
                     </div>
+
+                    {/* Course History */}
+                    {studentCourseData.courseHistory && studentCourseData.courseHistory.length > 0 && (
+                      <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                        <h4 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                          <CheckCircle size={16} /> History
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {studentCourseData.courseHistory.slice(0, 4).map((course: any, index: number) => (
+                            <div key={index} className="bg-black/20 p-3 rounded-lg border border-white/10">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="min-w-0">
+                                  <p className="text-white font-medium text-sm truncate">{course.topicTitle}</p>
+                                  <p className="text-white/60 text-xs">{course.subject}</p>
+                                </div>
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                  course.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                                }`}>
+                                  {course.finalScore}%
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-xs text-white/60">
+                                <span>Checkpoints: {course.checkpoints?.filter((cp: any) => cp.passed).length}/{course.checkpoints?.length}</span>
+                                <span>{course.completedDate ? new Date(course.completedDate).toLocaleDateString() : 'N/A'}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <BookOpen className="text-white/20" size={48} />
+                  <div className="text-center py-8">
+                    <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <BookOpen className="text-white/20" size={32} />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">No Course Data Available</h3>
-                    <p className="text-white/60">
-                      {selectedStudent} hasn't completed any courses or checkpoints yet
+                    <h3 className="text-lg font-bold text-white mb-2">No Course Data</h3>
+                    <p className="text-white/60 text-sm">
+                      {selectedStudent} hasn't completed any courses yet
                     </p>
-                    <p className="text-white/40 text-sm mt-2">
-                      Course data will appear here once the student starts learning
-                    </p>
-                  </div>
-                )}
-
-                {/* Course History */}
-                {studentCourseData.courseHistory && studentCourseData.courseHistory.length > 0 && (
-                  <div className="bg-white/5 border border-white/10 p-5 rounded-2xl">
-                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                      <CheckCircle size={18} /> Course Completion History
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {studentCourseData.courseHistory.slice(0, 6).map((course: any, index: number) => (
-                        <div key={index} className="bg-black/20 p-4 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <p className="text-white font-medium">{course.topicTitle}</p>
-                              <p className="text-white/60 text-sm">{course.subject} • Grade {course.gradeLevel}</p>
-                            </div>
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              course.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                            }`}>
-                              {course.finalScore}% {course.passed ? '✓' : '✗'}
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-xs text-white/60">
-                              <span>Checkpoints</span>
-                              <span>{course.checkpoints?.filter((cp: any) => cp.passed).length}/{course.checkpoints?.length} passed</span>
-                            </div>
-                            <div className="flex justify-between text-xs text-white/60">
-                              <span>Completed</span>
-                              <span>{course.completedDate ? new Date(course.completedDate).toLocaleDateString() : 'N/A'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
             ) : selectedStudent ? (
-              <div className="text-center py-12">
+              <div className="text-center py-8">
                 {trackingLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto mb-6"></div>
-                    <h3 className="text-xl font-bold text-white mb-2">Loading Course Data</h3>
-                    <p className="text-white/60">Analyzing performance data for {selectedStudent}...</p>
-                    <p className="text-white/40 text-sm mt-2">This may take a few moments</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+                    <h3 className="text-lg font-bold text-white mb-2">Loading...</h3>
+                    <p className="text-white/60 text-sm">Analyzing data for {selectedStudent}</p>
                   </>
                 ) : (
                   <>
-                    <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <UsersIcon className="text-white/20" size={48} />
+                    <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <UsersIcon className="text-white/20" size={32} />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Select a Student</h3>
-                    <p className="text-white/60">
-                      Choose a student from the dropdown menu to track their course performance
-                    </p>
-                    <p className="text-white/40 text-sm mt-2">
-                      You can search, filter, and sort students using the controls above
+                    <h3 className="text-lg font-bold text-white mb-2">Select Student</h3>
+                    <p className="text-white/60 text-sm">
+                      Choose a student to track their course performance
                     </p>
                   </>
                 )}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Target className="text-white/20" size={48} />
+              <div className="text-center py-8">
+                <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="text-white/20" size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Student Course Tracking</h3>
-                <p className="text-white/60">
-                  Track individual student performance across all courses and checkpoints
-                </p>
-                <p className="text-white/40 text-sm mt-2">
-                  View topic averages, checkpoint details, and overall statistics
+                <h3 className="text-lg font-bold text-white mb-2">Student Tracking</h3>
+                <p className="text-white/60 text-sm">
+                  Track individual student performance
                 </p>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* Student Performance Table */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">Student Performance</h2>
-          <div className="flex items-center gap-4">
+      {/* Student Performance Table - Mobile Optimized */}
+      <div className="bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 overflow-hidden">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">Student Performance</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
             <span className="text-white/60 text-sm">
               {filteredStudents.length} students • Avg: {classStats?.classAverage || 0}%
             </span>
             {classStats && (
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded">
-                  {classStats.performanceLevels.excellent} Excellent
+                  {classStats.performanceLevels.excellent} Exc
                 </span>
                 <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded">
                   {classStats.performanceLevels.good} Good
                 </span>
                 <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded">
-                  {classStats.performanceLevels.needsHelp} Needs Help
+                  {classStats.performanceLevels.needsHelp} Help
                 </span>
               </div>
             )}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-white/80">
-            <thead className="text-xs text-white/60 border-b border-white/10">
-              <tr>
-                <th className="py-3 px-4">Student</th>
-                <th className="py-3 px-4">Grade Level</th>
-                <th className="py-3 px-4">Average Score</th>
-                <th className="py-3 px-4">Completion Rate</th>
-                <th className="py-3 px-4">Last Active</th>
-                <th className="py-3 px-4">Streak</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStudents.slice(0, 10).map(student => (
-                <tr 
-                  key={student.username} 
-                  className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
-                    selectedStudent === student.username ? 'bg-cyan-500/10' : ''
-                  }`}
-                >
-                  <td className="py-3 px-4 font-medium">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
-                        <span className="text-white text-sm font-bold">
-                          {student.username.charAt(0).toUpperCase()}
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="min-w-full inline-block align-middle">
+            <table className="min-w-full text-sm text-left text-white/80">
+              <thead className="text-xs text-white/60 border-b border-white/10">
+                <tr>
+                  <th className="py-2 px-3">Student</th>
+                  <th className="py-2 px-3 hidden sm:table-cell">Grade</th>
+                  <th className="py-2 px-3">Score</th>
+                  <th className="py-2 px-3 hidden md:table-cell">Completion</th>
+                  <th className="py-2 px-3 hidden lg:table-cell">Last Active</th>
+                  <th className="py-2 px-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.slice(0, 8).map(student => (
+                  <tr 
+                    key={student.username} 
+                    className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
+                      selectedStudent === student.username ? 'bg-cyan-500/10' : ''
+                    }`}
+                  >
+                    <td className="py-2 px-3 font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-bold">
+                            {student.username.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="truncate max-w-[120px]">{student.username}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 hidden sm:table-cell">
+                      <span className="px-1.5 py-0.5 rounded bg-white/5 text-xs">
+                        G{student.gradeLevel}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
+                            style={{ width: `${Math.min(100, student.avgScore)}%` }}
+                          />
+                        </div>
+                        <span className={`font-medium text-xs ${
+                          student.avgScore >= 80 ? 'text-green-400' :
+                          student.avgScore >= 60 ? 'text-yellow-400' :
+                          'text-red-400'
+                        }`}>
+                          {Math.round(student.avgScore)}%
                         </span>
                       </div>
-                      {student.username}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded bg-white/5 text-xs">
-                      Grade {student.gradeLevel}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
-                          style={{ width: `${Math.min(100, student.avgScore)}%` }}
-                        />
-                      </div>
-                      <span className={`font-bold min-w-[50px] ${
-                        student.avgScore >= 80 ? 'text-green-400' :
-                        student.avgScore >= 60 ? 'text-yellow-400' :
-                        'text-red-400'
+                    </td>
+                    <td className="py-2 px-3 hidden md:table-cell">
+                      <span className={`px-1.5 py-0.5 rounded text-xs ${
+                        student.completionRate >= 80 ? 'bg-green-500/20 text-green-400' :
+                        student.completionRate >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
                       }`}>
-                        {Math.round(student.avgScore)}%
+                        {student.completionRate}%
                       </span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      student.completionRate >= 80 ? 'bg-green-500/20 text-green-400' :
-                      student.completionRate >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {student.completionRate}%
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <Clock size={12} className="text-white/40" />
-                      {student.lastActive}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`flex items-center gap-2 ${
-                      student.streak > 0 ? 'text-yellow-400' : 'text-white/60'
-                    }`}>
-                      <Zap size={12} /> {student.streak} days
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      student.avgScore >= 80 ? 'bg-green-500/20 text-green-400' :
-                      student.avgScore >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {student.avgScore >= 80 ? 'Excellent' :
-                       student.avgScore >= 60 ? 'Good' : 'Needs Help'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedStudent(student.username);
-                          setShowTrackingSection(true);
-                        }}
-                        className="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 px-3 py-1 rounded transition-colors"
-                      >
-                        Track Courses
-                      </button>
-                      <button className="text-xs bg-white/5 hover:bg-white/10 text-white/60 px-2 py-1 rounded">
-                        <MoreVertical size={12} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="py-2 px-3 hidden lg:table-cell">
+                      <div className="flex items-center gap-1">
+                        <Clock size={10} className="text-white/40" />
+                        <span className="text-xs">{student.lastActive}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setSelectedStudent(student.username);
+                            setShowTrackingSection(true);
+                          }}
+                          className="text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 px-2 py-1 rounded transition-colors whitespace-nowrap"
+                        >
+                          Track
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {filteredStudents.length === 0 && (
-          <div className="text-center py-12">
-            <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
+          <div className="text-center py-8">
+            <UsersIcon className="text-white/20 mx-auto mb-3" size={32} />
             <p className="text-white/40">No students found</p>
-            <p className="text-white/30 text-sm mt-1">
-              {searchTerm ? 'Try a different search term' : 'Students will appear here once they start using the platform'}
-            </p>
+          </div>
+        )}
+
+        {filteredStudents.length > 8 && (
+          <div className="mt-4 text-center">
+            <button className="text-sm text-cyan-400 hover:text-cyan-300">
+              View all {filteredStudents.length} students →
+            </button>
           </div>
         )}
       </div>
 
-      {/* Create Announcement */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-          <Megaphone className="text-orange-400" /> Create Announcement
+      {/* Create Announcement - Mobile Optimized */}
+      <div className="bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+          <Megaphone className="text-orange-400" size={18} /> Create Announcement
         </h2>
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <div>
-            <label className="block text-white/60 text-sm mb-2">Title</label>
+            <label className="block text-white/60 text-xs sm:text-sm mb-1">Title</label>
             <input
               type="text"
               value={newAnnouncement.title}
               onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 sm:px-4 py-2 text-white focus:outline-none focus:border-cyan-500 text-sm"
               placeholder="Important update..."
             />
           </div>
           <div>
-            <label className="block text-white/60 text-sm mb-2">Content</label>
+            <label className="block text-white/60 text-xs sm:text-sm mb-1">Content</label>
             <textarea
               value={newAnnouncement.content}
               onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-h-[100px]"
-              placeholder="Share important information with your students..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 sm:px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-h-[80px] sm:min-h-[100px] text-sm"
+              placeholder="Share important information..."
             />
           </div>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div className="text-white/40 text-xs">
-              Announcements expire after 48 hours
+              Expires in 48 hours
             </div>
             <button
               onClick={createAnnouncement}
-              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-4 sm:px-6 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors w-full sm:w-auto text-sm sm:text-base"
             >
-              <Send size={16} /> Publish Announcement
+              <Send size={14} /> Publish Announcement
             </button>
           </div>
         </div>
       </div>
 
-      {/* Active Announcements & Recent Assessments */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Megaphone className="text-orange-400" /> Active Announcements
+      {/* Active Announcements & Recent Assessments - Mobile Stacked */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <div className="bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+            <Megaphone className="text-orange-400" size={16} /> Announcements
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {announcements.length > 0 ? (
               announcements.map(ann => {
-                const timeLeft = ann.expiresAt ? ann.expiresAt - Date.now() : null;
+                const expiresDate = ann.expires_at ? new Date(ann.expires_at) : null;
+                const timeLeft = expiresDate ? expiresDate.getTime() - Date.now() : null;
                 const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
                 const isExpiring = hoursLeft <= 24;
-                const isUrgent = hoursLeft <= 6;
                 
                 return (
-                  <div key={ann.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="text-white font-medium">{ann.title}</p>
+                  <div key={ann.id} className="bg-white/5 p-3 rounded-lg border border-white/10">
+                    <div className="flex justify-between items-start mb-1">
+                      <p className="text-white font-medium text-sm">{ann.title}</p>
                       {isExpiring && (
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          isUrgent 
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          hoursLeft <= 6 
                             ? 'bg-red-500/20 text-red-300' 
                             : 'bg-yellow-500/20 text-yellow-300'
                         }`}>
-                          {hoursLeft}h left
+                          {hoursLeft}h
                         </span>
                       )}
                     </div>
-                    <p className="text-white/60 text-sm mb-2 line-clamp-2">{ann.content}</p>
+                    <p className="text-white/60 text-xs mb-2 line-clamp-2">{ann.content}</p>
                     <div className="flex justify-between text-white/30 text-xs">
                       <span className="flex items-center gap-1">
-                        <UsersIcon size={10} /> By: {ann.author}
+                        <UsersIcon size={10} /> {ann.author_name || 'System'}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Calendar size={10} /> {new Date(ann.timestamp).toLocaleDateString()}
+                        <Calendar size={10} /> {new Date(ann.created_at).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="text-center py-8">
-                <Megaphone className="text-white/20 mx-auto mb-3" size={32} />
-                <p className="text-white/40">No active announcements</p>
-                <p className="text-white/30 text-sm mt-1">Create your first announcement above</p>
+              <div className="text-center py-6">
+                <Megaphone className="text-white/20 mx-auto mb-2" size={24} />
+                <p className="text-white/40 text-sm">No announcements</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <ClipboardList className="text-cyan-400" /> Recent Assessments
+        <div className="bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+            <ClipboardList className="text-cyan-400" size={16} /> Assessments
           </h3>
           <div className="space-y-3">
             {assessments.length > 0 ? (
               assessments.map(assessment => (
-                <div key={assessment.id} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-white font-medium">{assessment.title}</p>
-                    <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
-                      {assessment.questions?.length || 0} Questions
+                <div key={assessment.id} className="bg-white/5 p-3 rounded-lg border border-white/10">
+                  <div className="flex justify-between items-start mb-1">
+                    <p className="text-white font-medium text-sm truncate">{assessment.title}</p>
+                    <span className="text-xs bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded whitespace-nowrap">
+                      {assessment.questions?.length || 0} Qs
                     </span>
                   </div>
-                  <p className="text-white/60 text-sm mb-2">{assessment.subject}</p>
+                  <p className="text-white/60 text-xs mb-1">{assessment.subject}</p>
                   <div className="flex justify-between text-white/30 text-xs">
                     <span className="flex items-center gap-1">
-                      <UsersIcon size={10} /> Grade: {assessment.targetGrade}
+                      <UsersIcon size={10} /> G{assessment.targetGrade}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Calendar size={10} /> By: {assessment.createdBy}
+                      <Calendar size={10} /> {assessment.createdBy}
                     </span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-8">
-                <ClipboardList className="text-white/20 mx-auto mb-3" size={32} />
-                <p className="text-white/40">No assessments created yet</p>
-                <p className="text-white/30 text-sm mt-1">Create assessments to assign to students</p>
+              <div className="text-center py-6">
+                <ClipboardList className="text-white/20 mx-auto mb-2" size={24} />
+                <p className="text-white/40 text-sm">No assessments</p>
               </div>
             )}
           </div>

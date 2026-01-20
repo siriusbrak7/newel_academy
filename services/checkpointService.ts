@@ -1,6 +1,8 @@
 // services/checkpointService.ts - OPTIMIZED VERSION
 import { supabase } from './supabaseClient';
-import { Checkpoint, Question } from '../types';
+import { Checkpoint, Question, QuestionFormat } from '../types';
+
+
 
 // Cache for checkpoint questions (5-minute cache)
 const checkpointCache = new Map<string, {
@@ -134,13 +136,13 @@ export const getCheckpointQuestions = async (checkpointId: string): Promise<Ques
         .eq('id', checkpointId)
         .single(),
       
-      // Get questions using a more efficient query
+      // Get questions with ALL FIELDS including format, metadata, content
       supabase
         .from('checkpoint_questions')
         .select(`
           id,
           sort_order,
-          question:questions (
+          questions!inner(
             id, 
             text, 
             type, 
@@ -148,7 +150,10 @@ export const getCheckpointQuestions = async (checkpointId: string): Promise<Ques
             correct_answer, 
             options, 
             model_answer,
-            explanation
+            explanation,
+            format,
+            metadata,
+            content
           )
         `)
         .eq('checkpoint_id', checkpointId)
@@ -186,14 +191,25 @@ export const getCheckpointQuestions = async (checkpointId: string): Promise<Ques
       return [];
     }
     
-    // Map questions efficiently
-    const questions = questionsData.data
+    // Map questions efficiently with ALL FIELDS
+    const questions: Question[] = questionsData.data
       .map(item => {
-        const q = Array.isArray(item.question) ? item.question[0] : item.question;
-        if (!q) {
+        // Handle the nested questions data properly
+        let questionData: any;
+        
+        if (item.questions) {
+          // If it's an array, take the first one
+          if (Array.isArray(item.questions)) {
+            questionData = item.questions[0];
+          } else if (typeof item.questions === 'object') {
+            questionData = item.questions;
+          }
+        }
+        
+        if (!questionData) {
           // Return a simple fallback question
           return {
-            id: `fallback-${item.id}`,
+            id: `fallback-${item.id || Date.now()}`,
             text: 'Question not available',
             type: 'MCQ' as const,
             difficulty: 'IGCSE' as const,
@@ -201,20 +217,28 @@ export const getCheckpointQuestions = async (checkpointId: string): Promise<Ques
             correctAnswer: '',
             options: [] as string[],
             modelAnswer: '',
-            explanation: ''
+            explanation: '',
+            format: 'plain_text' as const,
+            metadata: {},
+            content: ''
           } as Question;
         }
         
         return {
-          id: q.id,
-          text: q.text || 'Question text not available',
-          type: (q.type as 'MCQ' | 'THEORY') || 'MCQ',
-          difficulty: (q.difficulty as 'IGCSE' | 'AS' | 'A_LEVEL') || 'IGCSE',
+          id: questionData.id,
+          text: questionData.text || 'Question text not available',
+          type: (questionData.type as 'MCQ' | 'THEORY') || 'MCQ',
+          difficulty: (questionData.difficulty as 'IGCSE' | 'AS' | 'A_LEVEL') || 'IGCSE',
           topic: 'General', // Will be set by parent component
-          correctAnswer: q.correct_answer || '',
-          options: q.options || [] as string[],
-          modelAnswer: q.model_answer || '',
-          explanation: q.explanation || ''
+          correctAnswer: questionData.correct_answer || '',
+          options: questionData.options || [] as string[],
+          modelAnswer: questionData.model_answer || '',
+          explanation: questionData.explanation || '',
+          
+          // NEW FIELDS
+          format: (questionData.format as QuestionFormat) || 'plain_text',
+          metadata: questionData.metadata || {},
+          content: questionData.content || ''
         } as Question;
       })
       .filter((q): q is Question => q !== null);

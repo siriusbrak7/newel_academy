@@ -481,9 +481,9 @@ useEffect(() => {
   );
 };
 
-/* ------------------------------------
-   Main App
------------------------------------- */
+//* ------------------------------------
+  //Main App//
+//------------------------------------ */
 const App: React.FC = () => {
   const [auth, setAuth] = useState<AuthState>({ loggedIn: false, user: null });
   const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
@@ -493,45 +493,43 @@ const App: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
-  useEffect(() => {
-  const init = async () => {
-    try {
-      await initializeSupabase();
-      const storedUser = sessionService.getSession();
-
-      if (storedUser) {
-        try {
-          const validated = await sessionService.validateSession();
-          if (validated) setAuth({ loggedIn: true, user: validated });
-          else sessionService.clearSession();
-        } catch {
-          setAuth({ loggedIn: true, user: storedUser });
-        }
-      }
-
-      setTheme(DEFAULT_THEME);
-      
-      // ADD THIS: Setup notification system
-      try {
-        // Initialize notification system
-        console.log('🔔 Setting up notification system...');
-        // The system is initialized via database triggers, just check if user has notifications
-        if (auth.user?.username) {
-          const notifications = await getUserNotifications(auth.user.username);
-          console.log(`✅ ${notifications.length} notifications loaded`);
-        }
-      } catch (notifError) {
-        console.warn('⚠️ Notification check failed:', notifError);
-      }
-      
-    } finally {
-      setInitializing(false);
-    }
+  // Handle mobile menu toggle
+  const handleMobileMenuToggle = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
   };
 
-  init();
-  document.title = 'The Newel • Ace Scientific Concepts....';
-}, []);
+  // Initialize app
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await initializeSupabase();
+        const storedUser = sessionService.getSession();
+
+        if (storedUser) {
+          try {
+            const validated = await sessionService.validateSession();
+            if (validated) {
+              setAuth({ loggedIn: true, user: validated });
+              // Load notifications after user is confirmed
+              const notifications = await getUserNotifications(validated.username);
+              console.log(`✅ ${notifications.length} notifications loaded`);
+            } else {
+              sessionService.clearSession();
+            }
+          } catch {
+            setAuth({ loggedIn: true, user: storedUser });
+          }
+        }
+
+        setTheme(DEFAULT_THEME);
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    init();
+    document.title = 'The Newel • Ace Scientific Concepts....';
+  }, []);
 
   // Theme sync with index.html ThemeManager
   useEffect(() => {
@@ -544,6 +542,20 @@ const App: React.FC = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Handle scroll lock for mobile menu
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  // Handle login
   const handleLogin = (user: User) => {
     const now = Date.now();
     const updatedUser: User = {
@@ -556,24 +568,13 @@ const App: React.FC = () => {
     setShowAuthModal(false);
   };
 
+  // Handle logout
   const handleLogout = () => {
     sessionService.clearSession();
     setAuth({ loggedIn: false, user: null });
     setSidebarOpen(false);
     setMobileMenuOpen(false);
   };
-
-      useEffect(() => {
-      if (mobileMenuOpen) {
-        document.body.classList.add('mobile-menu-open');
-      } else {
-        document.body.classList.remove('mobile-menu-open');
-      }
-      
-      return () => {
-        document.body.classList.remove('mobile-menu-open');
-      };
-    }, [mobileMenuOpen]);
 
   if (initializing) {
     return (
@@ -596,7 +597,7 @@ const App: React.FC = () => {
         notifications={2}
         onOpenAuth={() => setShowAuthModal(true)}
         currentTheme={theme}
-        onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+        onToggleMobileMenu={handleMobileMenuToggle}
       />
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentTheme={theme} setTheme={setTheme} />
