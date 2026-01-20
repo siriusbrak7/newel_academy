@@ -1,6 +1,7 @@
 ﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
 import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, dbToFrontendAnnouncement, Question } from '../types';
 import { supabase } from './supabaseClient';
+import { v4 as uuidv4 } from 'uuid';
 
 // Add this function at the TOP of storageService.ts, after imports
 function generateUUID(): string {
@@ -607,29 +608,9 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
     
     console.log('✅ Topic saved with ID:', savedTopic.id);
     
-    // 3. Save materials - FIXED VERSION
+    // 3. Save materials - SIMPLE AND CORRECT VERSION
     if (topic.materials && topic.materials.length > 0 && savedTopic.id) {
       console.log(`📦 Processing ${topic.materials.length} materials...`);
-      
-      // Prepare materials with correct topic_id - ALWAYS include id field
-      const materialsToSave = topic.materials.map((mat: any) => {
-        const materialData: any = {
-          // Always include id field - either existing UUID or undefined for new
-          id: mat.id && !mat.id.startsWith('temp_') && mat.id !== 'null' && mat.id !== null 
-            ? mat.id 
-            : undefined,
-          topic_id: savedTopic.id,
-          title: mat.title,
-          type: mat.type,
-          content: mat.content,
-          created_at: mat.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        return materialData;
-      });
-      
-      console.log('📝 Materials to save:', materialsToSave);
       
       // Delete existing materials for this topic first
       await supabase
@@ -637,19 +618,46 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
         .delete()
         .eq('topic_id', savedTopic.id);
       
-      // Insert all new materials
-      const { data: savedMaterials, error: matError } = await supabase
-        .from('materials')
-        .insert(materialsToSave)
-        .select();
+      // Prepare and insert materials ONE BY ONE to avoid batch issues
+      const savedMaterials = [];
       
-      if (matError) {
-        console.error('❌ Materials save error:', matError);
-        throw matError;
+      for (const mat of topic.materials) {
+        try {
+          // Generate a proper UUID for every material
+          const materialId = generateUUID();
+          
+          const materialData = {
+            id: materialId,
+            topic_id: savedTopic.id,
+            title: mat.title,
+            type: mat.type,
+            content: mat.content,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          console.log('📝 Inserting material:', materialData);
+          
+          const { data: savedMaterial, error: matError } = await supabase
+            .from('materials')
+            .insert(materialData)
+            .select()
+            .single();
+          
+          if (matError) {
+            console.error('❌ Single material insert error:', matError);
+            throw matError;
+          }
+          
+          savedMaterials.push(savedMaterial);
+        } catch (matError) {
+          console.error('❌ Failed to save material:', mat.title, matError);
+          // Continue with other materials
+        }
       }
       
-      console.log(`✅ ${savedMaterials?.length || 0} materials saved`);
-      savedTopic.materials = savedMaterials || [];
+      console.log(`✅ ${savedMaterials.length} materials saved`);
+      savedTopic.materials = savedMaterials;
     } else {
       savedTopic.materials = [];
     }
@@ -661,6 +669,7 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
     throw error;
   }
 };
+
 
 // =====================================================
 // PROGRESS MANAGEMENT
