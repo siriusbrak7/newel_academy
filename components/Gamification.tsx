@@ -1,17 +1,18 @@
-// Gamification.tsx - FIXED VERSION
+// Gamification.tsx - UPDATED VERSION WITH DYNAMIC QUESTION GENERATION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Trophy, Zap, TrendingUp, Users, Star, Award, Timer, Target, 
-  Brain, Crown, BookOpen, ClipboardList, AlertCircle 
+  Brain, Crown, BookOpen, ClipboardList, AlertCircle,
+  RefreshCw
 } from 'lucide-react';
-import { getLeaderboards, saveSprintScore } from '../services/storageService';
+import { getLeaderboards, saveSprintScore, getCourses, getTopicQuestions, getTopicCheckpoints } from '../services/storageService';
+import { supabase } from '../services/supabaseClient';
 
 interface LeaderboardEntry {
   username: string;
   score: number;
   grade_level?: string;
-  
 }
 
 interface LeaderboardData {
@@ -20,26 +21,227 @@ interface LeaderboardData {
   assessments: LeaderboardEntry[];
 }
 
+interface SprintQuestion {
+  id: string;
+  text: string;
+  answer: string;
+  options?: string[];
+  type: 'MCQ' | 'THEORY';
+  topic: string;
+  subject: string;
+  difficulty: 'IGCSE' | 'AS' | 'A_LEVEL';
+}
+
 export const SprintChallenge: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(222);
   const [isRunning, setIsRunning] = useState(false);
   const [score, setScore] = useState(0);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<SprintQuestion[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
   const [username, setUsername] = useState('');
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
 
-  // Initialize questions
-  useEffect(() => {
-    const sampleQuestions = [
-      { id: 1, text: "What is the chemical symbol for water?", answer: "H2O" },
-      { id: 2, text: "Who discovered gravity?", answer: "Newton" },
-      { id: 3, text: "What planet is known as the Red Planet?", answer: "Mars" },
-      { id: 4, text: "What is the largest organ in the human body?", answer: "Skin" },
-      { id: 5, text: "What gas do plants absorb from the atmosphere?", answer: "CO2" },
+  // Initialize questions from database
+  const loadRandomQuestions = async () => {
+    try {
+      setLoadingQuestions(true);
+      console.log('🎲 Loading random questions for Sprint Challenge...');
+      
+      // Get ALL questions from database
+      const { data: allQuestions, error } = await supabase
+        .from('questions')
+        .select(`
+          id,
+          text,
+          correct_answer,
+          options,
+          type,
+          difficulty,
+          topic:topics(
+            title,
+            subject:subject_id(name)
+          )
+        `)
+        .not('correct_answer', 'is', null)
+        .not('text', 'is', null)
+        .limit(100); // Get up to 100 questions
+
+      if (error) {
+        console.error('❌ Error loading questions:', error);
+        // Fallback to sample questions
+        setQuestions(getSampleQuestions());
+        return;
+      }
+
+      if (!allQuestions || allQuestions.length === 0) {
+        console.log('📭 No questions found in database, using sample questions');
+        setQuestions(getSampleQuestions());
+        return;
+      }
+
+      console.log(`📚 Found ${allQuestions.length} questions in database`);
+
+      // Transform database questions to SprintQuestion format
+      const sprintQuestions: SprintQuestion[] = allQuestions.map((q: any) => {
+        let subjectName = 'General';
+        let topicName = 'General';
+        
+        // Safely extract subject and topic names
+        if (q.topic) {
+          if (Array.isArray(q.topic) && q.topic.length > 0) {
+            const topic = q.topic[0];
+            topicName = topic?.title || 'General';
+            if (topic?.subject) {
+              if (Array.isArray(topic.subject) && topic.subject.length > 0) {
+                subjectName = topic.subject[0]?.name || 'General';
+              } else if (typeof topic.subject === 'object') {
+                subjectName = (topic.subject as any)?.name || 'General';
+              }
+            }
+          } else if (typeof q.topic === 'object') {
+            topicName = q.topic.title || 'General';
+            if (q.topic.subject) {
+              if (Array.isArray(q.topic.subject) && q.topic.subject.length > 0) {
+                subjectName = q.topic.subject[0]?.name || 'General';
+              } else if (typeof q.topic.subject === 'object') {
+                subjectName = (q.topic.subject as any)?.name || 'General';
+              }
+            }
+          }
+        }
+
+        return {
+          id: q.id,
+          text: q.text,
+          answer: q.correct_answer || '',
+          options: q.options || [],
+          type: q.type || 'MCQ',
+          topic: topicName,
+          subject: subjectName,
+          difficulty: q.difficulty || 'IGCSE'
+        };
+      }).filter(q => q.text && q.answer); // Filter out invalid questions
+
+      console.log(`✅ Transformed ${sprintQuestions.length} valid questions`);
+
+      // Shuffle and select 20 random questions
+      const shuffled = [...sprintQuestions].sort(() => Math.random() - 0.5);
+      const selectedQuestions = shuffled.slice(0, 20);
+      
+      setQuestions(selectedQuestions);
+      setQuestionCount(selectedQuestions.length);
+      console.log(`🎯 Selected ${selectedQuestions.length} random questions`);
+      
+    } catch (error) {
+      console.error('❌ Error in loadRandomQuestions:', error);
+      setQuestions(getSampleQuestions());
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  // Fallback sample questions
+  const getSampleQuestions = (): SprintQuestion[] => {
+    return [
+      { 
+        id: '1', 
+        text: "What is the chemical symbol for water?", 
+        answer: "H2O",
+        type: 'MCQ',
+        topic: 'Chemistry Basics',
+        subject: 'Chemistry',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '2', 
+        text: "Who discovered gravity?", 
+        answer: "Newton",
+        type: 'THEORY',
+        topic: 'Physics Fundamentals',
+        subject: 'Physics',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '3', 
+        text: "What planet is known as the Red Planet?", 
+        answer: "Mars",
+        type: 'MCQ',
+        topic: 'Astronomy',
+        subject: 'Physics',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '4', 
+        text: "What is the largest organ in the human body?", 
+        answer: "Skin",
+        type: 'MCQ',
+        topic: 'Human Biology',
+        subject: 'Biology',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '5', 
+        text: "What gas do plants absorb from the atmosphere?", 
+        answer: "CO2",
+        type: 'MCQ',
+        topic: 'Photosynthesis',
+        subject: 'Biology',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '6', 
+        text: "What is the atomic number of Carbon?", 
+        answer: "6",
+        type: 'MCQ',
+        topic: 'Atomic Structure',
+        subject: 'Chemistry',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '7', 
+        text: "What force keeps planets in orbit around the sun?", 
+        answer: "Gravity",
+        type: 'THEORY',
+        topic: 'Gravity',
+        subject: 'Physics',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '8', 
+        text: "What process do plants use to make food?", 
+        answer: "Photosynthesis",
+        type: 'MCQ',
+        topic: 'Plant Biology',
+        subject: 'Biology',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '9', 
+        text: "What is the formula for speed?", 
+        answer: "Speed = Distance/Time",
+        type: 'THEORY',
+        topic: 'Motion',
+        subject: 'Physics',
+        difficulty: 'IGCSE'
+      },
+      { 
+        id: '10', 
+        text: "What is the powerhouse of the cell?", 
+        answer: "Mitochondria",
+        type: 'MCQ',
+        topic: 'Cell Biology',
+        subject: 'Biology',
+        difficulty: 'IGCSE'
+      }
     ];
-    setQuestions(sampleQuestions);
+  };
+
+  useEffect(() => {
+    // Load questions on component mount
+    loadRandomQuestions();
     
     // Get username from localStorage
     const storedUser = localStorage.getItem('newel_currentUser');
@@ -71,7 +273,9 @@ export const SprintChallenge: React.FC = () => {
     return () => clearInterval(timer);
   }, [isRunning, timeLeft]);
 
-  const startGame = () => {
+  const startGame = async () => {
+    // Reload fresh random questions for each game
+    await loadRandomQuestions();
     setTimeLeft(222);
     setScore(0);
     setCurrentQuestion(0);
@@ -83,13 +287,44 @@ export const SprintChallenge: React.FC = () => {
   const checkAnswer = () => {
     if (!isRunning || gameOver) return;
     
-    const correct = userAnswer.trim().toLowerCase() === 
-                   questions[currentQuestion]?.answer?.toLowerCase();
+    const currentQ = questions[currentQuestion];
+    if (!currentQ) return;
+    
+    let correct = false;
+    
+    if (currentQ.type === 'MCQ') {
+      // For MCQ, check if answer matches any of the options (case-insensitive)
+      const userAnswerLower = userAnswer.trim().toLowerCase();
+      const correctAnswerLower = currentQ.answer.toLowerCase();
+      
+      // Check if it's an exact match
+      correct = userAnswerLower === correctAnswerLower;
+      
+      // Also check if it matches any of the options (if options exist)
+      if (!correct && currentQ.options && currentQ.options.length > 0) {
+        correct = currentQ.options.some(option => 
+          option.toLowerCase() === userAnswerLower
+        );
+      }
+    } else {
+      // For THEORY questions, do partial matching
+      const userAnswerLower = userAnswer.trim().toLowerCase();
+      const correctAnswerLower = currentQ.answer.toLowerCase();
+      
+      // More lenient matching for theory questions
+      correct = userAnswerLower.includes(correctAnswerLower) || 
+                correctAnswerLower.includes(userAnswerLower) ||
+                userAnswerLower === correctAnswerLower;
+    }
     
     if (correct) {
       setScore(prev => prev + 100);
+      console.log('✅ Correct!');
+    } else {
+      console.log('❌ Incorrect. Correct answer:', currentQ.answer);
     }
     
+    // Move to next question or end game
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
     } else {
@@ -109,7 +344,7 @@ export const SprintChallenge: React.FC = () => {
     
     try {
       await saveSprintScore(username, score);
-      console.log('✅ Score saved to leaderboard');
+      console.log('✅ Score saved to leaderboard:', score);
     } catch (error) {
       console.error('❌ Failed to save score:', error);
     }
@@ -121,18 +356,38 @@ export const SprintChallenge: React.FC = () => {
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getCurrentQuestionInfo = () => {
+    const q = questions[currentQuestion];
+    if (!q) return { subject: '', topic: '', difficulty: '' };
+    
+    return {
+      subject: q.subject,
+      topic: q.topic,
+      difficulty: q.difficulty,
+      type: q.type === 'MCQ' ? 'Multiple Choice' : 'Theory'
+    };
+  };
+
+  const questionInfo = getCurrentQuestionInfo();
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-4xl font-bold text-white mb-2">222-Sprint Challenge</h1>
-      <p className="text-white/60 mb-8">Answer as many questions correctly in 222 seconds!</p>
+      <p className="text-white/60 mb-8">Answer random questions from all subjects in 222 seconds!</p>
       
       <div className="grid md:grid-cols-2 gap-8">
         {/* Left: Game Panel */}
         <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border border-white/20 p-8 rounded-2xl">
           <div className="flex justify-between items-center mb-6">
             <div className="text-center">
-              <div className="text-5xl font-bold text-cyan-400 font-mono">{timeLeft}</div>
-              <div className="text-white/60 text-sm">seconds left</div>
+              <div className="text-5xl font-bold text-cyan-400 font-mono">{formatTime(timeLeft)}</div>
+              <div className="text-white/60 text-sm">time remaining</div>
             </div>
             <div className="text-center">
               <div className="text-5xl font-bold text-yellow-400 font-mono">{score}</div>
@@ -140,53 +395,148 @@ export const SprintChallenge: React.FC = () => {
             </div>
           </div>
           
-          {!gameOver ? (
+          {loadingQuestions ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+              <p className="text-white/60">Loading random questions...</p>
+              <p className="text-white/40 text-sm mt-2">Selecting from all subjects and topics</p>
+            </div>
+          ) : !gameOver ? (
             <>
               <div className="bg-black/30 p-6 rounded-xl mb-6">
-                <div className="text-white/50 text-sm mb-2">Question {currentQuestion + 1} of {questions.length}</div>
-                <div className="text-white text-xl font-bold mb-4">
+                {/* Question Info */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-xs font-bold">
+                    {questionInfo.subject}
+                  </span>
+                  <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">
+                    {questionInfo.topic}
+                  </span>
+                  <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded-full text-xs">
+                    {questionInfo.difficulty}
+                  </span>
+                  <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-xs">
+                    {questionInfo.type}
+                  </span>
+                </div>
+                
+                <div className="text-white/50 text-sm mb-2">
+                  Question {currentQuestion + 1} of {questions.length}
+                </div>
+                
+                <div className="text-white text-xl font-bold mb-6">
                   {questions[currentQuestion]?.text || "Loading question..."}
                 </div>
+                
+                {questions[currentQuestion]?.type === 'MCQ' && 
+                 questions[currentQuestion]?.options &&
+                 questions[currentQuestion]?.options.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    <p className="text-white/60 text-sm">Options:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {questions[currentQuestion].options?.map((option, idx) => (
+                        <div key={idx} className="bg-white/5 p-3 rounded-lg text-white/80 text-sm">
+                          {String.fromCharCode(65 + idx)}. {option}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <input
                   type="text"
                   value={userAnswer}
                   onChange={(e) => setUserAnswer(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type your answer..."
-                  className="w-full p-4 bg-white/10 border border-white/20 rounded-lg text-white text-lg"
+                  placeholder={
+                    questions[currentQuestion]?.type === 'MCQ' 
+                      ? "Enter the letter or answer..." 
+                      : "Type your answer..."
+                  }
+                  className="w-full p-4 bg-white/10 border border-white/20 rounded-lg text-white text-lg placeholder-white/40"
                   disabled={!isRunning}
                 />
+                
+                <div className="text-white/40 text-sm mt-3">
+                  {questions[currentQuestion]?.type === 'MCQ' 
+                    ? "Type the letter (A, B, C, D) or the full answer" 
+                    : "Short answer expected"}
+                </div>
               </div>
               
               <div className="flex gap-4">
                 {!isRunning ? (
                   <button
                     onClick={startGame}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold py-4 rounded-lg text-lg hover:scale-105 transition-transform"
+                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold py-4 rounded-lg text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"
                   >
-                    <Zap className="inline mr-2" /> Start Sprint!
+                    <Zap size={20} /> Start Sprint!
                   </button>
                 ) : (
-                  <button
-                    onClick={checkAnswer}
-                    className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-500 text-white font-bold py-4 rounded-lg text-lg hover:scale-105 transition-transform"
-                  >
-                    Submit Answer →
-                  </button>
+                  <>
+                    <button
+                      onClick={checkAnswer}
+                      className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-500 text-white font-bold py-4 rounded-lg text-lg hover:scale-105 transition-transform"
+                    >
+                      Submit Answer →
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Skip current question
+                        if (currentQuestion < questions.length - 1) {
+                          setCurrentQuestion(prev => prev + 1);
+                          setUserAnswer('');
+                        } else {
+                          setGameOver(true);
+                          setIsRunning(false);
+                          saveScore();
+                        }
+                      }}
+                      className="px-4 bg-white/10 text-white/70 rounded-lg hover:bg-white/20 transition"
+                    >
+                      Skip
+                    </button>
+                  </>
                 )}
+              </div>
+              
+              {/* Progress bar */}
+              <div className="mt-6">
+                <div className="flex justify-between text-white/60 text-sm mb-1">
+                  <span>Progress</span>
+                  <span>{Math.round(((currentQuestion + 1) / questions.length) * 100)}%</span>
+                </div>
+                <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-green-500 to-cyan-500 transition-all duration-300"
+                    style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+                  />
+                </div>
               </div>
             </>
           ) : (
             <div className="text-center py-8">
               <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white mb-2">Game Over!</h3>
-              <p className="text-white/70 mb-6">Final Score: <span className="text-3xl font-bold text-yellow-400">{score}</span></p>
-              <button
-                onClick={startGame}
-                className="bg-gradient-to-r from-purple-600 to-pink-500 text-white font-bold py-3 px-8 rounded-lg text-lg"
-              >
-                Play Again
-              </button>
+              <h3 className="text-2xl font-bold text-white mb-2">Time's Up!</h3>
+              <p className="text-white/70 mb-2">Final Score:</p>
+              <p className="text-5xl font-bold text-yellow-400 mb-6">{score}</p>
+              <p className="text-white/60 mb-6">
+                You answered {currentQuestion} of {questions.length} questions
+              </p>
+              <div className="flex gap-4">
+                <button
+                  onClick={startGame}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-bold py-3 rounded-lg text-lg"
+                >
+                  Play Again
+                </button>
+                <button
+                  onClick={loadRandomQuestions}
+                  className="px-4 bg-white/10 text-white rounded-lg hover:bg-white/20 transition flex items-center gap-2"
+                >
+                  <RefreshCw size={16} /> New Questions
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -200,33 +550,76 @@ export const SprintChallenge: React.FC = () => {
             <ul className="space-y-3 text-white/70">
               <li className="flex items-start gap-2">
                 <Zap className="text-yellow-400 mt-1" size={16} />
-                <span>You have 222 seconds (3:42) to answer questions</span>
+                <span><strong>222 seconds</strong> (3:42) to answer as many questions as possible</span>
               </li>
               <li className="flex items-start gap-2">
                 <Star className="text-yellow-400 mt-1" size={16} />
-                <span>Each correct answer: +100 points</span>
+                <span><strong>+100 points</strong> for each correct answer</span>
               </li>
               <li className="flex items-start gap-2">
-                <Timer className="text-cyan-400 mt-1" size={16} />
-                <span>Timer stops when you run out of time or questions</span>
+                <Brain className="text-cyan-400 mt-1" size={16} />
+                <span>Questions are <strong>randomly selected</strong> from all subjects and topics</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <BookOpen className="text-purple-400 mt-1" size={16} />
+                <span>Includes <strong>MCQ and Theory</strong> questions from your courses</span>
               </li>
               <li className="flex items-start gap-2">
                 <Trophy className="text-yellow-400 mt-1" size={16} />
-                <span>Top scores appear on the global leaderboard</span>
+                <span>Top scores appear on the <strong>global leaderboard</strong></span>
               </li>
             </ul>
           </div>
           
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="text-green-400" /> Tips
+              <TrendingUp className="text-green-400" /> Game Statistics
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white">{questions.length}</div>
+                <div className="text-white/60 text-sm">Questions Loaded</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white">
+                  {questions.filter(q => q.subject === 'Biology').length}
+                </div>
+                <div className="text-white/60 text-sm">Biology</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white">
+                  {questions.filter(q => q.subject === 'Physics').length}
+                </div>
+                <div className="text-white/60 text-sm">Physics</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white">
+                  {questions.filter(q => q.subject === 'Chemistry').length}
+                </div>
+                <div className="text-white/60 text-sm">Chemistry</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Brain className="text-cyan-400" /> Tips for Success
             </h3>
             <ul className="space-y-2 text-white/60 text-sm">
-              <li>• Press Enter to quickly submit answers</li>
-              <li>• Don't overthink - trust your first instinct</li>
-              <li>• Practice with different subjects for better scores</li>
-              <li>• Check leaderboard for competitive targets</li>
+              <li>• <strong>Press Enter</strong> to quickly submit answers</li>
+              <li>• For MCQ: Type the <strong>letter (A, B, C, D)</strong> or the full answer</li>
+              <li>• Theory questions accept <strong>partial matches</strong></li>
+              <li>• Skip questions you don't know to save time</li>
+              <li>• Practice all subjects for better scores</li>
+              <li>• Check the leaderboard for competitive targets</li>
             </ul>
+          </div>
+          
+          <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/30 p-4 rounded-xl">
+            <p className="text-white/80 text-sm">
+              <strong>Note:</strong> Questions are pulled randomly from your course materials. 
+              The more courses you complete, the more diverse your questions will be!
+            </p>
           </div>
         </div>
       </div>
@@ -234,7 +627,7 @@ export const SprintChallenge: React.FC = () => {
   );
 };
 
-// Updated LeaderboardView with renderTable function inside
+// LeaderboardView component remains the same as before
 export const LeaderboardView: React.FC = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData>({
     academic: [],
@@ -310,7 +703,6 @@ export const LeaderboardView: React.FC = () => {
     return entries.findIndex(entry => entry.username === username) + 1;
   };
 
-  // In the renderTable function, update the table header and cell:
   const renderTable = (entries: LeaderboardEntry[]) => {
     if (!entries || entries.length === 0) {
       return (
@@ -327,12 +719,12 @@ export const LeaderboardView: React.FC = () => {
             <th className="p-4">Rank</th>
             <th className="p-4">Student</th>
             <th className="p-4">Score</th>
-            <th className="p-4">Grade</th> {/* Changed from Type to Grade */}
+            <th className="p-4">Grade</th>
             <th className="p-4 text-right">Badge</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {entries.slice(0, 20).map((entry, index) => {
+          {entries.slice(0, 40).map((entry, index) => {
             const isCurrentUser = entry.username === username;
             return (
               <tr 
@@ -429,7 +821,6 @@ export const LeaderboardView: React.FC = () => {
 
   const currentData = leaderboardData[activeTab];
   const currentUserRank = getCurrentUserRank(currentData);
-  const totalEntries = currentData.length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -461,7 +852,7 @@ export const LeaderboardView: React.FC = () => {
             <Zap className="text-purple-400" size={32} />
             <span className="text-3xl font-bold text-white">{leaderboardData.challenge.length}</span>
           </div>
-          <p className="text-white/60 text-sm">Challenge Champions</p>
+          <p className="text-white/60 text-sm">Sprint Challenge Champions</p>
         </div>
         
         <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30 p-6 rounded-2xl">
@@ -528,7 +919,7 @@ export const LeaderboardView: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-bold text-white">Master the Sprint</h4>
-                <p className="text-white/60 text-sm">High scores in the 222-Sprint boost your challenge rank</p>
+                <p className="text-white/60 text-sm">Play the 222-Sprint Challenge to boost your ranking</p>
               </div>
             </div>
           </div>
@@ -538,8 +929,8 @@ export const LeaderboardView: React.FC = () => {
                 <Star className="text-green-400" size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-white">Consistency Matters</h4>
-                <p className="text-white/60 text-sm">Daily practice improves both speed and accuracy</p>
+                <h4 className="font-bold text-white">Study All Subjects</h4>
+                <p className="text-white/60 text-sm">The Sprint Challenge pulls questions from all topics</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -547,8 +938,8 @@ export const LeaderboardView: React.FC = () => {
                 <Award className="text-yellow-400" size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-white">Review Weak Areas</h4>
-                <p className="text-white/60 text-sm">Use the AI Tutor to strengthen challenging topics</p>
+                <h4 className="font-bold text-white">Practice Daily</h4>
+                <p className="text-white/60 text-sm">Regular practice improves both speed and accuracy</p>
               </div>
             </div>
           </div>

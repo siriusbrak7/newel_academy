@@ -22,17 +22,17 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 // =====================================================
 const DEMO_ACCOUNTS = ['admin', 'teacher_demo', 'student_demo'];
 
-// ADD THESE CONSTANTS AT THE TOP OF storageService.ts
+// CORRECTED VERSION - Swap Physics and Chemistry UUIDs:
 const SUBJECT_IDS = {
   'Biology': '68bc18f9-a557-43b1-98a2-7e32bc0a9808',
-  'Physics': '583fdc7b-499c-428f-8dca-c131514bc99e',
-  'Chemistry': '4c89ad84-4141-402f-bf4b-708c9ef5b9ec'
+  'Physics': '4c89ad84-4141-402f-bf4b-708c9ef5b9ec',    // SWAPPED: Was Chemistry
+  'Chemistry': '583fdc7b-499c-428f-8dca-c131514bc99e'   // SWAPPED: Was Physics
 } as const;
 
 const SUBJECT_NAMES = {
   '68bc18f9-a557-43b1-98a2-7e32bc0a9808': 'Biology',
-  '583fdc7b-499c-428f-8dca-c131514bc99e': 'Physics',
-  '4c89ad84-4141-402f-bf4b-708c9ef5b9ec': 'Chemistry'
+  '4c89ad84-4141-402f-bf4b-708c9ef5b9ec': 'Physics',    // SWAPPED
+  '583fdc7b-499c-428f-8dca-c131514bc99e': 'Chemistry'   // SWAPPED
 };
 
 
