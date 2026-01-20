@@ -332,20 +332,21 @@ const handleDeleteMaterial = async (materialIndex: number, id: string) => {
     return;
   }
 
-  const newMat: Material = {
+  // ✅ TEMPORARY MATERIAL (for immediate UI update)
+  const tempMat: Material = {
     id: `temp_${Date.now()}`,
     title: addMatForm.title,
     type: addMatForm.type as 'text' | 'link' | 'file',
     content: content
   };
 
-  // ✅ CRITICAL: Update LOCAL state immediately
+  // ✅ IMMEDIATE UI UPDATE
   const updatedTopic = { 
     ...editingTopic, 
-    materials: [...editingTopic.materials, newMat] 
+    materials: [...editingTopic.materials, tempMat] 
   };
   
-  // Update the courses state locally FIRST
+  // Update local state immediately
   setCourses(prev => ({
     ...prev,
     [activeSubject]: {
@@ -355,12 +356,25 @@ const handleDeleteMaterial = async (materialIndex: number, id: string) => {
   }));
   
   try {
-    // Then save to database
-    await saveTopic(activeSubject, updatedTopic);
+    // ✅ CRITICAL: Save the topic with the new material
+    const savedTopic = await saveTopic(activeSubject, updatedTopic);
     
-    // Get fresh data from database (optional, but ensures sync)
-    const updatedCourses = await getCourses(true);
-    setCourses(updatedCourses);
+    // ✅ IMPORTANT: Instead of reloading all courses, update just this topic
+    if (savedTopic && savedTopic.id) {
+      // Update the specific topic in state
+      setCourses(prev => ({
+        ...prev,
+        [activeSubject]: {
+          ...prev[activeSubject],
+          [savedTopic.id!]: savedTopic // This should have the real material IDs
+        }
+      }));
+      
+      // Also update the selected topic
+      if (selectedTopicId === savedTopic.id) {
+        setSelectedTopicId(savedTopic.id);
+      }
+    }
     
     alert('✅ Material added successfully!');
     
@@ -382,6 +396,48 @@ const handleDeleteMaterial = async (materialIndex: number, id: string) => {
   }
 };
 
+// Subject ID mapping - based on your database
+const SUBJECT_IDS = {
+  'Biology': '68bc18f9-a557-43b1-98a2-7e32bc0a9808',
+  'Physics': '583fdc7b-499c-428f-8dca-c131514bc99e',
+  'Chemistry': '4c89ad84-4141-402f-bf4b-708c9ef5b9ec'
+} as const;
+
+// Reverse mapping for display
+const SUBJECT_NAMES = {
+  '68bc18f9-a557-43b1-98a2-7e32bc0a9808': 'Biology',
+  '583fdc7b-499c-428f-8dca-c131514bc99e': 'Physics',
+  '4c89ad84-4141-402f-bf4b-708c9ef5b9ec': 'Chemistry'
+};
+
+useEffect(() => {
+  console.log('🔄 CourseManager mounted, checking data...');
+  
+  const loadAndDebug = async () => {
+    const coursesData = await getCourses();
+    
+    // DEBUG: Check if materials are loaded
+    Object.entries(coursesData).forEach(([subject, topics]) => {
+      let totalMaterials = 0;
+      Object.values(topics).forEach((topic: any) => {
+        totalMaterials += topic.materials?.length || 0;
+      });
+      console.log(`📊 ${subject}: ${Object.keys(topics).length} topics, ${totalMaterials} materials`);
+      
+      // Log first topic with materials
+      const firstTopic = Object.values(topics).find((t: any) => t.materials?.length > 0);
+      if (firstTopic) {
+        console.log(`   Example: "${firstTopic.title}" has ${firstTopic.materials.length} materials`);
+      }
+    });
+    
+    setCourses(coursesData);
+  };
+  
+  loadAndDebug();
+  loadTheorySubmissions();
+}, []);
+
   // Get filtered topics
   const allTopics = Object.values(courses[activeSubject] || {}) as Topic[];
   const filteredTopics = allTopics.filter(topic => {
@@ -392,6 +448,57 @@ const handleDeleteMaterial = async (materialIndex: number, id: string) => {
     
     return matchesSearch && matchesGrade;
   });
+
+  // Add this function to check specific topics
+const debugTopicMaterials = async (topicTitle: string) => {
+  console.log(`🔍 Debugging: ${topicTitle}`);
+  
+  // Get fresh data
+  const coursesData = await getCourses(true);
+  setCourses(coursesData);
+  
+  // Find the topic
+  const allTopics = Object.values(coursesData[activeSubject] || {}) as Topic[];
+  const topic = allTopics.find(t => t.title === topicTitle);
+  
+  if (topic) {
+    console.log(`📦 Topic found: ${topic.title}`);
+    console.log(`📎 Materials in state: ${topic.materials?.length || 0}`);
+    
+    if (topic.materials && topic.materials.length > 0) {
+      topic.materials.forEach((mat, i) => {
+        console.log(`   ${i+1}. ${mat.title} (${mat.type}) - ID: ${mat.id}`);
+      });
+    } else {
+      console.log('❌ No materials in state, checking database...');
+      
+      // Direct database query
+      const { data, error } = await supabase
+        .from('materials')
+        .select('*')
+        .eq('topic_id', topic.id);
+      
+      if (error) {
+        console.error('Database error:', error);
+      } else {
+        console.log(`✅ Database has ${data?.length || 0} materials for this topic`);
+        data?.forEach((mat, i) => {
+          console.log(`   ${i+1}. ${mat.title} (${mat.type})`);
+        });
+      }
+    }
+  } else {
+    console.log(`❌ Topic not found: ${topicTitle}`);
+  }
+};
+
+// Add a debug button to your UI
+<button
+  onClick={() => debugTopicMaterials('Biological Molecules & Enzymes')}
+  className="px-3 py-1 bg-purple-600 text-white text-sm rounded"
+>
+  Debug Materials
+</button>
 
   // Add QuestionsView component inside the main component
   const QuestionsView = ({ topicId }: { topicId: string }) => {

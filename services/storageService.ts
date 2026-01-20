@@ -12,6 +12,21 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 // =====================================================
 const DEMO_ACCOUNTS = ['admin', 'teacher_demo', 'student_demo'];
 
+// ADD THESE CONSTANTS AT THE TOP OF storageService.ts
+const SUBJECT_IDS = {
+  'Biology': '68bc18f9-a557-43b1-98a2-7e32bc0a9808',
+  'Physics': '583fdc7b-499c-428f-8dca-c131514bc99e',
+  'Chemistry': '4c89ad84-4141-402f-bf4b-708c9ef5b9ec'
+} as const;
+
+const SUBJECT_NAMES = {
+  '68bc18f9-a557-43b1-98a2-7e32bc0a9808': 'Biology',
+  '583fdc7b-499c-428f-8dca-c131514bc99e': 'Physics',
+  '4c89ad84-4141-402f-bf4b-708c9ef5b9ec': 'Chemistry'
+};
+
+
+
 // ADD this helper function at the TOP of storageService.ts:
 export const optimizeQuery = async <T>(
   queryName: string,
@@ -332,89 +347,57 @@ export const deleteUser = async (username: string): Promise<void> => {
 // COURSE MANAGEMENT - OPTIMIZED WITH CACHING
 // =====================================================
 // FIXED VERSION - Remove ambiguous join
+// In storageService.ts
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
-  // Return cached data if valid (10 minutes cache)
-  const now = Date.now();
-  if (!forceRefresh && coursesCache && cacheTimestamp && (now - cacheTimestamp < 10 * 60 * 1000)) {
-    console.log('📦 Returning cached courses');
-    return coursesCache;
-  }
-  
-  console.time('getCourses');
-  console.log('🚀 Fetching courses (FIXED VERSION - NO AMBIGUOUS JOIN)...');
-  
   try {
-    // OPTIMIZATION: Get all subjects first
-    const { data: subjectsData } = await supabase
-      .from('subjects')
-      .select('id, name');
+    console.log('📚 Fetching all courses...');
     
-    const subjectMap = new Map();
-    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
-    
-    // Get topics WITHOUT ambiguous join
-    const { data: topicsData, error: topicsError } = await supabase
+    const { data: topics, error } = await supabase
       .from('topics')
       .select(`
-        id,
-        title,
-        description,
-        grade_level,
-        subject_id,
-        checkpoints_required,
-        checkpoint_pass_percentage,
-        final_assessment_required,
-        created_at
+        *,
+        materials (*)
       `)
-      .order('title', { ascending: true });
+      .order('created_at', { ascending: false });
 
-    if (topicsError) throw topicsError;
-
-    if (!topicsData || topicsData.length === 0) {
-      console.log('📊 No topics found');
-      console.timeEnd('getCourses');
-      return {};
-    }
-
-    console.log(`📚 Found ${topicsData.length} topics`);
+    if (error) throw error;
 
     const courses: CourseStructure = {};
     
-    // Build courses structure
-    topicsData.forEach(topic => {
-      const subjectName = subjectMap.get(topic.subject_id) || 'General';
+    topics?.forEach((topic: any) => {
+      // Convert subject_id to subject name
+      const subjectName = SUBJECT_NAMES[topic.subject_id];
+      
+      if (!subjectName) {
+        console.warn(`⚠️ Unknown subject_id: ${topic.subject_id} for topic: ${topic.title}`);
+        return; // Skip topics with unknown subject IDs
+      }
       
       if (!courses[subjectName]) {
         courses[subjectName] = {};
       }
-
+      
       courses[subjectName][topic.id] = {
-        id: topic.id,
-        title: topic.title,
-        gradeLevel: topic.grade_level || '9',
-        description: topic.description || '',
-        subtopics: [], // Load on demand
-        materials: [], // Load on demand
-        checkpoints_required: topic.checkpoints_required || 3,
-        checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
-        final_assessment_required: topic.final_assessment_required !== false,
+        ...topic,
+        materials: topic.materials || []
       };
     });
 
-    console.log(`✅ Courses fetched: ${Object.keys(courses).length} subjects, ${topicsData.length} topics`);
-    
-    // Cache the result
-    coursesCache = courses;
-    cacheTimestamp = Date.now();
-    
-    console.timeEnd('getCourses');
-    console.log(`⏱️ Load time: ${(now - cacheTimestamp)/1000}s`);
+    // Debug log
+    console.log('📊 Course summary:', {
+      Biology: {
+        topics: Object.keys(courses['Biology'] || {}).length,
+        materials: Object.values(courses['Biology'] || {})
+          .reduce((sum, topic) => sum + (topic.materials?.length || 0), 0)
+      },
+      Physics: Object.keys(courses['Physics'] || {}).length,
+      Chemistry: Object.keys(courses['Chemistry'] || {}).length
+    });
     
     return courses;
   } catch (error) {
-    console.error('❌ Get courses error:', error);
-    console.timeEnd('getCourses');
-    return coursesCache || {};
+    console.error('❌ Error fetching courses:', error);
+    return {};
   }
 };
 
@@ -565,135 +548,46 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
 // In storageService.ts, update the saveTopic function:
 // storageService.ts - Updated saveTopic function
 // In storageService.ts - REPLACE the entire saveTopic function with this:
-export const saveTopic = async (subject: string, topic: Topic): Promise<Topic> => {
-  console.log(`💾 Saving topic "${topic.title}" to subject: ${subject}`);
-  
+// In storageService.ts - update saveTopic function
+// In storageService.ts - FIX saveTopic
+export const saveTopic = async (subject: string, topic: any): Promise<any> => {
   try {
-    // Get or create subject
-    const { data: subjectData } = await supabase
-      .from('subjects')
-      .select('id')
-      .eq('name', subject)
+    const subjectId = SUBJECT_IDS[subject as keyof typeof SUBJECT_IDS];
+    
+    if (!subjectId) {
+      throw new Error(`Unknown subject: ${subject}`);
+    }
+    
+    console.log('💾 Saving topic:', { 
+      subject, 
+      subjectId, 
+      title: topic.title 
+    });
+    
+    const { data: savedTopic, error } = await supabase
+      .from('topics')
+      .upsert({
+        id: topic.id?.startsWith('temp_') ? undefined : topic.id,
+        subject_id: subjectId,  // Use UUID
+        title: topic.title,
+        grade_level: topic.gradeLevel,
+        description: topic.description,
+        subtopics: topic.subtopics,
+        checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired,
+        checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage,
+        final_assessment_required: topic.final_assessment_required || topic.finalAssessmentRequired,
+        updated_at: new Date().toISOString()
+      })
+      .select(`
+        *,
+        materials (*)
+      `)
       .single();
 
-    let subjectId: string;
-    
-    if (!subjectData) {
-      console.log(`📌 Creating new subject: ${subject}`);
-      const { data: newSubject } = await supabase
-        .from('subjects')
-        .insert({ name: subject })
-        .select('id')
-        .single();
-      subjectId = newSubject.id;
-    } else {
-      subjectId = subjectData.id;
-    }
-
-    // Prepare topic data
-    const topicData: any = {
-      subject_id: subjectId,
-      title: topic.title,
-      description: topic.description,
-      grade_level: topic.gradeLevel,
-      checkpoints_required: topic.checkpoints_required || 3,
-      checkpoint_pass_percentage: topic.checkpoint_pass_percentage || 85,
-      final_assessment_required: topic.final_assessment_required !== false,
-      updated_at: new Date().toISOString()
-    };
-
-    let topicId: string;
-    let savedTopic: Topic = { ...topic };
-    
-    // Save topic and get ID
-    if (topic.id && !topic.id.startsWith('temp_')) {
-      // Update existing topic
-      console.log(`📝 Updating existing topic ID: ${topic.id}`);
-      const { error: updateError } = await supabase
-        .from('topics')
-        .update(topicData)
-        .eq('id', topic.id);
-      
-      if (updateError) throw updateError;
-      topicId = topic.id;
-    } else {
-      // Insert new topic
-      console.log(`🆕 Creating new topic: "${topic.title}"`);
-      const { data: newTopic, error: insertError } = await supabase
-        .from('topics')
-        .insert([topicData])
-        .select('id, created_at')
-        .single();
-      
-      if (insertError) throw insertError;
-      if (!newTopic) throw new Error('Failed to create topic');
-      
-      topicId = newTopic.id;
-      savedTopic = {
-        ...savedTopic,
-        id: newTopic.id,
-        
-      };
-      
-      console.log(`✅ New topic created with ID: ${topicId}`);
-    }
-
-    // ✅ CRITICAL FIX: Save materials to materials table
-    if (topic.materials && topic.materials.length > 0) {
-      console.log(`📎 Saving ${topic.materials.length} materials to database`);
-      
-      // FIRST: Delete all existing materials for this topic
-      const { error: deleteError } = await supabase
-        .from('materials')
-        .delete()
-        .eq('topic_id', topicId);
-        
-      if (deleteError) {
-        console.warn('⚠️ Could not delete old materials:', deleteError.message);
-        // Don't throw - we'll try to insert anyway
-      }
-      
-      // THEN: Insert the current materials
-      const materialsToInsert = topic.materials.map((material, index) => ({
-        topic_id: topicId,
-        title: material.title,
-        type: material.type,
-        content: material.type === 'file' ? material.content : material.content,
-        storage_path: material.type === 'file' ? material.content : null,
-        sort_order: index,
-        created_at: new Date().toISOString()
-      }));
-      
-      if (materialsToInsert.length > 0) {
-        const { error: materialsError } = await supabase
-          .from('materials')
-          .insert(materialsToInsert);
-        
-        if (materialsError) {
-          console.error('❌ Error inserting materials:', materialsError.message);
-          // Don't throw - topic is saved, materials might fail but we continue
-        } else {
-          console.log(`✅ Successfully saved ${materialsToInsert.length} materials`);
-        }
-      }
-    } else {
-      console.log('📭 No materials to save');
-    }
-
-    // Clear cache to ensure fresh data on next fetch
-    coursesCache = null;
-    cacheTimestamp = 0;
-    
-    console.log(`✅ Topic "${topic.title}" saved successfully with ID: ${topicId}`);
-    
-    // Return the saved topic with its ID
-    return {
-      ...savedTopic,
-      id: topicId
-    };
-    
+    if (error) throw error;
+    return savedTopic;
   } catch (error) {
-    console.error('❌ Save topic error:', error);
+    console.error('❌ Error in saveTopic:', error);
     throw error;
   }
 };
