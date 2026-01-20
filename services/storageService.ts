@@ -571,18 +571,19 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
     }
     
     // 2. Save/Update the topic
-    const topicData = {
-      id: finalTopicId?.startsWith('temp_') ? undefined : finalTopicId,
-      subject_id: subjectId,
-      title: topic.title,
-      grade_level: topic.gradeLevel || topic.grade_level || '9',
-      description: topic.description || '',
-      subtopics: Array.isArray(topic.subtopics) ? topic.subtopics : [],
-      checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired || 3,
-      checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage || 80,
-      final_assessment_required: topic.final_assessment_required !== undefined ? topic.final_assessment_required : true,
-      updated_at: new Date().toISOString()
-    };
+    // In storageService.ts, updated saveTopic function:
+const topicData = {
+  id: finalTopicId?.startsWith('temp_') ? undefined : finalTopicId,
+  subject_id: subjectId,
+  title: topic.title,
+  grade_level: topic.gradeLevel || topic.grade_level || '9',
+  description: topic.description || '',
+  // REMOVED: subtopics: Array.isArray(topic.subtopics) ? topic.subtopics : [],
+  checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired || 3,
+  checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage || 80,
+  final_assessment_required: topic.final_assessment_required !== undefined ? topic.final_assessment_required : true,
+  updated_at: new Date().toISOString()
+};
     
     console.log('📤 Saving topic data:', topicData);
     
