@@ -1540,10 +1540,10 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
   console.time('getAllStudentStats');
   
   try {
-    // Get all users (excluding demo accounts) in ONE query
+    // Get all users (excluding demo accounts)
     const { data: usersData, error: usersError } = await supabase
       .from('users')
-      .select('username, grade_level, login_history, last_login, role')
+      .select('username, grade_level, login_history, last_login, role, created_at')
       .eq('approved', true)
       .eq('role', 'student')
       .not('username', 'in', `(${DEMO_ACCOUNTS.map(a => `'${a}'`).join(',')})`);
@@ -1554,43 +1554,73 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
       return [];
     }
 
-    // Get all submissions in ONE query
+    // Get all submissions (only graded ones with actual scores)
     const { data: submissionsData } = await supabase
       .from('submissions')
-      .select('username, score, graded')
-      .eq('graded', true);
+      .select('username, score, graded, submitted_at')
+      .eq('graded', true)
+      .gt('score', 0); // Only include actual scores > 0
 
-    // Get all checkpoint progress in ONE query
+    // Get all checkpoint progress (only with actual scores)
     const { data: checkpointData } = await supabase
       .from('student_checkpoint_progress')
-      .select('user_id, score, passed')
+      .select('user_id, score, passed, completed_at')
+      .gt('score', 0) // Only include actual scores
       .not('score', 'is', null);
 
     // Create user map for fast lookup
     const userMap = new Map();
     usersData.forEach(user => userMap.set(user.username, user));
 
+    // Get user IDs for checkpoint mapping
+    const { data: allUsers } = await supabase
+      .from('users')
+      .select('id, username')
+      .eq('role', 'student');
+
+    const userUsernameMap = new Map();
+    allUsers?.forEach(u => userUsernameMap.set(u.id, u.username));
+
     // Calculate stats efficiently
     const stats: StudentStats[] = [];
     
     for (const user of usersData) {
       // Calculate submission scores
-      const userSubmissions = submissionsData?.filter(s => s.username === user.username) || [];
-      const submissionScores = userSubmissions.map(s => s.score || 0);
+      const userSubmissions = submissionsData?.filter(s => 
+        s.username === user.username && 
+        s.score && 
+        s.score > 0
+      ) || [];
       
-      // Calculate checkpoint scores
+      // Calculate checkpoint scores - map user_id to username
       const userCheckpoints = checkpointData?.filter(cp => {
-        // Need to get user_id from username - we'll approximate
-        return true; // Simplified for performance
+        const username = userUsernameMap.get(cp.user_id);
+        return username === user.username && cp.score && cp.score > 0;
       }) || [];
-      const checkpointScores = userCheckpoints.map(cp => cp.score || 0);
       
       // Combine all scores
+      const submissionScores = userSubmissions.map(s => s.score);
+      const checkpointScores = userCheckpoints.map(cp => cp.score);
       const allScores = [...submissionScores, ...checkpointScores];
-      const avgScore = allScores.length > 0 
-        ? allScores.reduce((a, b) => a + b, 0) / allScores.length 
-        : 0;
       
+      // CRITICAL FIX: Only calculate average if there are actual scores
+      let avgScore = 0;
+      let completionRate = 0;
+      
+      if (allScores.length > 0) {
+        avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+        
+        // Calculate completion rate based on actual checkpoints
+        const passedCheckpoints = userCheckpoints.filter(cp => cp.passed).length;
+        const totalCheckpointsAttempted = userCheckpoints.length;
+        completionRate = totalCheckpointsAttempted > 0 ? 
+          Math.round((passedCheckpoints / totalCheckpointsAttempted) * 100) : 0;
+      } else {
+        // New students or students with no activity get 0%
+        avgScore = 0;
+        completionRate = 0;
+      }
+
       // Calculate user stats
       const { activeDays, streak } = calculateUserStats({
         username: user.username,
@@ -1603,19 +1633,24 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
         lastLogin: user.last_login ? new Date(user.last_login).getTime() : undefined
       });
 
+      // Only include students with some activity or for reporting
       stats.push({
         username: user.username,
         gradeLevel: user.grade_level || '?',
         avgScore: Math.round(avgScore * 10) / 10, // 1 decimal place
-        completionRate: userCheckpoints.filter(cp => cp.passed).length > 0 ? 50 : 0, // Simplified
+        completionRate: completionRate,
         lastActive: user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
         streak: streak,
         activeDays: activeDays
       });
     }
 
-    // Sort by average score
-    const sortedStats = stats.sort((a, b) => b.avgScore - a.avgScore);
+    // Sort by average score (highest first), but put 0 scores at the end
+    const sortedStats = stats.sort((a, b) => {
+      if (a.avgScore === 0 && b.avgScore > 0) return 1;
+      if (b.avgScore === 0 && a.avgScore > 0) return -1;
+      return b.avgScore - a.avgScore;
+    });
     
     // Cache the result
     sessionStorage.setItem(CACHE_KEY, JSON.stringify({
@@ -1625,6 +1660,8 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
     
     console.timeEnd('getAllStudentStats');
     console.log(`✅ Student stats loaded: ${sortedStats.length} students`);
+    console.log(`📊 Active students: ${sortedStats.filter(s => s.avgScore > 0).length}`);
+    console.log(`📊 New students (0%): ${sortedStats.filter(s => s.avgScore === 0).length}`);
     
     return sortedStats;
   } catch (error) {
@@ -1688,27 +1725,27 @@ export const getTopicMaterials = async (topicId: string): Promise<Material[]> =>
 export const getClassOverview = async () => {
   const stats = await getAllStudentStats();
   
+  // Only count students with actual scores for averages
+  const studentsWithScores = stats.filter(s => s.avgScore > 0);
   const totalStudents = stats.length;
+  const activeStudents = studentsWithScores.length;
   
-  let totalScore = 0;
-  let studentCount = 0;
+  let classAverage = 0;
+  if (activeStudents > 0) {
+    const totalScore = studentsWithScores.reduce((sum, student) => sum + student.avgScore, 0);
+    classAverage = Math.round(totalScore / activeStudents);
+  }
   
-  stats.forEach(s => {
-    if (s.avgScore > 0) {
-      totalScore += s.avgScore;
-      studentCount++;
-    }
-  });
-  
-  const classAverage = studentCount > 0 ? Math.round(totalScore / studentCount) : 0;
-  
-  // Find weakest topic (simplified)
-  const weakestTopic = totalStudents > 0 ? 'General Science' : 'No Data';
+  // Find weakest topic only for active students
+  const weakestTopic = activeStudents > 0 ? 'Analyzing...' : 'No Data';
   
   return {
     totalStudents,
+    activeStudents,
     classAverage,
-    weakestTopic
+    weakestTopic,
+    inactivePercentage: totalStudents > 0 ? 
+      Math.round(((totalStudents - activeStudents) / totalStudents) * 100) : 0
   };
 };
 
