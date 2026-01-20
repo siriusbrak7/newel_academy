@@ -607,13 +607,17 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
     
     console.log('✅ Topic saved with ID:', savedTopic.id);
     
-    // 3. Save materials
+    // 3. Save materials - FIXED VERSION
     if (topic.materials && topic.materials.length > 0 && savedTopic.id) {
       console.log(`📦 Processing ${topic.materials.length} materials...`);
       
-      // Prepare materials with correct topic_id
+      // Prepare materials with correct topic_id - ALWAYS include id field
       const materialsToSave = topic.materials.map((mat: any) => {
         const materialData: any = {
+          // Always include id field - either existing UUID or undefined for new
+          id: mat.id && !mat.id.startsWith('temp_') && mat.id !== 'null' && mat.id !== null 
+            ? mat.id 
+            : undefined,
           topic_id: savedTopic.id,
           title: mat.title,
           type: mat.type,
@@ -622,16 +626,10 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
           updated_at: new Date().toISOString()
         };
         
-        // ONLY include id if it's a valid UUID (not temp and not null)
-        if (mat.id && !mat.id.startsWith('temp_') && mat.id !== 'null' && mat.id !== null) {
-          materialData.id = mat.id;
-        }
-        // Otherwise, let the database generate the UUID via gen_random_uuid()
-        
         return materialData;
       });
       
-      console.log('📝 Materials to save:', materialsToSave.length);
+      console.log('📝 Materials to save:', materialsToSave);
       
       // Delete existing materials for this topic first
       await supabase
