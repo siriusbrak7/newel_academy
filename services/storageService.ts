@@ -1,5 +1,5 @@
 ﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
-import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, dbToFrontendAnnouncement } from '../types';
+import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, dbToFrontendAnnouncement, Question } from '../types';
 import { supabase } from './supabaseClient';
 
 // Add caching variables at the TOP of the file (right after imports)
@@ -340,7 +340,7 @@ export const deleteUser = async (username: string): Promise<void> => {
 // In storageService.ts
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
   try {
-    console.log('📚 Fetching courses with grade levels preserved...');
+    console.log('📚 Fetching courses from database...');
     
     const { data: topics, error } = await supabase
       .from('topics')
@@ -348,11 +348,16 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         *,
         materials (*)
       `)
-      .order('grade_level', { ascending: true })  // Order by grade
+      .order('grade_level', { ascending: true })
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Database error:', error);
+      throw error;
+    }
 
+    console.log(`✅ Retrieved ${topics?.length || 0} topics`);
+    
     const courses: CourseStructure = {};
     
     topics?.forEach((topic: any) => {
@@ -367,23 +372,27 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
         courses[subjectName] = {};
       }
       
-      // Preserve all topic data including grade_level
-      courses[subjectName][topic.id] = {
+      // Format topic with proper field names
+      const formattedTopic = {
         ...topic,
-        gradeLevel: topic.grade_level,  // Ensure gradeLevel is set
+        id: topic.id,
+        title: topic.title,
+        gradeLevel: topic.grade_level,
+        description: topic.description,
+        subtopics: topic.subtopics || [],
         materials: topic.materials || []
       };
+      
+      courses[subjectName][topic.id] = formattedTopic;
     });
 
-    // Log grade distribution
+    // Log summary
     Object.keys(courses).forEach(subject => {
-      const gradeCounts: Record<string, number> = {};
-      Object.values(courses[subject]).forEach((topic: any) => {
-        const grade = topic.gradeLevel || 'unknown';
-        gradeCounts[grade] = (gradeCounts[grade] || 0) + 1;
-      });
+      const topics = Object.values(courses[subject]);
+      const totalMaterials = topics.reduce((sum: number, topic: any) => 
+        sum + (topic.materials?.length || 0), 0);
       
-      console.log(`📊 ${subject} grade distribution:`, gradeCounts);
+      console.log(`📊 ${subject}: ${topics.length} topics, ${totalMaterials} materials`);
     });
     
     return courses;
@@ -488,49 +497,33 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
   // =====================================================
   // GET TOPIC QUESTIONS (ON DEMAND)
   // =====================================================
-  export const getTopicQuestions = async (topicId: string): Promise<Record<string, any[]>> => {
+  export const getTopicQuestions = async (topicId: string): Promise<Record<string, Question[]>> => {
   try {
-    const { data: questionsData, error } = await supabase
+    console.log('❓ Fetching questions for topic:', topicId);
+    
+    const { data, error } = await supabase
       .from('questions')
       .select('*')
       .eq('topic_id', topicId);
-
-    if (error) throw error;
-
-    const subtopicQuestions: Record<string, any[]> = {};
     
-    (questionsData || []).forEach(q => {
-      const subtopic = q.subtopic_name || 'general';
-      if (!subtopicQuestions[subtopic]) {
-        subtopicQuestions[subtopic] = [];
+    if (error) throw error;
+    
+    // Group by subtopic
+    const grouped: Record<string, Question[]> = {};
+    
+    data?.forEach((q: any) => {
+      const subtopic = q.subtopic || 'General';
+      if (!grouped[subtopic]) {
+        grouped[subtopic] = [];
       }
-      
-      subtopicQuestions[subtopic].push({
-        id: q.id,
-        text: q.text,
-        type: q.type,
-        difficulty: q.difficulty || 'IGCSE',
-        topic: q.topic_name || '',
-        options: q.options || [],
-        correctAnswer: q.correct_answer || '',
-        modelAnswer: q.model_answer,
-        
-        // NEW FIELDS
-        format: q.format || 'plain_text',
-        metadata: q.metadata || {},
-        content: q.content || '',
-        
-        // DB fields
-        topic_id: q.topic_id,
-        subtopic_name: q.subtopic_name,
-        explanation: q.explanation,
-        sort_order: q.sort_order
-      });
+      grouped[subtopic].push(q);
     });
-
-    return subtopicQuestions;
+    
+    console.log(`✅ Found questions in ${Object.keys(grouped).length} subtopics`);
+    return grouped;
+    
   } catch (error) {
-    console.error('❌ Get topic questions error:', error);
+    console.error('❌ Error fetching questions:', error);
     return {};
   }
 };
@@ -550,34 +543,104 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
       throw new Error(`Unknown subject: ${subject}`);
     }
     
-    console.log('💾 Saving topic:', { 
-      subject, 
-      subjectId, 
-      title: topic.title 
+    console.log('💾 saveTopic called:', {
+      subject,
+      subjectId,
+      topicId: topic.id,
+      title: topic.title,
+      materials: topic.materials?.length || 0
     });
     
-    const { data: savedTopic, error } = await supabase
+    // 1. First, ensure we have a valid topic ID
+    let finalTopicId = topic.id;
+    
+    // If topic has no ID or is a temp ID, check if it exists by title
+    if (!finalTopicId || finalTopicId.startsWith('temp_')) {
+      const { data: existingTopic } = await supabase
+        .from('topics')
+        .select('id')
+        .eq('title', topic.title)
+        .eq('subject_id', subjectId)
+        .eq('grade_level', topic.gradeLevel || topic.grade_level)
+        .single();
+      
+      if (existingTopic) {
+        finalTopicId = existingTopic.id;
+        console.log('🔍 Found existing topic ID:', finalTopicId);
+      }
+    }
+    
+    // 2. Save/Update the topic
+    const topicData = {
+      id: finalTopicId?.startsWith('temp_') ? undefined : finalTopicId,
+      subject_id: subjectId,
+      title: topic.title,
+      grade_level: topic.gradeLevel || topic.grade_level || '9',
+      description: topic.description || '',
+      subtopics: Array.isArray(topic.subtopics) ? topic.subtopics : [],
+      checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired || 3,
+      checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage || 80,
+      final_assessment_required: topic.final_assessment_required !== undefined ? topic.final_assessment_required : true,
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log('📤 Saving topic data:', topicData);
+    
+    const { data: savedTopic, error: topicError } = await supabase
       .from('topics')
-      .upsert({
-        id: topic.id?.startsWith('temp_') ? undefined : topic.id,
-        subject_id: subjectId,  // Use UUID
-        title: topic.title,
-        grade_level: topic.gradeLevel,
-        description: topic.description,
-        subtopics: topic.subtopics,
-        checkpoints_required: topic.checkpoints_required || topic.checkpointsRequired,
-        checkpoint_pass_percentage: topic.checkpoint_pass_percentage || topic.checkpointPassPercentage,
-        final_assessment_required: topic.final_assessment_required || topic.finalAssessmentRequired,
-        updated_at: new Date().toISOString()
-      })
-      .select(`
-        *,
-        materials (*)
-      `)
+      .upsert(topicData)
+      .select()
       .single();
-
-    if (error) throw error;
+    
+    if (topicError) {
+      console.error('❌ Topic save error:', topicError);
+      throw topicError;
+    }
+    
+    console.log('✅ Topic saved with ID:', savedTopic.id);
+    
+    // 3. Save materials
+    if (topic.materials && topic.materials.length > 0 && savedTopic.id) {
+      console.log(`📦 Processing ${topic.materials.length} materials...`);
+      
+      // Prepare materials with correct topic_id
+      const materialsToSave = topic.materials.map((mat: any) => ({
+        id: mat.id?.startsWith('temp_') ? undefined : mat.id,
+        topic_id: savedTopic.id, // CRITICAL: Use the saved topic ID
+        title: mat.title,
+        type: mat.type,
+        content: mat.content,
+        created_at: mat.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      
+      console.log('📝 Materials to save:', materialsToSave.length);
+      
+      // Delete existing materials for this topic first
+      await supabase
+        .from('materials')
+        .delete()
+        .eq('topic_id', savedTopic.id);
+      
+      // Insert all new materials
+      const { data: savedMaterials, error: matError } = await supabase
+        .from('materials')
+        .insert(materialsToSave)
+        .select();
+      
+      if (matError) {
+        console.error('❌ Materials save error:', matError);
+        throw matError;
+      }
+      
+      console.log(`✅ ${savedMaterials?.length || 0} materials saved`);
+      savedTopic.materials = savedMaterials || [];
+    } else {
+      savedTopic.materials = [];
+    }
+    
     return savedTopic;
+    
   } catch (error) {
     console.error('❌ Error in saveTopic:', error);
     throw error;
