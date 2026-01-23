@@ -597,7 +597,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           checkpointId={activeCheckpoint.id}
           checkpointTitle={activeCheckpoint.title}
           questions={activeCheckpoint.questions}
-          passThreshold={activeCheckpoint.required_score || 80}
+          passThreshold={80}
           onComplete={(score, passed, results) => 
             handleCheckpointComplete(activeCheckpoint.id, score, passed, results)
           }
@@ -613,7 +613,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         <QuizInterface
           title={`${topic.title} - Final Assessment`}
           questions={finalAssessmentQuestions}
-          passThreshold={finalAssessment.pass_percentage || 80}
+          passThreshold={80}
           onComplete={handleFinalAssessmentComplete}
           onClose={() => setActiveFinalQuiz(false)}
           isCourseFinal={true}
@@ -628,7 +628,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           checkpointId={showReviewForCheckpoint}
           checkpointTitle={`Review: ${checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.title || 'Checkpoint'}`}
           questions={checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.questions || []}
-          passThreshold={checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.required_score || 80}
+          passThreshold={80}
           onComplete={() => {}}
           onClose={() => setShowReviewForCheckpoint(null)}
           username={user.username}

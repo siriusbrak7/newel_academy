@@ -4,10 +4,6 @@
     env: static
     buildCommand: npm run build
     staticPublishPath: ./dist
-    routes:
-      - path: "/*"
-        methods: ["GET"]
-        handler: "dist/index.html"
     headers:
       - path: /assets/*
         name: Cache-Control
