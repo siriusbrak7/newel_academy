@@ -3,6 +3,9 @@
    Clean, functional, production-ready
    ============================================ */
 
+/* MUST BE FIRST - Import font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+
 /* ===== BASE RESETS FOR MOBILE ===== */
 html {
   -webkit-text-size-adjust: 100%;
@@ -252,7 +255,6 @@ body.mobile-menu-open {
 }
 
 /* mobile.css - Optimized for 2016-2025 devices */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 
 /* ===== PERFORMANCE OPTIMIZATIONS ===== */
 /* Disable heavy animations on older devices */
