@@ -77,6 +77,18 @@
         };
       })();
     </script>
+
+    <!-- SPA Redirect Handler for 404.html -->
+    <script>
+      // Handle redirects from 404.html for SPA routing
+      (function() {
+        let redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.pathname) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+    </script>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>

@@ -4,6 +4,10 @@
     env: static
     buildCommand: npm run build
     staticPublishPath: ./dist
+    redirects:
+      - source: "/*"
+        destination: "/index.html"
+        type: 404
     headers:
       - path: /*
         name: Cache-Control
