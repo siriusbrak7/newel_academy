@@ -1999,6 +1999,8 @@ export const getStudentSubjectPerformance = async (username: string): Promise<Re
   }
 };
 
+// Add to storageService.ts (after getStudentSubjectPerformance):
+
 // Add this function to storageService.ts
 export const getStudentCourseProgress = async (username: string): Promise<any[]> => {
   try {
@@ -2141,6 +2143,7 @@ export const getUserNotifications = async (username: string): Promise<Notificati
     return [];
   }
 };
+
 
 // Create notification (use sparingly - triggers handle most)
 export const createNotification = async (
@@ -3105,19 +3108,12 @@ export const getStudentTopicPerformance = async (username: string, topicId: stri
 
 // Get topics filtered by student grade level
 // Get topics filtered by student grade level
+// In storageService.ts, update getTopicsForStudent:
 export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStructure> => {
   console.log(`📊 Getting topics for grade level: "${gradeLevel}"`);
   
   try {
-    // Get all subjects first to avoid ambiguous joins
-    const { data: subjectsData } = await supabase
-      .from('subjects')
-      .select('id, name');
-    
-    const subjectMap = new Map();
-    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
-    
-    // Get topics WITHOUT ambiguous join
+    // Get topics for the student's grade OR lower grades
     const { data: topicsData, error } = await supabase
       .from('topics')
       .select(`
@@ -3125,94 +3121,47 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
         title,
         description,
         grade_level,
-        sort_order,
-        subject_id
+        subject_id,
+        subjects!inner (name)
       `)
-      .eq('grade_level', gradeLevel)
-      .order('sort_order', { ascending: true })
+      .lte('grade_level', gradeLevel) // Topics for this grade or lower
       .order('title');
 
     if (error) {
-      console.error('❌ Supabase error in getTopicsForStudent:', error);
+      console.error('❌ Supabase error:', error);
       return {};
     }
 
-    console.log(`📊 Found ${topicsData?.length || 0} topics for grade ${gradeLevel}`);
+    console.log(`📊 Found ${topicsData?.length || 0} accessible topics for grade ${gradeLevel}`);
     
     if (!topicsData || topicsData.length === 0) {
-      console.log(`📊 No topics found for grade ${gradeLevel}. Checking all topics...`);
-      const { data: allTopics } = await supabase
-        .from('topics')
-        .select('*, subject_id')
-        .order('title');
-      
-      console.log('📊 All topics in database:', allTopics?.map(t => ({
-        id: t.id,
-        title: t.title,
-        grade: t.grade_level,
-        subject_id: t.subject_id
-      })));
-      
+      console.log(`📊 No topics found for grade ${gradeLevel}`);
       return {};
     }
     
-    // Get materials for all topics (single query for efficiency)
-    const topicIds = topicsData.map(t => t.id);
-    const { data: allMaterials } = await supabase
-      .from('materials')
-      .select('*')
-      .in('topic_id', topicIds);
-    
-    // Get checkpoints for all topics (single query for efficiency)
-    const { data: allCheckpoints } = await supabase
-      .from('checkpoints')
-      .select('*')
-      .in('topic_id', topicIds);
-    
     const courses: CourseStructure = {};
     
-    topicsData.forEach(topic => {
-      const subjectName = subjectMap.get(topic.subject_id) || 'General';
+    topicsData.forEach((topic: any) => {
+      const subjectName = (typeof topic.subjects === 'object' && topic.subjects?.name) ? topic.subjects.name : 'General';
       
       if (!courses[subjectName]) {
         courses[subjectName] = {};
       }
 
-      console.log(`📊 Adding topic - Subject: ${subjectName}, Title: ${topic.title}`);
-      
-      // Filter materials for this specific topic
-      const topicMaterials = allMaterials?.filter(m => m.topic_id === topic.id) || [];
-      const topicCheckpoints = allCheckpoints?.filter(c => c.topic_id === topic.id) || [];
-      
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
         gradeLevel: topic.grade_level,
         description: topic.description || '',
         subtopics: [],
-        materials: topicMaterials.map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          type: m.type,
-          content: m.content || m.storage_path || ''
-        })),
-        checkpoints: topicCheckpoints.map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          checkpointNumber: c.checkpoint_number,
-          requiredScore: c.required_score,
-          questionCount: c.question_count
-        }))
+        materials: [] // Will be loaded on demand
       };
     });
 
-    console.log(`📊 Final courses structure for grade ${gradeLevel}:`, {
-      subjects: Object.keys(courses),
-      topicCounts: Object.keys(courses).map(subject => ({
-        subject,
-        count: Object.keys(courses[subject]).length
-      }))
-    });
+    console.log(`📊 Courses by subject:`, Object.keys(courses).map(subject => ({
+      subject,
+      count: Object.keys(courses[subject]).length
+    })));
     
     return courses;
   } catch (error) {

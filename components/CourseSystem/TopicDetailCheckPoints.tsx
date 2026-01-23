@@ -10,32 +10,19 @@ import {
   getTopicFinalAssessment,
   updateTopicProgress,
   getCoursesLight,
-  getTopicMaterials, // OPTIMIZED: On-demand materials loading
+  getTopicMaterials,
   notifyTopic80PercentComplete,
-  getStudentCourseHistory,
-  getStudentAssessmentFeedback,
-  getStudentSubjectPerformance // For quick stats
 } from '../../services/storageService';
 import { getAITutorResponse } from '../../services/geminiService';
 import { supabase } from '../../services/supabaseClient';
 import { 
-  ArrowLeft, FileText, Play, CheckCircle, Lock, Link as LinkIcon, 
-  File, Wand2, MessageCircle, ChevronRight, Brain, Check, Clock,
-  Trophy, BookOpen, Target, BarChart3, Zap, AlertCircle, RefreshCw, Star,
-  Loader2, ExternalLink, ChevronDown, Users, Award, TrendingUp
+  ArrowLeft, FileText, CheckCircle, Lock, Link as LinkIcon, 
+  File, Wand2, MessageCircle, ChevronRight, Brain,
+  Trophy, BookOpen, Target, BarChart3, Zap, AlertCircle, Star,
+  Loader2, ExternalLink, TrendingUp
 } from 'lucide-react';
 import { CheckpointQuiz } from './CheckpointQuiz';
 import { QuizInterface } from './QuizInterface';
-
-// Quick user session helper
-const getCurrentUser = () => {
-  try {
-    const stored = localStorage.getItem('newel_currentUser');
-    return stored ? JSON.parse(stored) : null;
-  } catch {
-    return null;
-  }
-};
 
 // Cache for topic data
 const topicCache = new Map();
@@ -110,6 +97,15 @@ export const TopicDetailCheckpoints: React.FC = () => {
   // =====================================================
   useEffect(() => {
     const loadEssentialData = async () => {
+      if (!subject || !topicId) {
+        navigate('/courses');
+        return;
+      }
+
+      // Decode URL parameters
+      const decodedSubject = decodeURIComponent(subject);
+      const decodedTopicId = decodeURIComponent(topicId);
+
       console.time('loadTopicEssentialData');
       
       try {
@@ -124,11 +120,12 @@ export const TopicDetailCheckpoints: React.FC = () => {
         setUser(storedUser);
 
         // 2. Load basic topic info (NO MATERIALS initially)
-        console.log(`📥 Loading topic basics: ${topicId} in ${subject}...`);
+        console.log(`📥 Loading topic basics: ${decodedTopicId} in ${decodedSubject}...`);
         const courses = await getCoursesLight();
-        const topicData = courses[subject!]?.[topicId!];
+        const topicData = courses[decodedSubject]?.[decodedTopicId];
         
         if (!topicData) {
+          console.error('Topic not found:', decodedSubject, decodedTopicId);
           navigate('/courses');
           return;
         }
@@ -141,8 +138,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
         // 3. Load checkpoints and progress in parallel
         const [checkpointsData, progressData] = await Promise.all([
-          getTopicCheckpoints(topicId!),
-          getCachedProgress(storedUser.username, topicId!)
+          getTopicCheckpoints(decodedTopicId),
+          getCachedProgress(storedUser.username, decodedTopicId)
         ]);
         
         if (!checkpointsData || checkpointsData.length === 0) {
@@ -182,7 +179,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
         // 6. Lazy load materials after 500ms delay (non-blocking)
         setTimeout(() => {
-          loadTopicMaterials();
+          loadTopicMaterials(decodedTopicId);
         }, 500);
 
       } catch (error) {
@@ -198,15 +195,18 @@ export const TopicDetailCheckpoints: React.FC = () => {
   // =====================================================
   // OPTIMIZATION 3: LAZY LOAD MATERIALS
   // =====================================================
-  const loadTopicMaterials = async () => {
-    if (!topicId || materialsLoaded) return;
+  const loadTopicMaterials = async (targetTopicId = topicId) => {
+    if (!targetTopicId || materialsLoaded) return;
     
+    // Decode if needed (though usually passed decoded)
+    const decodedId = decodeURIComponent(targetTopicId);
+
     console.time('loadTopicMaterials');
     setLoading(prev => ({ ...prev, materials: true }));
     
     try {
-      console.log(`📚 Lazy loading materials for topic: ${topicId}`);
-      const loadedMaterials = await getTopicMaterials(topicId);
+      console.log(`📚 Lazy loading materials for topic: ${decodedId}`);
+      const loadedMaterials = await getTopicMaterials(decodedId);
       
       setMaterials(loadedMaterials);
       setMaterialsLoaded(true);
@@ -233,10 +233,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const loadFinalAssessment = async () => {
     if (finalAssessment || !topicId) return;
     
+    const decodedTopicId = decodeURIComponent(topicId);
     setLoading(prev => ({ ...prev, finalAssessment: true }));
     
     try {
-      const finalAssess = await getTopicFinalAssessment(topicId);
+      const finalAssess = await getTopicFinalAssessment(decodedTopicId);
       setFinalAssessment(finalAssess);
 
       if (finalAssess) {
@@ -341,6 +342,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
       return;
     }
 
+    const decodedTopicId = decodeURIComponent(topicId || '');
+    const decodedSubject = decodeURIComponent(subject || '');
+
     try {
       // Cache results for review
       if (results) {
@@ -354,10 +358,10 @@ export const TopicDetailCheckpoints: React.FC = () => {
       await saveCheckpointProgress(user.username, checkpointId, score, passed);
       
       // Update local progress (clear cache)
-      const progressKey = `progress_${user.username}_${topicId}`;
+      const progressKey = `progress_${user.username}_${decodedTopicId}`;
       sessionStorage.removeItem(progressKey);
       
-      const newProgress = await getStudentCheckpointProgress(user.username, topicId!);
+      const newProgress = await getStudentCheckpointProgress(user.username, decodedTopicId);
       setCheckpointProgress(newProgress);
 
       // Check if checkpoint 4 was passed
@@ -374,7 +378,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             await notifyTopic80PercentComplete(
               user.username,
               topic.title,
-              subject!,
+              decodedSubject,
               progressPercentage
             );
           }
@@ -400,22 +404,25 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const handleFinalAssessmentComplete = async (score: number, passed: boolean) => {
     if (!user || !subject || !topicId) return;
 
+    const decodedTopicId = decodeURIComponent(topicId);
+    const decodedSubject = decodeURIComponent(subject);
+
     try {
       setHasPassedFinalAssessment(passed);
       setFinalAssessmentScore(score);
       setFinalAssessmentCompletionDate(new Date().toLocaleDateString());
 
       // Find checkpoint 5 and save progress
-      const checkpointsData = await getTopicCheckpoints(topicId);
+      const checkpointsData = await getTopicCheckpoints(decodedTopicId);
       const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 5);
       
       if (checkpoint5) {
         await saveCheckpointProgress(user.username, checkpoint5.id, score, passed);
-        const progressData = await getStudentCheckpointProgress(user.username, topicId);
+        const progressData = await getStudentCheckpointProgress(user.username, decodedTopicId);
         setCheckpointProgress(progressData);
       }
 
-      await updateTopicProgress(user.username, subject!, topicId!, {
+      await updateTopicProgress(user.username, decodedSubject, decodedTopicId, {
         mainAssessmentScore: score,
         mainAssessmentPassed: passed
       });
@@ -597,7 +604,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           onClose={() => setActiveCheckpoint(null)}
           username={user.username}
           checkpoint={activeCheckpoint}
-          topicId={topicId}
+          topicId={topicId!}
         />
       )}
 
@@ -626,7 +633,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           onClose={() => setShowReviewForCheckpoint(null)}
           username={user.username}
           checkpoint={checkpoints.find(cp => cp.id === showReviewForCheckpoint)!}
-          topicId={topicId}
+          topicId={topicId!}
           mode="review"
           reviewResults={checkpointResults[showReviewForCheckpoint]}
         />
@@ -691,7 +698,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             <div className="flex items-center gap-4 text-sm">
               <span className="text-white/50">Grade {topic.gradeLevel}</span>
               <span className="text-white/50">•</span>
-              <span className="text-white/50">{subject}</span>
+              <span className="text-white/50">{decodeURIComponent(subject || '')}</span>
             </div>
           </div>
           
@@ -724,7 +731,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
               </h2>
               {!materialsLoaded && !loading.materials && (
                 <button 
-                  onClick={loadTopicMaterials}
+                  onClick={() => loadTopicMaterials()}
                   className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                 >
                   Load Materials
@@ -771,7 +778,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                 <FileText className="w-12 h-12 text-white/20 mx-auto mb-3" />
                 <p className="text-white/60">Materials not loaded yet</p>
                 <button 
-                  onClick={loadTopicMaterials}
+                  onClick={() => loadTopicMaterials()}
                   className="mt-3 text-sm text-cyan-400 hover:text-cyan-300"
                 >
                   Click to load materials
@@ -780,7 +787,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             )}
             
             {/* Biolens Integration for Biology */}
-            {subject === 'Biology' && (
+            {subject && decodeURIComponent(subject) === 'Biology' && (
               <div className="bg-green-900/20 p-4 rounded-xl border border-green-500/30 mt-4">
                 <h4 className="text-green-300 font-bold mb-2 flex items-center gap-2">
                   <Brain size={16} /> Biolens Interactive

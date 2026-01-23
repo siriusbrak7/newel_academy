@@ -145,6 +145,7 @@ interface CoursePerformance {
 // FIX: Implement missing function with proper return type
 // FIX: Implement missing function with proper return type
 // FIX: Replace the entire getStudentDetailedCoursePerformance function with this corrected version
+// FIXED VERSION of getStudentDetailedCoursePerformance in Dashboards.tsx
 const getStudentDetailedCoursePerformance = async (username: string): Promise<Record<string, CoursePerformance>> => {
   try {
     console.log(`📊 Getting detailed course performance for ${username}`);
@@ -161,8 +162,8 @@ const getStudentDetailedCoursePerformance = async (username: string): Promise<Re
       return {};
     }
 
-    // Get all topics the student has progress on
-    const { data: topicsProgress } = await supabase
+    // SIMPLIFIED QUERY - Get everything in one go
+    const { data: topicsProgress, error } = await supabase
       .from('user_progress')
       .select(`
         *,
@@ -170,16 +171,31 @@ const getStudentDetailedCoursePerformance = async (username: string): Promise<Re
           id,
           title,
           grade_level,
-          subject:subject_id (name)
+          subject_id
         )
       `)
       .eq('user_id', userData.id);
+
+    if (error) {
+      console.error('❌ Error fetching topics progress:', error);
+      return {};
+    }
 
     console.log(`📚 Found ${topicsProgress?.length || 0} topics with progress`);
 
     if (!topicsProgress || topicsProgress.length === 0) {
       return {};
     }
+
+    // Get subject names in a separate query
+    const subjectIds = topicsProgress.map(tp => tp.topic?.subject_id).filter(Boolean);
+    const { data: subjects } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .in('id', subjectIds);
+
+    const subjectMap = new Map();
+    subjects?.forEach(s => subjectMap.set(s.id, s.name));
 
     const performance: Record<string, CoursePerformance> = {};
     
@@ -213,14 +229,7 @@ const getStudentDetailedCoursePerformance = async (username: string): Promise<Re
         : 0;
       
       // Get subject name safely
-      let subjectName = 'General';
-      if (topic.subject) {
-        if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-          subjectName = topic.subject[0]?.name || 'General';
-        } else if (typeof topic.subject === 'object') {
-          subjectName = (topic.subject as any)?.name || 'General';
-        }
-      }
+      const subjectName = subjectMap.get(topic.subject_id) || 'General';
 
       performance[topic.id] = {
         topicTitle: topic.title,
@@ -229,7 +238,7 @@ const getStudentDetailedCoursePerformance = async (username: string): Promise<Re
         checkpointCount: checkpointProgress?.length || 0,
         checkpointScores,
         averageScore,
-        passed: averageScore >= 60, // Adjust threshold as needed
+        passed: averageScore >= 60,
         completedAt: checkpointProgress?.length > 0 
           ? Math.max(...checkpointProgress.map(cp => new Date(cp.completed_at || 0).getTime()))
           : undefined,
@@ -1949,6 +1958,45 @@ export const TeacherDashboard: React.FC<{ user: User }> = ({ user }) => {
   // Cache for student data (2-minute cache)
   const [studentDataCache, setStudentDataCache] = useState<Record<string, any>>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Add this helper function at the top of TeacherDashboard component
+const loadStudentPerformance = async (username: string) => {
+  try {
+    // Use the simpler function
+    const subjectPerformance = await getStudentSubjectPerformance(username);
+    
+    // If that fails, try a direct query
+    if (Object.keys(subjectPerformance).length === 0) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', username)
+        .single();
+      
+      if (userData) {
+        const { data: progress } = await supabase
+          .from('student_checkpoint_progress')
+          .select(`
+            score,
+            checkpoint:checkpoints (
+              topic:topics (
+                subject:subject_id (name)
+              )
+            )
+          `)
+          .eq('user_id', userData.id)
+          .not('score', 'is', null);
+        
+        // Process the data...
+      }
+    }
+    
+    return subjectPerformance;
+  } catch (error) {
+    console.error('Error loading student performance:', error);
+    return {};
+  }
+};
 
   // =====================================================
   // OPTIMIZATION 1: PARALLEL DATA LOADING

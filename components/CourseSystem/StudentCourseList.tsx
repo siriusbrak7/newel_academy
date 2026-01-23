@@ -4,12 +4,12 @@ import { CourseStructure, User } from '../../types';
 import { 
   getTopicsForStudent, 
   getProgress, 
-  canAccessTopic, 
+  canAccessTopic,
   getStudentCheckpointProgress,
-  getCourses  // ADD THIS IMPORT
+  getCourses
 } from '../../services/storageService';
 import { ChevronRight, FileText, ArrowLeft, Lock } from 'lucide-react';
-import { CourseSkeleton } from './CourseSkeleton'; // ADD THIS IMPORT
+import { CourseSkeleton } from './CourseSkeleton';
 
 interface StudentCourseListProps {
   user: User;
@@ -175,7 +175,6 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
     );
   }
 
-  // Return your normal course list component...
   return (
     <div className="max-w-7xl mx-auto px-4">
       <div className="space-y-8">
@@ -259,8 +258,16 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
                           {topic.materials?.length || 0} materials
                         </div>
                         <Link
-                          to={isLocked ? '#' : `/topic/${subject}/${topic.id}`}
-                          onClick={(e) => isLocked && e.preventDefault()}
+                          to={isLocked ? '#' : `/topic/${encodeURIComponent(subject)}/${topic.id}`}
+                          onClick={(e) => {
+                            if (isLocked) {
+                              e.preventDefault();
+                              alert('Complete previous topics to unlock this one');
+                            } else {
+                              // Force topic load by clearing cache
+                              sessionStorage.removeItem(`progress_${user.username}_${topic.id}`);
+                            }
+                          }}
                           className={`flex items-center gap-1 text-sm font-medium ${
                             isLocked 
                               ? 'text-red-400 cursor-not-allowed' 

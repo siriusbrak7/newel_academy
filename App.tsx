@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import AuthModal from './components/AuthModal';
+// Look for other imports and add this:
 import { AdminDashboard, StudentDashboard, TeacherDashboard } from './components/Dashboards';
 import {
   StudentCourseList,
@@ -758,7 +759,9 @@ const App: React.FC = () => {
                 </RequireAuth>
               }
             />  
-          <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetail /></RequireAuth>} />
+          <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetail />
+  </RequireAuth>
+} />
 
           <Route
             path="/assessments"
