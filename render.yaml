@@ -4,6 +4,14 @@
     env: static
     buildCommand: npm run build
     staticPublishPath: ./dist
+    
+    # Custom domain (if applicable)
+    # customDomains:
+    #   - newel-academy.onrender.com
+    
+    # Ensure _redirects file is deployed
+    ignoreFiles: []
+    
     headers:
       - path: /assets/*
         name: Cache-Control
@@ -11,6 +19,7 @@
       - path: /*
         name: Cache-Control
         value: public, max-age=0, must-revalidate
+    
     envVars:
       - key: VITE_SUPABASE_URL
         sync: false

@@ -1,20 +1,23 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import AuthModal from './components/AuthModal';
-// Look for other imports and add this:
-import { AdminDashboard, StudentDashboard, TeacherDashboard } from './components/Dashboards';
-import {
-  StudentCourseList,
-  CourseManager,
-  AssessmentManager,
-  StudentAssessmentList,
-  TopicDetail
-} from './components/CourseSystem';
-import { TeacherAssessmentReview } from './components/TeacherAssessmentReview';
-import { SprintChallenge, LeaderboardView } from './components/Gamification';
-import AITutorChat from './components/AITutorChat';
+
+// Lazy load heavy components for code splitting
+const AdminDashboard = React.lazy(() => import('./components/Dashboards').then(m => ({ default: m.AdminDashboard })));
+const StudentDashboard = React.lazy(() => import('./components/Dashboards').then(m => ({ default: m.StudentDashboard })));
+const TeacherDashboard = React.lazy(() => import('./components/Dashboards').then(m => ({ default: m.TeacherDashboard })));
+const StudentCourseList = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.StudentCourseList })));
+const CourseManager = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.CourseManager })));
+const AssessmentManager = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.AssessmentManager })));
+const StudentAssessmentList = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.StudentAssessmentList })));
+const TopicDetail = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.TopicDetail })));
+const TeacherAssessmentReview = React.lazy(() => import('./components/TeacherAssessmentReview').then(m => ({ default: m.TeacherAssessmentReview })));
+const SprintChallenge = React.lazy(() => import('./components/Gamification').then(m => ({ default: m.SprintChallenge })));
+const LeaderboardView = React.lazy(() => import('./components/Gamification').then(m => ({ default: m.LeaderboardView })));
+const AITutorChat = React.lazy(() => import('./components/AITutorChat'));
+
 import { ImageOptimizer } from './components/ImageOptimizer';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
@@ -36,6 +39,16 @@ import {
   User as UserIcon // Aliased to avoid conflict with User type
 } from 'lucide-react';
 import { getUserNotifications } from './services/storageService';
+
+// Loading fallback component
+const LoadingScreen: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-900">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-cyan-500 mx-auto mb-4"></div>
+      <p className="text-white text-sm">Loading...</p>
+    </div>
+  </div>
+);
 
 // Declare ThemeManager from index.html
 declare global {
@@ -724,71 +737,73 @@ const App: React.FC = () => {
       )}
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              auth.loggedIn && auth.user ? (
-                <Navigate
-                  to={
-                    auth.user.role === 'admin'
-                      ? '/admin'
-                      : auth.user.role === 'teacher'
-                      ? '/teacher-dashboard'
-                      : '/student-dashboard'
-                  }
-                  replace
-                />
-              ) : (
-                <Homepage theme={theme} onOpenAuth={() => setShowAuthModal(true)} />
-              )
-            }
-          />
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                auth.loggedIn && auth.user ? (
+                  <Navigate
+                    to={
+                      auth.user.role === 'admin'
+                        ? '/admin'
+                        : auth.user.role === 'teacher'
+                        ? '/teacher-dashboard'
+                        : '/student-dashboard'
+                    }
+                    replace
+                  />
+                ) : (
+                  <Homepage theme={theme} onOpenAuth={() => setShowAuthModal(true)} />
+                )
+              }
+            />
 
-          <Route path="/admin" element={<RequireAuth allowedRoles={['admin']} user={auth.user} loggedIn={auth.loggedIn}><AdminDashboard /></RequireAuth>} />
-          <Route path="/teacher-dashboard" element={<RequireAuth allowedRoles={['teacher']} user={auth.user} loggedIn={auth.loggedIn}><TeacherDashboard user={auth.user!} /></RequireAuth>} />
-          <Route path="/student-dashboard" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}><StudentDashboard user={auth.user!} /></RequireAuth>} />
+            <Route path="/admin" element={<RequireAuth allowedRoles={['admin']} user={auth.user} loggedIn={auth.loggedIn}><AdminDashboard /></RequireAuth>} />
+            <Route path="/teacher-dashboard" element={<RequireAuth allowedRoles={['teacher']} user={auth.user} loggedIn={auth.loggedIn}><TeacherDashboard user={auth.user!} /></RequireAuth>} />
+            <Route path="/student-dashboard" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}><StudentDashboard user={auth.user!} /></RequireAuth>} />
 
-          <Route
-            path="/courses"
-            element={
-              <RequireAuth allowedRoles={['teacher', 'student']} user={auth.user} loggedIn={auth.loggedIn}>
-                {auth.user?.role === 'teacher' 
-                  ? <CourseManager />
-                  : <StudentCourseList user={auth.user!} />}
+            <Route
+              path="/courses"
+              element={
+                <RequireAuth allowedRoles={['teacher', 'student']} user={auth.user} loggedIn={auth.loggedIn}>
+                  {auth.user?.role === 'teacher' 
+                    ? <CourseManager />
+                    : <StudentCourseList user={auth.user!} />}
+                  </RequireAuth>
+                }
+              />  
+            <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetail />
+    </RequireAuth>
+  } />
+
+            <Route
+              path="/assessments"
+              element={
+                <RequireAuth allowedRoles={['teacher', 'student', 'admin']} user={auth.user} loggedIn={auth.loggedIn}>
+                  {auth.user?.role === 'teacher' || auth.user?.role === 'admin' ? <AssessmentManager /> : <StudentAssessmentList user={auth.user!} />}
                 </RequireAuth>
               }
-            />  
-          <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetail />
-  </RequireAuth>
-} />
+            />
 
-          <Route
-            path="/assessments"
-            element={
-              <RequireAuth allowedRoles={['teacher', 'student', 'admin']} user={auth.user} loggedIn={auth.loggedIn}>
-                {auth.user?.role === 'teacher' || auth.user?.role === 'admin' ? <AssessmentManager /> : <StudentAssessmentList user={auth.user!} />}
-              </RequireAuth>
-            }
-          />
+            <Route path="/teacher-assessments" element={<RequireAuth allowedRoles={['teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}><TeacherAssessmentReview /></RequireAuth>} />
+            <Route path="/sprint-challenge" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}><SprintChallenge /></RequireAuth>} />
+            <Route path="/leaderboard" element={<RequireAuth allowedRoles={['student', 'teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}><LeaderboardView /></RequireAuth>} />
 
-          <Route path="/teacher-assessments" element={<RequireAuth allowedRoles={['teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}><TeacherAssessmentReview /></RequireAuth>} />
-          <Route path="/sprint-challenge" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}><SprintChallenge /></RequireAuth>} />
-          <Route path="/leaderboard" element={<RequireAuth allowedRoles={['student', 'teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}><LeaderboardView /></RequireAuth>} />
-
-          <Route
-            path="*"
-            element={
-              <div className="min-h-screen flex flex-col items-center justify-center">
-                <h1 className={`text-6xl font-bold mb-4 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'cyber-text-glow text-green-400' : 'text-white'}`}>404</h1>
-                <p className={`text-xl mb-8 ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>Page not found</p>
-                <Link to="/" className={`text-xl hover:underline ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>
-                  ← Return to Home
-                </Link>
-              </div>
-            }
-          />
-        </Routes>
+            <Route
+              path="*"
+              element={
+                <div className="min-h-screen flex flex-col items-center justify-center">
+                  <h1 className={`text-6xl font-bold mb-4 font-['Poppins'] ${theme === 'Cyber-Dystopian' ? 'cyber-text-glow text-green-400' : 'text-white'}`}>404</h1>
+                  <p className={`text-xl mb-8 ${theme === 'Cyber-Dystopian' ? 'text-green-300/60' : 'text-white/60'}`}>Page not found</p>
+                  <Link to="/" className={`text-xl hover:underline ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>
+                    ← Return to Home
+                  </Link>
+                </div>
+              }
+            />
+          </Routes>
+        </Suspense>
       </main>
 
       <footer className={`text-center py-8 border-t backdrop-blur-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/30 border-green-500/10 bg-black/50' : 'text-white/30 border-white/10 bg-black/20'}`}>
