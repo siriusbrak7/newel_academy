@@ -46,4 +46,6 @@ export default defineConfig({
     exclude: ['bcryptjs'],
     include: ['react', 'react-dom', 'react-router-dom']
   },
+  // Add this to ensure _redirects file is copied
+  publicDir: 'public',
 });

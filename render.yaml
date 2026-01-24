@@ -5,10 +5,37 @@
     buildCommand: npm run build
     staticPublishPath: ./dist
     
-    # ADD THIS - CRITICAL FOR PAGE RELOADS
+    # CRITICAL: These rewrite rules handle SPA routing
     routes:
       - type: rewrite
-        source: "/*"
+        source: /student-dashboard
+        destination: /index.html
+      - type: rewrite
+        source: /teacher-dashboard
+        destination: /index.html
+      - type: rewrite
+        source: /admin
+        destination: /index.html
+      - type: rewrite
+        source: /courses
+        destination: /index.html
+      - type: rewrite
+        source: /assessments
+        destination: /index.html
+      - type: rewrite
+        source: /sprint-challenge
+        destination: /index.html
+      - type: rewrite
+        source: /leaderboard
+        destination: /index.html
+      - type: rewrite
+        source: /topic/*
+        destination: /index.html
+      - type: rewrite
+        source: /teacher-assessments
+        destination: /index.html
+      - type: rewrite
+        source: /*
         destination: /index.html
     
     headers:
