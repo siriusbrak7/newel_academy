@@ -37,7 +37,7 @@ export default defineConfig({
     assetsDir: 'assets',
     chunkSizeWarningLimit: 1000,
   },
-  base: '/',
+  base: './',  // CHANGE THIS FROM '/' TO './'
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
     'global': 'window',
@@ -46,6 +46,4 @@ export default defineConfig({
     exclude: ['bcryptjs'],
     include: ['react', 'react-dom', 'react-router-dom']
   },
-  // Add this to ensure _redirects file is copied
-  publicDir: 'public',
 });
