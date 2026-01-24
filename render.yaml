@@ -5,12 +5,11 @@
     buildCommand: npm run build
     staticPublishPath: ./dist
     
-    # Custom domain (if applicable)
-    # customDomains:
-    #   - newel-academy.onrender.com
-    
-    # Ensure _redirects file is deployed
-    ignoreFiles: []
+    # CRITICAL: Add this for SPA routing (was probably missing)
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: /index.html
     
     headers:
       - path: /assets/*

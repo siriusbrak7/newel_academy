@@ -5,13 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && npm run postbuild",
-    "postbuild": "copyfiles public/_redirects dist/ && copyfiles netlify.toml dist/",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "deploy": "npm run build",
     "cleanup": "npx tsx cleanup.ts",
     "deploy:prepare": "npm run cleanup && npm run build",
-    "render-build": "./render-build.sh",
     "predeploy": "npm run cleanup"
   },
   "dependencies": {
@@ -25,7 +23,6 @@
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.556.0",
     "react": "^19.2.1",
-    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.10.1",
     "uuid": "^13.0.0"
