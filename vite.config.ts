@@ -26,27 +26,10 @@ export default defineConfig({
       external: ['crypto'],
       output: {
         manualChunks: {
-          // Split vendor code
-          'vendor': [
-            'react',
-            'react-dom',
-            'react-router-dom'
-          ],
-          // Split supabase (only load when needed)
-          'supabase': [
-            '@supabase/supabase-js'
-          ],
-          // Split chart libraries
-          'charts': [
-            'chart.js',
-            'react-chartjs-2'
-          ],
-          // Split UI libraries
-          'ui': [
-            'lucide-react',
-            'jspdf',
-            'jspdf-autotable'
-          ]
+          'vendor': ['react', 'react-dom', 'react-router-dom'],
+          'supabase': ['@supabase/supabase-js'],
+          'charts': ['chart.js', 'react-chartjs-2'],
+          'ui': ['lucide-react', 'jspdf', 'jspdf-autotable']
         }
       }
     },
@@ -61,10 +44,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['bcryptjs'],
-    include: [
-      'react',
-      'react-dom',
-      'react-router-dom'
-    ]
+    include: ['react', 'react-dom', 'react-router-dom']
   },
 });

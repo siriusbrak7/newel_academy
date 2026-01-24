@@ -5,7 +5,7 @@
     buildCommand: npm run build
     staticPublishPath: ./dist
     
-    # CRITICAL: Add this for SPA routing (was probably missing)
+    # ADD THIS - CRITICAL FOR PAGE RELOADS
     routes:
       - type: rewrite
         source: "/*"
