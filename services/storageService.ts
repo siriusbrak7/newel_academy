@@ -413,9 +413,9 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
 };
 
 // storageService.ts - Add this function
-export const getCoursesLight = async (): Promise<CourseStructure> => {
+export const getCoursesLight = async (gradeLevel?: string): Promise<CourseStructure> => {
   console.time('getCoursesLight');
-  console.log('🚀 Fetching light courses (no materials)...');
+  console.log(`🚀 Fetching light courses (no materials)${gradeLevel ? ` for grade ${gradeLevel}` : ''}...`);
   
   try {
     // Get all subjects first to avoid ambiguous joins
@@ -427,7 +427,7 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
     subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
     
     // Fetch topics WITHOUT ambiguous join
-    const { data: topicsData, error } = await supabase
+    let query = supabase
       .from('topics')
       .select(`
         id,
@@ -438,6 +438,13 @@ export const getCoursesLight = async (): Promise<CourseStructure> => {
         checkpoints_required
       `)
       .order('title', { ascending: true });
+    
+    // Add WHERE clause to filter by grade if provided
+    if (gradeLevel) {
+      query = query.eq('grade_level', gradeLevel);
+    }
+    
+    const { data: topicsData, error } = await query;
 
     if (error) throw error;
 
@@ -3113,7 +3120,7 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
   console.log(`📊 Getting topics for grade level: "${gradeLevel}"`);
   
   try {
-    // Get topics for the student's grade OR lower grades
+    // Get topics for the student's grade only
     const { data: topicsData, error } = await supabase
       .from('topics')
       .select(`
@@ -3124,7 +3131,7 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
         subject_id,
         subjects!inner (name)
       `)
-      .lte('grade_level', gradeLevel) // Topics for this grade or lower
+      .eq('grade_level', gradeLevel) // Topics for this grade only
       .order('title');
 
     if (error) {

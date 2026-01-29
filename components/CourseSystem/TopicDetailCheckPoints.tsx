@@ -121,7 +121,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
         // 2. Load basic topic info (NO MATERIALS initially)
         console.log(`📥 Loading topic basics: ${decodedTopicId} in ${decodedSubject}...`);
-        const courses = await getCoursesLight();
+        const courses = await getCoursesLight(storedUser.gradeLevel);
         const topicData = courses[decodedSubject]?.[decodedTopicId];
         
         if (!topicData) {

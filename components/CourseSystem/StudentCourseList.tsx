@@ -39,13 +39,10 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         const gradeSpecificCourses = await getTopicsForStudent(user.gradeLevel);
         
         setProgress(50);
-        setLoadingStage('Loading all available courses...');
+        setLoadingStage('Loading your progress...');
         
-        // Get all courses for fallback
-        const allCourses = await getCourses();
-        
-        // Merge both (prefer grade-specific)
-        const mergedCourses = { ...allCourses, ...gradeSpecificCourses };
+        // Use grade-specific courses directly
+        const mergedCourses = gradeSpecificCourses;
         
         setProgress(70);
         setLoadingStage('Loading your progress...');
