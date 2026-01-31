@@ -393,6 +393,47 @@ export interface DbQuestion {
   created_at?: string;
 }
 
+/**
+ * Helper to map database question to frontend question
+ */
+export function mapDbQuestionToFrontend(dbQuestion: any): Question {
+  return {
+    id: dbQuestion.id,
+    text: dbQuestion.text,
+    options: dbQuestion.options || [],
+    correctAnswer: dbQuestion.correct_answer || '',
+    type: dbQuestion.type as 'MCQ' | 'THEORY',
+    difficulty: dbQuestion.difficulty as 'IGCSE' | 'AS' | 'A_LEVEL',
+    topic: dbQuestion.topic || '',
+    modelAnswer: dbQuestion.model_answer,
+    explanation: dbQuestion.explanation,
+    format: dbQuestion.format as QuestionFormat,
+    metadata: dbQuestion.metadata,
+    content: dbQuestion.content,
+    
+    // Keep database fields for reference
+    topic_id: dbQuestion.topic_id,
+    subtopic_name: dbQuestion.subtopic_name,
+    sort_order: dbQuestion.sort_order
+  };
+}
+
+/**
+ * Helper to map database checkpoint to frontend checkpoint
+ */
+export function mapDbCheckpointToFrontend(dbCheckpoint: any): FrontendCheckpoint {
+  return {
+    id: dbCheckpoint.id,
+    title: dbCheckpoint.title,
+    checkpointNumber: dbCheckpoint.checkpoint_number,
+    requiredScore: dbCheckpoint.required_score || 85,
+    questionCount: dbCheckpoint.question_count || 5,
+    description: dbCheckpoint.description,
+    isFinalAssessment: dbCheckpoint.is_final_assessment || false,
+    timeLimitPerQuestion: dbCheckpoint.time_limit_per_question || 25
+  };
+}
+
 export interface DbAssessment {
   id: string;
   title: string;

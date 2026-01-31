@@ -4,6 +4,7 @@ import { Timer, Loader2, CheckCircle, XCircle, AlertCircle, Info } from 'lucide-
 import Confetti from '../Confetti';
 import { supabase } from '../../services/supabaseClient';
 import { saveTheorySubmission } from '../../services/theoryGradingService';
+import { gradeQuiz, submitQuizWithAnswers } from '../../src/utils/quiz-utils';
 
 // --- Types ---
 interface Checkpoint {
@@ -71,7 +72,8 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
 }) => {
   // --- State ---
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  // Store answers keyed by question ID. For MCQ store the selected index (number). For THEORY store the text (string).
+  const [answers, setAnswers] = useState<Record<string, number | string>>({});
   const [submitted, setSubmitted] = useState(mode === 'review'); // Start submitted in review mode
   const [score, setScore] = useState(mode === 'review' ? reviewResults?.score || 0 : 0);
   const [results, setResults] = useState<QuestionResult[]>(
@@ -112,9 +114,11 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleAnswerChange = useCallback((val: string) => {
-    setAnswers(prev => ({ ...prev, [currentQ]: val }));
-  }, [currentQ]);
+  const handleAnswerChange = useCallback((val: number | string, questionId?: string) => {
+    const qId = questionId || questions[currentQ]?.id;
+    if (!qId) return;
+    setAnswers(prev => ({ ...prev, [qId]: val }));
+  }, [currentQ, questions]);
 
   const handleSubmit = async (forced = false) => {
     setGrading(true);
@@ -131,12 +135,14 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
           .single();
 
         if (userData && topicId) {
+          const theoryQId = questions[0]?.id;
+          const theoryAns = theoryQId ? String(answers[theoryQId] || '') : '';
           await saveTheorySubmission(
             userData.id,
             checkpointId,
             topicId,
             questions[0]?.text || '',
-            sanitizeInput(answers[0] || '')
+            sanitizeInput(theoryAns)
           );
           setSubmitted(true);
           onComplete(0, false, []);
@@ -144,37 +150,41 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
           throw new Error('User or topic not found');
         }
       } else {
-        // MCQ Grading
+        // MCQ Grading (now supports storing indices for MCQ answers)
         let correctCount = 0;
         const gradingResults: QuestionResult[] = [];
+        let mcqCount = 0;
 
-        questions.forEach((q, idx) => {
-          if (q.type === 'MCQ' && q.correctAnswer && q.options) {
-            const selectedAnswer = answers[idx] || "No Answer Selected";
-            const correctLetter = q.correctAnswer.toUpperCase();
-            const letterIndex = 'ABCD'.indexOf(correctLetter);
-            let correctOptionText = "";
+        questions.forEach((q) => {
+          if (q.type === 'MCQ' && q.options && q.options.length) {
+            mcqCount++;
+            const selectedVal = answers[q.id];
+            const selectedText = (typeof selectedVal === 'number' && Array.isArray(q.options)) ? q.options[selectedVal] : String(selectedVal || 'No Answer Selected');
 
-            if (letterIndex >= 0 && letterIndex < q.options.length) {
-              correctOptionText = q.options[letterIndex];
+            // Determine correct option text. Support both letter-style (A/B/C/D) and full-text correct answers.
+            let correctOptionText = String(q.correctAnswer || '');
+            if (typeof q.correctAnswer === 'string' && q.correctAnswer.length === 1) {
+              const letterIndex = 'ABCD'.indexOf(q.correctAnswer.toUpperCase());
+              if (letterIndex >= 0 && letterIndex < q.options.length) {
+                correctOptionText = q.options[letterIndex];
+              }
             }
 
-            const isCorrect = selectedAnswer === correctOptionText;
+            const isCorrect = selectedText === correctOptionText;
             if (isCorrect) correctCount++;
 
-            // UPDATED: Ensure explanation is included in the result object
             gradingResults.push({
               questionText: q.text,
-              userAnswer: selectedAnswer,
+              userAnswer: selectedText,
               correctAnswer: correctOptionText,
-              isCorrect: isCorrect,
+              isCorrect,
               options: q.options,
-              explanation: q.explanation 
+              explanation: q.explanation
             });
           }
         });
 
-        const finalScore = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
+        const finalScore = mcqCount > 0 ? (correctCount / mcqCount) * 100 : 0;
         
         setResults(gradingResults);
         setScore(finalScore);
@@ -186,6 +196,32 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
 
         // Pass results to parent component
         onComplete(finalScore, finalScore >= passThreshold, gradingResults);
+
+        // OPTIONAL: Try to persist a submission record with answers as text
+        if (username) {
+          try {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('id')
+              .eq('username', username)
+              .single();
+
+            const userId = userData?.id;
+            if (userId) {
+              // Build selectedAnswers as Record<questionId, index>
+              const selectedIndices: Record<string, number> = {};
+              questions.forEach((q) => {
+                const sel = answers[q.id];
+                if (typeof sel === 'number') selectedIndices[q.id] = sel;
+              });
+
+              // Save submission (converts indices to text internally)
+              await submitQuizWithAnswers(checkpointId, userId, username, selectedIndices);
+            }
+          } catch (e) {
+            console.error('Failed to save automatic submission:', e);
+          }
+        }
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred during grading.');
@@ -375,7 +411,6 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
               timeLeft < 60 ? 'bg-red-500/20 text-red-400 border-red-500/50 animate-pulse' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
             }`}
             role="timer"
-            aria-live={timeLeft < 60 ? "assertive" : "off"}
           >
             <Timer size={16} aria-hidden="true" />
             <span className="sr-only">Time Remaining:</span>
@@ -400,18 +435,18 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
           {!isTheory ? (
             <div className="space-y-3" role="radiogroup" aria-labelledby="question-text">
               {q.options.map((opt, i) => {
-                const isSelected = answers[currentQ] === opt;
+                const isSelected = answers[q.id] === i;
                 return (
                   <button
                     key={i}
-                    onClick={() => handleAnswerChange(opt)}
+                    onClick={() => handleAnswerChange(i, q.id)}
                     className={`w-full text-left p-4 rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
                       isSelected
                         ? 'bg-cyan-600/30 border-cyan-400 text-white'
                         : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                     }`}
                     role="radio"
-                    aria-checked={isSelected}
+                    aria-checked={isSelected ? 'true' : 'false'}
                   >
                     <span className="inline-block w-6 font-bold opacity-50 mr-2" aria-hidden="true">
                       {String.fromCharCode(65 + i)}.
@@ -425,8 +460,8 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
             <textarea
               className="w-full h-48 bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-purple-400 outline-none resize-none focus:ring-1 focus:ring-purple-400"
               placeholder="Type your answer here..."
-              value={answers[currentQ] || ''}
-              onChange={(e) => handleAnswerChange(e.target.value)}
+              value={String(answers[q.id] || '')}
+              onChange={(e) => handleAnswerChange(e.target.value, q.id)}
               aria-label="Type your answer"
             />
           )}

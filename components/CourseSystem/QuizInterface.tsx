@@ -23,7 +23,8 @@ export const QuizInterface: React.FC<QuizProps> = ({
   isAssessment, isCourseFinal, assessmentId, username 
 }) => {
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  // Store answers keyed by question ID. For MCQ store the selected index (number). For THEORY store the text (string).
+  const [answers, setAnswers] = useState<Record<string, number | string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -86,8 +87,10 @@ export const QuizInterface: React.FC<QuizProps> = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleAnswerChange = (val: string) => {
-    setAnswers({ ...answers, [currentQ]: val });
+  const handleAnswerChange = (val: number | string, questionId?: string) => {
+    const qId = questionId || questions[currentQ]?.id;
+    if (!qId) return;
+    setAnswers(prev => ({ ...prev, [qId]: val }));
   };
 
   const handleTeacherAssignedSubmit = () => {
@@ -95,8 +98,13 @@ export const QuizInterface: React.FC<QuizProps> = ({
     
     if (assessmentId && username) {
       const answersMap: Record<string, string> = {};
-      questions.forEach((q, idx) => {
-        answersMap[q.id] = answers[idx] || '';
+      questions.forEach((q) => {
+        const val = answers[q.id];
+        if (q.type === 'MCQ' && typeof val === 'number' && Array.isArray(q.options)) {
+          answersMap[q.id] = q.options[val];
+        } else {
+          answersMap[q.id] = String(val || '');
+        }
       });
       
       const submission: Submission = {
@@ -132,15 +140,26 @@ export const QuizInterface: React.FC<QuizProps> = ({
   let theoryFeedback = '';
 
   try {
-    // Grade MCQ questions
-    questions.forEach((q, idx) => {
+    // Grade MCQ questions (use indices/text conversion)
+    questions.forEach((q) => {
       if (q.type === 'MCQ') {
         mcqCount++;
-        if (answers[idx] === q.correctAnswer) {
+        const sel = answers[q.id];
+        const userSelectedText = (typeof sel === 'number' && Array.isArray(q.options)) ? q.options[sel] : String(sel || '');
+
+        let correctOptionText = String(q.correctAnswer || '');
+        if (typeof q.correctAnswer === 'string' && q.correctAnswer.length === 1) {
+          const letterIndex = 'ABCD'.indexOf(q.correctAnswer.toUpperCase());
+          if (letterIndex >= 0 && letterIndex < q.options.length) {
+            correctOptionText = q.options[letterIndex];
+          }
+        }
+
+        if (userSelectedText === correctOptionText) {
           mcqScore++;
-          console.log(`MCQ ${idx + 1}: Correct! Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
+          console.log(`MCQ: Correct! Answer: ${userSelectedText}, Correct: ${correctOptionText}`);
         } else {
-          console.log(`MCQ ${idx + 1}: Incorrect. Answer: ${answers[idx]}, Correct: ${q.correctAnswer}`);
+          console.log(`MCQ: Incorrect. Answer: ${userSelectedText}, Correct: ${correctOptionText}`);
         }
       }
     });
@@ -153,11 +172,11 @@ export const QuizInterface: React.FC<QuizProps> = ({
     
     if (theoryQIndex >= 0) {
       const q = questions[theoryQIndex];
-      const studentAns = answers[theoryQIndex] || "No answer provided.";
+      const studentAns = String(answers[q.id] || "No answer provided.");
       console.log('Theory question found:', {
         questionText: q.text?.substring(0, 100) + '...',
         answerLength: studentAns.length,
-        hasAnswer: !!answers[theoryQIndex]
+        hasAnswer: !!answers[q.id]
       });
       
       try {
@@ -235,14 +254,19 @@ export const QuizInterface: React.FC<QuizProps> = ({
     if (username && assessmentId) {
       const answersMap: Record<string, string> = {};
       questions.forEach((q, idx) => {
+        const val = answers[q.id];
         if (q.id) {
-          answersMap[q.id] = answers[idx] || '';
+          if (q.type === 'MCQ' && typeof val === 'number' && Array.isArray(q.options)) {
+            answersMap[q.id] = q.options[val];
+          } else {
+            answersMap[q.id] = String(val || '');
+          }
         } else {
           console.error('Question missing ID:', q);
-          answersMap[`q${idx}`] = answers[idx] || '';
+          answersMap[`q${idx}`] = String(answers[q.id] || '');
         }
       });
-      
+
       // Build submission object - match what your database expects
       const submission: Submission = {
         assessmentId: assessmentId,
@@ -283,14 +307,27 @@ export const QuizInterface: React.FC<QuizProps> = ({
 
   const handleCheckpointSubmit = () => {
   let rawScore = 0;
-  
-  questions.forEach((q, idx) => {
-    if (q.type === 'MCQ' && answers[idx] === q.correctAnswer) {
-      rawScore++;
+  let mcqCount = 0;
+
+  questions.forEach((q) => {
+    if (q.type === 'MCQ') {
+      mcqCount++;
+      const sel = answers[q.id];
+      const selectedText = (typeof sel === 'number' && Array.isArray(q.options)) ? q.options[sel] : String(sel || '');
+
+      let correctOptionText = String(q.correctAnswer || '');
+      if (typeof q.correctAnswer === 'string' && q.correctAnswer.length === 1) {
+        const letterIndex = 'ABCD'.indexOf(q.correctAnswer.toUpperCase());
+        if (letterIndex >= 0 && letterIndex < q.options.length) {
+          correctOptionText = q.options[letterIndex];
+        }
+      }
+
+      if (selectedText === correctOptionText) rawScore++;
     }
   });
   
-  const finalScore = questions.length > 0 ? (rawScore / questions.length) * 100 : 0;
+  const finalScore = mcqCount > 0 ? (rawScore / mcqCount) * 100 : 0;
   
   setScore(finalScore);
   setSubmitted(true);
@@ -449,33 +486,38 @@ export const QuizInterface: React.FC<QuizProps> = ({
           
           {q.type === 'MCQ' ? (
             <div className="space-y-3">
-              {q.options && q.options.map((opt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleAnswerChange(opt)}
-                  className={`w-full text-left p-4 rounded-xl border transition-all ${
-                    answers[currentQ] === opt 
-                      ? 'bg-cyan-600/30 border-cyan-400 text-white' 
-                      : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                  }`}
-                >
-                  <span className="inline-block w-6 font-bold opacity-50 mr-2">
-                    {String.fromCharCode(65 + i)}.
-                  </span>
-                  {opt}
-                </button>
-              ))}
+              {q.options && q.options.map((opt, i) => {
+                const isSelected = answers[q.id] === i;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleAnswerChange(i, q.id)}
+                    className={`w-full text-left p-4 rounded-xl border transition-all ${
+                      isSelected
+                        ? 'bg-cyan-600/30 border-cyan-400 text-white'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                    }`}
+                    role="radio"
+                    aria-checked={isSelected ? 'true' : 'false'}
+                  >
+                    <span className="inline-block w-6 font-bold opacity-50 mr-2">
+                      {String.fromCharCode(65 + i)}.
+                    </span>
+                    {opt}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div>
               <textarea
                 className="w-full h-48 bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-cyan-400 outline-none resize-none"
                 placeholder="Type your detailed reflective essay here..."
-                value={answers[currentQ] || ''}
-                onChange={(e) => handleAnswerChange(e.target.value)}
+                value={String(answers[q.id] || '')}
+                onChange={(e) => handleAnswerChange(e.target.value, q.id)}
               />
               <div className="text-xs text-white/50 mt-2">
-                Answer length: {answers[currentQ]?.length || 0} characters
+                Answer length: {String(answers[q.id])?.length || 0} characters
               </div>
             </div>
           )}
