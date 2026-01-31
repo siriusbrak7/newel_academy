@@ -196,53 +196,68 @@ export async function gradeQuiz(
   correctCount: number;
   totalQuestions: number;
 }> {
+  // Delegate to the more explicit implementation
+  return await fixQuizGrading(checkpointId, userAnswers);
+} 
+
+/**
+ * Fixed quiz grading: compares user-selected indices against correct answer TEXT
+ */
+export async function fixQuizGrading(
+  checkpointId: string,
+  userAnswers: Record<string, number>
+): Promise<{
+  score: number;
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+}> {
+  // userAnswers should be: { questionId: selectedOptionIndex }
   try {
-    const { data: questionsData, error } = await supabase
+    const { data: questions, error } = await supabase
       .from('checkpoint_questions')
       .select(`
         question_id,
         questions:question_id (
           id,
-          text,
           options,
           correct_answer
         )
       `)
       .eq('checkpoint_id', checkpointId);
 
-    if (error || !questionsData) {
-      console.error('Error fetching questions for grading:', error);
+    if (error || !questions) {
+      console.error('Error fetching questions for fixQuizGrading:', error);
       return { score: 0, passed: false, correctCount: 0, totalQuestions: 0 };
     }
 
     let correctCount = 0;
+    const details: Array<any> = [];
 
-    questionsData.forEach((item: any) => {
+    questions.forEach((item: any) => {
       const q = item.questions;
       if (!q) return;
       const selectedIndex = userAnswers[q.id];
 
-      if (selectedIndex === undefined || selectedIndex === null) {
-        return; // unanswered
-      }
+      if (selectedIndex !== undefined && selectedIndex !== null) {
+        const userSelectedText = Array.isArray(q.options) ? q.options[selectedIndex] : undefined;
+        const isCorrect = userSelectedText === q.correct_answer;
 
-      const userSelectedText = Array.isArray(q.options) ? q.options[selectedIndex] : undefined;
+        if (isCorrect) correctCount++;
 
-      if (userSelectedText === q.correct_answer) {
-        correctCount++;
-      } else {
-        // Debug logging for incorrect answers
-        console.log('Incorrect answer for question:', q.id);
-        console.log('User selected text:', userSelectedText);
-        console.log('Correct answer:', q.correct_answer);
-        console.log('Options:', q.options);
+        details.push({
+          questionId: q.id,
+          userSelectedIndex: selectedIndex,
+          userSelectedText,
+          correctAnswerText: q.correct_answer,
+          isCorrect
+        });
       }
     });
 
-    const totalQuestions = questionsData.length;
+    const totalQuestions = questions.length;
     const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
 
-    // Get required score
     const { data: checkpoint } = await supabase
       .from('checkpoints')
       .select('required_score')
@@ -252,16 +267,12 @@ export async function gradeQuiz(
     const requiredScore = checkpoint?.required_score || 85;
     const passed = score >= requiredScore;
 
-    console.log('=== GRADING RESULTS ===');
-    console.log('Total questions:', totalQuestions);
-    console.log('Correct answers:', correctCount);
-    console.log('Score:', score + '%');
-    console.log('Required score:', requiredScore + '%');
-    console.log('Passed:', passed);
+    console.log('GRADING DETAILS:', details);
+    console.log(`RESULT: ${correctCount}/${totalQuestions} = ${score}% (Required: ${requiredScore}%)`);
 
     return { score, passed, correctCount, totalQuestions };
   } catch (error) {
-    console.error('Error grading quiz:', error);
+    console.error('Error in fixQuizGrading:', error);
     return { score: 0, passed: false, correctCount: 0, totalQuestions: 0 };
   }
 }
