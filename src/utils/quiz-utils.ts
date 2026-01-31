@@ -439,3 +439,27 @@ export async function saveQuizSubmission(
     console.error('Error saving submission:', error);
   }
 }
+
+/**
+ * Convert selected indices (array or record keyed by question index) into
+ * answers mapped by question ID (text values). Useful for components that
+ * store selections as indices.
+ */
+export function mapSelectedIndicesToText(
+  questions: Question[],
+  selectedAnswers: Record<number, number> | number[]
+): Record<string, string> {
+  const answers: Record<string, string> = {};
+
+  questions.forEach((q, index) => {
+    const selectedIndex = Array.isArray(selectedAnswers) ? (selectedAnswers as number[])[index] : (selectedAnswers as Record<number, number>)[index];
+    if (selectedIndex !== undefined && Array.isArray(q.options)) {
+      answers[q.id] = q.options[selectedIndex] || '';
+    } else {
+      answers[q.id] = '';
+    }
+  });
+
+  return answers;
+}
+
