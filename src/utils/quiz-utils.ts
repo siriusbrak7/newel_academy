@@ -81,8 +81,12 @@ export async function submitQuiz(
     }> = [];
 
     questions.forEach(question => {
-      const userAnswer = answers[question.id];
-      const isCorrect = userAnswer === question.correctAnswer;
+      const userAnswerIndex = answers[question.id]; // This is an INDEX (0,1,2,3)
+      const userAnswerText = (typeof userAnswerIndex === 'number' && question.options && question.options[userAnswerIndex]) 
+        ? question.options[userAnswerIndex] 
+        : String(userAnswerIndex || '');
+      
+      const isCorrect = userAnswerText === question.correctAnswer;
 
       if (isCorrect) {
         correctCount++;
@@ -91,7 +95,7 @@ export async function submitQuiz(
       answerDetails.push({
         questionId: question.id,
         questionText: question.text,
-        userAnswer: userAnswer || 'No answer',
+        userAnswer: userAnswerText,
         correctAnswer: question.correctAnswer || '',
         isCorrect
       });

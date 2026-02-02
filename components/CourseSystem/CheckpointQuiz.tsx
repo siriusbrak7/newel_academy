@@ -182,6 +182,14 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
             // Compare text directly (case-insensitive, trimmed)
             const isCorrect = userAnswerText.trim().toLowerCase() === correctAnswerText.toLowerCase();
             
+            console.log('DEBUG SCORING:', {
+              questionId: q.id,
+              selectedIndex: selectedIndex,
+              userAnswerText,
+              correctAnswerText,
+              options: q.options
+            });
+            
             if (isCorrect) correctCount++;
 
             gradingResults.push({
