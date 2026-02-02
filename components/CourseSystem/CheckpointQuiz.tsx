@@ -46,6 +46,14 @@ const sanitizeInput = (input: string): string => {
   return input.trim().replace(/[<>]/g, ''); // Basic sanitization
 };
 
+const normalizeAnswer = (text: string): string => {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[.,;:!?]/g, '') // Remove punctuation
+    .replace(/\s+/g, ' ');    // Normalize whitespace
+};
+
 const getCheckpointTimeLimit = (checkpoint: Checkpoint, questions: Question[]) => {
   if (!checkpoint || !questions) return 1800;
   switch (checkpoint.checkpoint_number) {
@@ -158,25 +166,28 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
         questions.forEach((q) => {
           if (q.type === 'MCQ' && q.options && q.options.length) {
             mcqCount++;
-            const selectedVal = answers[q.id];
-            const selectedText = (typeof selectedVal === 'number' && Array.isArray(q.options)) ? q.options[selectedVal] : String(selectedVal || 'No Answer Selected');
-
-            // Determine correct option text. Support both letter-style (A/B/C/D) and full-text correct answers.
-            let correctOptionText = String(q.correctAnswer || '');
-            if (typeof q.correctAnswer === 'string' && q.correctAnswer.length === 1) {
-              const letterIndex = 'ABCD'.indexOf(q.correctAnswer.toUpperCase());
-              if (letterIndex >= 0 && letterIndex < q.options.length) {
-                correctOptionText = q.options[letterIndex];
-              }
+            const selectedIndex = answers[q.id];
+            
+            // Get the user's selected answer text
+            let userAnswerText = 'No Answer Selected';
+            if (typeof selectedIndex === 'number' && selectedIndex >= 0 && selectedIndex < q.options.length) {
+              userAnswerText = q.options[selectedIndex];
+            } else if (typeof selectedIndex === 'string') {
+              userAnswerText = selectedIndex;
             }
-
-            const isCorrect = selectedText === correctOptionText;
+            
+            // Get correct answer (already full text from database)
+            const correctAnswerText = String(q.correctAnswer || '').trim();
+            
+            // Compare text directly (case-insensitive, trimmed)
+            const isCorrect = userAnswerText.trim().toLowerCase() === correctAnswerText.toLowerCase();
+            
             if (isCorrect) correctCount++;
 
             gradingResults.push({
               questionText: q.text,
-              userAnswer: selectedText,
-              correctAnswer: correctOptionText,
+              userAnswer: userAnswerText,
+              correctAnswer: correctAnswerText,
               isCorrect,
               options: q.options,
               explanation: q.explanation
