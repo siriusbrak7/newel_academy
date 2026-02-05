@@ -97,9 +97,11 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
 interface HomepageProps {
   theme: Theme;
   onOpenAuth: () => void;
+  mobileMenuOpen?: boolean;
+  setMobileMenuOpen?: (value: boolean) => void;
 }
 
-const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
+const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth, mobileMenuOpen, setMobileMenuOpen }) => {
   const [floatingIcons, setFloatingIcons] = useState<Array<{ id: number; x: number; y: number; icon: string; delay: number }>>([]);
 
   useEffect(() => {
@@ -117,18 +119,18 @@ const Homepage: React.FC<HomepageProps> = ({ theme, onOpenAuth }) => {
     }
   }, [theme]);
 
-  // Add to your existing App.tsx useEffect
-useEffect(() => {
-  const handleResize = () => {
-    // Close mobile menu on desktop
-    if (window.innerWidth >= 768 && setMobileMenuOpen) {
-      setMobileMenuOpen(false);
-    }
-  };
+  // Close mobile menu on resize to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      // Close mobile menu on desktop
+      if (window.innerWidth >= 768 && setMobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
 
-  window.addEventListener('resize', handleResize);
-  return () => window.removeEventListener('resize', handleResize);
-}, [setMobileMenuOpen]);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setMobileMenuOpen]);
 
   // App features with icons
   const appFeatures = [
@@ -175,9 +177,6 @@ useEffect(() => {
       iconColor: "text-indigo-400"
     }
   ];
-
-  // Add this useEffect to handle body scroll lock
-
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center text-center px-4 relative overflow-hidden">
@@ -264,8 +263,6 @@ useEffect(() => {
                 Explore Science...
               </span>
             </button>
-            
-            
           </div>
         </div>
 
@@ -397,23 +394,21 @@ useEffect(() => {
                   <p className="text-sm opacity-70">Test speed & accuracy on the leaderboard</p>
                 </div>
               </div>
-        
-        <div className="flex items-start gap-2">
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>6</div>
-          <div>
-            <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Track Progress</p>
-            <p className="text-sm opacity-70">Use dashboard analytics to improve</p>
+              
+              <div className="flex items-start gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${theme === 'Cyber-Dystopian' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>6</div>
+                <div>
+                  <p className={`font-medium ${theme === 'Cyber-Dystopian' ? 'text-green-300' : 'text-white'}`}>Track Progress</p>
+                  <p className="text-sm opacity-70">Use dashboard analytics to improve</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className={`text-center text-sm mt-4 pt-4 border-t ${theme === 'Cyber-Dystopian' ? 'border-green-500/20 text-green-300/60' : 'border-white/10 text-white/60'}`}>
+            Need personalized help? <a href="mailto:bbrak1235@gmail.com" className={`underline ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>Contact Admin</a>
           </div>
         </div>
-      </div>
-    </div>
-    
-    <div className={`text-center text-sm mt-4 pt-4 border-t ${theme === 'Cyber-Dystopian' ? 'border-green-500/20 text-green-300/60' : 'border-white/10 text-white/60'}`}>
-      Need personalized help? <a href="mailto:bbrak1235@gmail.com" className={`underline ${theme === 'Cyber-Dystopian' ? 'text-green-400' : 'text-cyan-400'}`}>Contact Admin</a>
-    </div>
-  </div>
-
-        
 
         {/* Final CTA */}
         <div
@@ -495,9 +490,9 @@ useEffect(() => {
   );
 };
 
-//* ------------------------------------
-  //Main App//
-//------------------------------------ */
+/* ------------------------------------
+   Main App
+------------------------------------ */
 const App: React.FC = () => {
   const [auth, setAuth] = useState<AuthState>({ loggedIn: false, user: null });
   const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
@@ -615,8 +610,6 @@ const App: React.FC = () => {
       />
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} currentTheme={theme} setTheme={setTheme} />
-
-      
 
       {/* Mobile Navigation Menu - FIXED VERSION */}
       <div className={`mobile-nav-container ${mobileMenuOpen ? 'active' : ''} ${theme === 'Cyber-Dystopian' ? 'cyber-bg' : ''}`}>
@@ -754,7 +747,12 @@ const App: React.FC = () => {
                     replace
                   />
                 ) : (
-                  <Homepage theme={theme} onOpenAuth={() => setShowAuthModal(true)} />
+                  <Homepage 
+                    theme={theme} 
+                    onOpenAuth={() => setShowAuthModal(true)}
+                    mobileMenuOpen={mobileMenuOpen}
+                    setMobileMenuOpen={setMobileMenuOpen}
+                  />
                 )
               }
             />
@@ -832,7 +830,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
-function setMobileMenuOpen(arg0: boolean) {
-  throw new Error('Function not implemented.');
-}

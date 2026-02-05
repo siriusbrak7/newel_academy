@@ -43,10 +43,11 @@ export const THEME_CONFIGS = {
   }
 };
 
-export const DEMO_USERS: User[] = [
+// DEMO USER CREDENTIALS - For development/testing only
+// In production, these should be removed and users should register via auth system
+export const DEMO_USERS: Omit<User, 'password'>[] = [
   {
     username: 'admin',
-    password: 'Cosmic2025!',
     role: 'admin',
     approved: true,
     securityQuestion: SECURITY_QUESTIONS[4],
@@ -54,7 +55,6 @@ export const DEMO_USERS: User[] = [
   },
   {
     username: 'teacher_demo',
-    password: 'Teach123!',
     role: 'teacher',
     approved: true,
     securityQuestion: SECURITY_QUESTIONS[0],
@@ -62,7 +62,6 @@ export const DEMO_USERS: User[] = [
   },
   {
     username: 'student_demo',
-    password: 'Learn123!',
     role: 'student',
     approved: true,
     gradeLevel: '12', 
@@ -71,3 +70,25 @@ export const DEMO_USERS: User[] = [
   }
 ];
 
+// Development environment check
+export const IS_DEV_MODE = process.env.NODE_ENV === 'development';
+
+// Authentication configuration
+export const AUTH_CONFIG = {
+  // In production, this should be false and all auth should go through Supabase
+  ALLOW_DEMO_LOGIN: IS_DEV_MODE,
+  
+  // Password requirements for user registration
+  PASSWORD_REQUIREMENTS: {
+    minLength: 8,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumbers: true,
+    requireSpecialChars: true
+  },
+  
+  // Security configuration
+  SESSION_TIMEOUT: 60 * 60 * 1000, // 1 hour in milliseconds
+  MAX_LOGIN_ATTEMPTS: 5,
+  LOCKOUT_DURATION: 15 * 60 * 1000 // 15 minutes
+};

@@ -248,17 +248,17 @@ export interface TheorySubmission {
 // ANNOUNCEMENTS & NOTIFICATIONS - UPDATED TO MATCH DATABASE
 // =======================
 
-// FRONTEND INTERFACE (what your components use)
+// FRONTEND INTERFACE (camelCase for consistency in UI code)
 export interface Announcement {
   id: string;
   title: string;
   content: string;
-  author_name: string;
-  expires_at: string;
-  created_at: string; // ISO string from database
+  authorName: string;      // Display name for UI
+  createdAt: string;       // ISO string
+  expiresAt: string;       // ISO string
   // Optional fields
-  author?: string;      // UUID from database (optional)
-  updated_at?: string;  // ISO string from database
+  author?: string;         // UUID from database (optional)
+  updatedAt?: string;      // ISO string from database
 }
 
 // DATABASE INTERFACE (what matches your Supabase schema)
@@ -273,24 +273,25 @@ export interface DbAnnouncement {
   expires_at?: string;   // Added to match your column
 }
 
-// HELPER: Convert DbAnnouncement to Announcement
+// HELPER: Convert DbAnnouncement (DB/snake_case) to Announcement (frontend/camelCase)
 export const dbToFrontendAnnouncement = (dbAnn: DbAnnouncement): Announcement => ({
   id: dbAnn.id,
   title: dbAnn.title,
   content: dbAnn.content,
-  author_name: dbAnn.author_name || 'System',
-  created_at: dbAnn.created_at || new Date().toISOString(),
-  expires_at: dbAnn.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+  authorName: dbAnn.author_name || 'System',
+  createdAt: dbAnn.created_at || new Date().toISOString(),
+  expiresAt: dbAnn.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
   author: dbAnn.author,
-  updated_at: dbAnn.updated_at
+  updatedAt: dbAnn.updated_at
 });
 
-// HELPER: Convert Announcement to DbAnnouncement for saving
-export const frontendToDbAnnouncement = (ann: Partial<Announcement>): Partial<DbAnnouncement> => ({
+// HELPER: Convert Announcement (frontend/camelCase) to DbAnnouncement (DB/snake_case) for saving
+export const frontendToDbAnnouncement = (ann: Partial<Announcement> & Record<string, any>): Partial<DbAnnouncement> => ({
   title: ann.title,
   content: ann.content,
-  author_name: ann.author_name,
-  expires_at: ann.expires_at
+  // Accept either authorName (camelCase) or author_name (backwards-compatible)
+  author_name: ann.authorName || ann.author_name,
+  expires_at: ann.expiresAt || ann.expires_at
   // Don't send id, created_at, updated_at - let database handle
 });
 

@@ -1237,7 +1237,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
               </h3>
               <div className="space-y-4">
                 {announcements.map(ann => {
-                  const expiresDate = ann.expires_at ? new Date(ann.expires_at) : null;
+                  const expiresDate = ann.expiresAt ? new Date(ann.expiresAt) : null;
                   const timeLeft = expiresDate ? expiresDate.getTime() - Date.now() : null;
                   const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
                   
@@ -1253,8 +1253,8 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                       <p className="text-white/60 text-sm">{ann.content}</p>
                       <div className="flex justify-between text-white/30 text-xs mt-2">
-                        <span>{new Date(ann.created_at).toLocaleDateString()}</span>
-                        <span>By: {ann.author}</span>
+                        <span>{new Date(ann.createdAt).toLocaleDateString()}</span>
+                        <span>By: {ann.author || ann.authorName}</span>
                       </div>
                     </div>
                   );
@@ -2274,9 +2274,10 @@ const loadStudentPerformance = async (username: string) => {
         id: `temp-${Date.now()}`, // Temporary ID for frontend
         title: newAnnouncement.title,
         content: newAnnouncement.content,
-        author_name: user.username,
-        created_at: new Date().toISOString(), // Required field
-        expires_at: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString()
+        authorName: user.username,
+        author: user.username,
+        createdAt: new Date().toISOString(), // Required field
+        expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString()
       });
       
       setNewAnnouncement({ title: '', content: '' });
@@ -2990,7 +2991,7 @@ const loadStudentPerformance = async (username: string) => {
           <div className="space-y-3">
             {announcements.length > 0 ? (
               announcements.map(ann => {
-                const expiresDate = ann.expires_at ? new Date(ann.expires_at) : null;
+                const expiresDate = ann.expiresAt ? new Date(ann.expiresAt) : null;
                 const timeLeft = expiresDate ? expiresDate.getTime() - Date.now() : null;
                 const hoursLeft = timeLeft ? Math.ceil(timeLeft / (60 * 60 * 1000)) : 48;
                 const isExpiring = hoursLeft <= 24;
@@ -3012,10 +3013,10 @@ const loadStudentPerformance = async (username: string) => {
                     <p className="text-white/60 text-xs mb-2 line-clamp-2">{ann.content}</p>
                     <div className="flex justify-between text-white/30 text-xs">
                       <span className="flex items-center gap-1">
-                        <UsersIcon size={10} /> {ann.author_name || 'System'}
+                        <UsersIcon size={10} /> {ann.authorName || 'System'}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Calendar size={10} /> {new Date(ann.created_at).toLocaleDateString()}
+                        <Calendar size={10} /> {new Date(ann.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </div>

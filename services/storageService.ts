@@ -1,21 +1,30 @@
 ﻿// storageService.ts - COMPLETE FIXED VERSION FOR DEPLOYMENT
-import { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, dbToFrontendAnnouncement, Question } from '../types';
+import type { User, CourseStructure, UserProgress, Assessment, Topic, TopicProgress, LeaderboardEntry, StudentStats, Submission, Announcement, Material, Notification, Question } from '../types';
+import { dbToFrontendAnnouncement, frontendToDbAnnouncement } from '../types';
 import { supabase } from './supabaseClient';
 import { v4 as uuidv4 } from 'uuid';
 
 // Add this function at the TOP of storageService.ts, after imports
 function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+  // Use the standard uuid library for consistency and correctness
+  return uuidv4();
+} 
 
 // Add caching variables at the TOP of the file (right after imports)
 let coursesCache: CourseStructure | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+// Clear course cache helper (invalidate on updates to courses)
+export const clearCoursesCache = (): void => {
+  coursesCache = null;
+  cacheTimestamp = 0;
+  try {
+    localStorage.removeItem('newel_courses_cache');
+  } catch (e) {
+    // ignore
+  }
+};
 
 // =====================================================
 // DEMO ACCOUNT CONFIGURATION
@@ -52,10 +61,15 @@ export const optimizeQuery = async <T>(
   const cached = storage.getItem(CACHE_KEY);
   
   if (cached) {
-    const { data, timestamp } = JSON.parse(cached);
-    if (now - timestamp < cacheDuration) {
-      console.log(`📦 Cache hit: ${queryName}`);
-      return data;
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      if (now - timestamp < cacheDuration) {
+        console.log(`📦 Cache hit: ${queryName}`);
+        return data;
+      }
+    } catch (e) {
+      console.warn(`⚠️ Failed to parse cache for ${queryName}, clearing key.`);
+      storage.removeItem(CACHE_KEY);
     }
   }
   
@@ -350,6 +364,32 @@ export const deleteUser = async (username: string): Promise<void> => {
 // In storageService.ts
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
   try {
+    // Use in-memory cache + persistent localStorage cache
+    if (!forceRefresh) {
+      // Check persistent localStorage cache first
+      const cachedStr = localStorage.getItem('newel_courses_cache');
+      if (cachedStr) {
+        try {
+          const { data, timestamp } = JSON.parse(cachedStr);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            console.log('📦 Returning cached courses (localStorage)');
+            coursesCache = data;
+            cacheTimestamp = timestamp;
+            return data;
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to parse cached courses, clearing cache');
+          localStorage.removeItem('newel_courses_cache');
+        }
+      }
+
+      // In-memory cache fallback
+      if (coursesCache && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+        console.log('📦 Returning cached courses (memory)');
+        return coursesCache;
+      }
+    }
+
     console.log('📚 Fetching courses from database...');
     
     const { data: topics, error } = await supabase
@@ -404,6 +444,15 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
       
       console.log(`📊 ${subject}: ${topics.length} topics, ${totalMaterials} materials`);
     });
+
+    // Update caches (in-memory + persistent)
+    coursesCache = courses;
+    cacheTimestamp = Date.now();
+    try {
+      localStorage.setItem('newel_courses_cache', JSON.stringify({ data: courses, timestamp: cacheTimestamp }));
+    } catch (e) {
+      console.warn('⚠️ Failed to persist courses cache to localStorage', e);
+    }
     
     return courses;
   } catch (error) {
@@ -668,7 +717,10 @@ export const saveTopic = async (subject: string, topic: any): Promise<any> => {
     } else {
       savedTopic.materials = [];
     }
-    
+
+    // Invalidate courses cache so callers get fresh data after topic/material updates
+    clearCoursesCache();
+
     return savedTopic;
     
   } catch (error) {
@@ -1353,44 +1405,34 @@ const get48HourExpiry = (): number => {
 export const saveAnnouncement = async (announcement: Announcement): Promise<Announcement> => {
   try {
     console.log('📝 Saving announcement:', announcement);
-    
-    // Prepare database payload
-    const dbPayload = {
-      title: announcement.title,
-      content: announcement.content,
-      author: announcement.author || null, // UUID or null
-      author_name: announcement.author_name || 'System',
-      expires_at: announcement.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
-      // Don't send id, created_at, updated_at - let database handle
-    };
-    
+
+    // Convert frontend announcement to DB shape
+    const dbPayload: any = frontendToDbAnnouncement(announcement);
+    if (announcement.author) dbPayload.author = announcement.author;
+
+    // Default expires_at if not provided
+    if (!dbPayload.expires_at) {
+      dbPayload.expires_at = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    }
+
     console.log('📤 Sending to database:', dbPayload);
-    
+
     const { data, error } = await supabase
       .from('announcements')
       .insert([dbPayload])
       .select()
       .single();
-    
+
     if (error) {
       console.error('❌ Supabase insert error:', error);
       throw error;
     }
-    
+
     console.log('✅ Announcement saved successfully:', data);
-    
-    // Return the saved announcement with all fields
-    return {
-      id: data.id,
-      title: data.title,
-      content: data.content,
-      author_name: data.author_name || 'System',
-      author: data.author,
-      created_at: data.created_at,
-      expires_at: data.expires_at,
-      updated_at: data.updated_at
-    };
-    
+
+    // Convert DB shape to frontend shape before returning
+    return dbToFrontendAnnouncement(data);
+
   } catch (error) {
     console.error('💥 Save announcement error:', error);
     throw error;
@@ -1426,17 +1468,8 @@ export const getAnnouncements = async (): Promise<Announcement[]> => {
         continue; // Skip adding to list
       }
       
-      // Convert to frontend format
-      announcements.push({
-        id: item.id,
-        title: item.title,
-        content: item.content,
-        author_name: item.author_name || 'System',
-        author: item.author,
-        created_at: item.created_at || new Date().toISOString(),
-        expires_at: item.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-        updated_at: item.updated_at
-      });
+        // Convert to frontend format (camelCase)
+      announcements.push(dbToFrontendAnnouncement(item));
     }
     
     return announcements;
@@ -1456,11 +1489,11 @@ export const createAnnouncementLegacy = async (
     id: `temp-${Date.now()}`, // Temporary ID for frontend
     title,
     content,
-    author_name: authorName,
+    authorName: authorName,
     author: undefined, // No UUID
-    created_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
-    updated_at: undefined
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
+    updatedAt: undefined
   };
   
   return await saveAnnouncement(announcementData);
