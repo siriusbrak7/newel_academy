@@ -2401,6 +2401,37 @@ export const getUserNotifications = async (username: string): Promise<Notificati
   }
 };
 
+// Add near other notification functions in storageService.ts
+export const sendNotification = async (userId: string, text: string, type: 'info' | 'success' | 'warning' | 'alert', metadata?: any): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        text: text,
+        type: type,
+        read: false,
+        metadata: metadata || null,
+        created_at: new Date().toISOString()
+      });
+
+    return !error;
+  } catch (error) {
+    console.error('❌ Failed to send notification:', error);
+    return false;
+  }
+};
+
+// Simple test function to verify notifications work
+export const testNotifications = async (userId: string): Promise<boolean> => {
+  return await sendNotification(
+    userId, 
+    '🎉 Notifications are working! System is operational.', 
+    'success',
+    { actionUrl: '/dashboard' }
+  );
+};
+
 
 // Create notification (use sparingly - triggers handle most)
 export const createNotification = async (

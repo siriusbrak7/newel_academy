@@ -1,4 +1,4 @@
-// Gamification.tsx - UPDATED VERSION WITH DYNAMIC QUESTION GENERATION
+// components/Gamification.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -6,7 +6,7 @@ import {
   Brain, Crown, BookOpen, ClipboardList, AlertCircle,
   RefreshCw
 } from 'lucide-react';
-import { getLeaderboards, saveSprintScore, getCourses, getTopicQuestions, getTopicCheckpoints } from '../services/storageService';
+import { getLeaderboards, saveSprintScore } from '../services/storageService';
 import { supabase } from '../services/supabaseClient';
 
 interface LeaderboardEntry {
@@ -21,15 +21,17 @@ interface LeaderboardData {
   assessments: LeaderboardEntry[];
 }
 
+// FIX 1: Updated Interface to include missing properties causing errors
 interface SprintQuestion {
   id: string;
   text: string;
   answer: string;
-  options?: string[];
-  type: 'MCQ' | 'THEORY';
-  topic: string;
   subject: string;
-  difficulty: 'IGCSE' | 'AS' | 'A_LEVEL';
+  topic: string;
+  type: string;
+  explanation?: string;
+  difficulty?: string;   // Added
+  options?: string[];    // Added
 }
 
 export const SprintChallenge: React.FC = () => {
@@ -42,103 +44,158 @@ export const SprintChallenge: React.FC = () => {
   const [userAnswer, setUserAnswer] = useState('');
   const [username, setUsername] = useState('');
   const [loadingQuestions, setLoadingQuestions] = useState(false);
-  const [questionCount, setQuestionCount] = useState(0);
 
   // Initialize questions from database
   const loadRandomQuestions = async () => {
     try {
       setLoadingQuestions(true);
-      console.log('🎲 Loading random questions for Sprint Challenge...');
-      
-      // Get ALL questions from database
-      const { data: allQuestions, error } = await supabase
+      console.log('🎮 Loading questions for Sprint Challenge from ALL checkpoints...');
+
+      // STRATEGY 1: Get questions via checkpoint questions join (BEST)
+      const { data: checkpointQuestions, error: cpError } = await supabase
+        .from('checkpoint_questions')
+        .select(`
+          id,
+          checkpoint_id,
+          question_id,
+          order,
+          questions!inner (
+            id,
+            text,
+            type,
+            difficulty,
+            topic_id,
+            subtopic_name,
+            options,
+            correct_answer,
+            model_answer,
+            explanation,
+            topics!inner (
+              title,
+              subjects!inner (name)
+            )
+          )
+        `)
+        .limit(200);
+
+      if (!cpError && checkpointQuestions && checkpointQuestions.length > 0) {
+        console.log(`✅ Found ${checkpointQuestions.length} questions from checkpoints`);
+        
+        // FIX 2: Handle potential array structure from Supabase join safely
+        const sprintQuestions: SprintQuestion[] = checkpointQuestions
+          .map((cpq: any) => {
+            // Normalize: If 'questions' is an array, take the first item, otherwise use it as is
+            const qData = Array.isArray(cpq.questions) ? cpq.questions[0] : cpq.questions;
+            return { ...cpq, questions: qData };
+          })
+          .filter((cpq) => cpq.questions && cpq.questions.text) // Safe filter
+          .map((cpq) => {
+            const q = cpq.questions;
+            const subject = Array.isArray(q.topics) 
+              ? q.topics[0]?.subjects?.name 
+              : q.topics?.subjects?.name || 'General';
+            
+            const topic = Array.isArray(q.topics)
+              ? q.topics[0]?.title
+              : q.topics?.title || 'General';
+            
+            return {
+              id: q.id,
+              text: q.text,
+              answer: q.correct_answer || q.model_answer || '',
+              subject: subject,
+              topic: topic,
+              type: q.type || 'MCQ',
+              explanation: q.explanation || '',
+              difficulty: q.difficulty || 'IGCSE',
+              options: q.options || []
+            };
+          });
+
+        // Shuffle and select questions
+        const shuffled = [...sprintQuestions].sort(() => Math.random() - 0.5);
+        const selectedQuestions = shuffled.slice(0, 20);
+        setQuestions(selectedQuestions);
+        setLoadingQuestions(false);
+        return;
+      }
+
+      console.log('⚠️ No checkpoint questions found, trying direct questions...');
+
+      // STRATEGY 2: Fallback to direct questions fetch
+      const { data: allQuestions, error: qError } = await supabase
         .from('questions')
         .select(`
           id,
           text,
-          correct_answer,
-          options,
           type,
           difficulty,
-          topic:topics(
+          topic_id,
+          subtopic_name,
+          options,
+          correct_answer,
+          model_answer,
+          explanation,
+          topics!inner (
             title,
-            subject:subject_id(name)
+            subjects!inner (name)
           )
         `)
-        .not('correct_answer', 'is', null)
-        .not('text', 'is', null)
-        .limit(100); // Get up to 100 questions
+        .limit(100);
 
-      if (error) {
-        console.error('❌ Error loading questions:', error);
-        // Fallback to sample questions
+      if (qError) {
+        console.error('❌ Error loading questions:', qError);
         setQuestions(getSampleQuestions());
+        setLoadingQuestions(false);
         return;
       }
 
       if (!allQuestions || allQuestions.length === 0) {
-        console.log('📭 No questions found in database, using sample questions');
+        console.log('⚠️ No questions found, using sample questions');
         setQuestions(getSampleQuestions());
+        setLoadingQuestions(false);
         return;
       }
 
-      console.log(`📚 Found ${allQuestions.length} questions in database`);
+      console.log(`✅ Found ${allQuestions.length} total questions`);
 
       // Transform database questions to SprintQuestion format
-      const sprintQuestions: SprintQuestion[] = allQuestions.map((q: any) => {
-        let subjectName = 'General';
-        let topicName = 'General';
-        
-        // Safely extract subject and topic names
-        if (q.topic) {
-          if (Array.isArray(q.topic) && q.topic.length > 0) {
-            const topic = q.topic[0];
-            topicName = topic?.title || 'General';
-            if (topic?.subject) {
-              if (Array.isArray(topic.subject) && topic.subject.length > 0) {
-                subjectName = topic.subject[0]?.name || 'General';
-              } else if (typeof topic.subject === 'object') {
-                subjectName = (topic.subject as any)?.name || 'General';
-              }
-            }
-          } else if (typeof q.topic === 'object') {
-            topicName = q.topic.title || 'General';
-            if (q.topic.subject) {
-              if (Array.isArray(q.topic.subject) && q.topic.subject.length > 0) {
-                subjectName = q.topic.subject[0]?.name || 'General';
-              } else if (typeof q.topic.subject === 'object') {
-                subjectName = (q.topic.subject as any)?.name || 'General';
-              }
-            }
-          }
-        }
-
-        return {
-          id: q.id,
-          text: q.text,
-          answer: q.correct_answer || '',
-          options: q.options || [],
-          type: q.type || 'MCQ',
-          topic: topicName,
-          subject: subjectName,
-          difficulty: q.difficulty || 'IGCSE'
-        };
-      }).filter(q => q.text && q.answer); // Filter out invalid questions
+      const sprintQuestions: SprintQuestion[] = allQuestions
+        .filter((q: any) => q.text && q.text.trim().length > 0)
+        .map((q: any) => {
+          const subjectName = Array.isArray(q.topics) 
+            ? q.topics[0]?.subjects?.name 
+            : q.topics?.subjects?.name || 'General';
+            
+          const topicName = Array.isArray(q.topics) 
+            ? q.topics[0]?.title 
+            : q.topics?.title || 'General';
+          
+          return {
+            id: q.id,
+            text: q.text,
+            answer: q.correct_answer || q.model_answer || '',
+            subject: subjectName,
+            topic: topicName,
+            type: q.type || 'MCQ',
+            explanation: q.explanation || '',
+            difficulty: q.difficulty || 'IGCSE',
+            options: q.options || []
+          };
+        });
 
       console.log(`✅ Transformed ${sprintQuestions.length} valid questions`);
 
       // Shuffle and select 20 random questions
       const shuffled = [...sprintQuestions].sort(() => Math.random() - 0.5);
       const selectedQuestions = shuffled.slice(0, 20);
-      
+
       setQuestions(selectedQuestions);
-      setQuestionCount(selectedQuestions.length);
-      console.log(`🎯 Selected ${selectedQuestions.length} random questions`);
-      
+      setLoadingQuestions(false);
+      console.log(`🎮 Loaded ${selectedQuestions.length} random questions`);
     } catch (error) {
-      console.error('❌ Error in loadRandomQuestions:', error);
+      console.error('❌ Error loading random questions:', error);
       setQuestions(getSampleQuestions());
-    } finally {
       setLoadingQuestions(false);
     }
   };
@@ -153,7 +210,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Chemistry Basics',
         subject: 'Chemistry',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['H2O', 'CO2', 'O2', 'NaCl']
       },
       { 
         id: '2', 
@@ -171,7 +229,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Astronomy',
         subject: 'Physics',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['Mars', 'Venus', 'Jupiter', 'Saturn']
       },
       { 
         id: '4', 
@@ -180,7 +239,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Human Biology',
         subject: 'Biology',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['Heart', 'Liver', 'Skin', 'Lungs']
       },
       { 
         id: '5', 
@@ -189,7 +249,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Photosynthesis',
         subject: 'Biology',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['Oxygen', 'Nitrogen', 'CO2', 'Hydrogen']
       },
       { 
         id: '6', 
@@ -198,7 +259,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Atomic Structure',
         subject: 'Chemistry',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['12', '6', '14', '8']
       },
       { 
         id: '7', 
@@ -216,7 +278,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Plant Biology',
         subject: 'Biology',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['Respiration', 'Photosynthesis', 'Transpiration', 'Digestion']
       },
       { 
         id: '9', 
@@ -234,7 +297,8 @@ export const SprintChallenge: React.FC = () => {
         type: 'MCQ',
         topic: 'Cell Biology',
         subject: 'Biology',
-        difficulty: 'IGCSE'
+        difficulty: 'IGCSE',
+        options: ['Nucleus', 'Mitochondria', 'Ribosome', 'Vacuole']
       }
     ];
   };

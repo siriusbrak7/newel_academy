@@ -328,7 +328,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     // Use window cache if available (fastest)
     const windowWithFacts = window as any;
     if (windowWithFacts.neuroscienceFacts && Array.isArray(windowWithFacts.neuroscienceFacts)) {
-      setNeuroscienceFacts(windowWithFacts.neuroscienceFacts.slice(0, 4)); // Only 4 facts
+      setNeuroscienceFacts(windowWithFacts.neuroscienceFacts); // ALL facts
     } else {
       // Fallback facts (small set)
       const defaultFacts = [
