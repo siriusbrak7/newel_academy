@@ -387,7 +387,7 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       // OPTIMIZATION: Use Promise.all for independent operations
       const [progressData, coursesData, allAssessments] = await Promise.all([
         getProgress(user.username),
-        getCoursesLight(), // Use LIGHT version (no materials)
+        getCoursesLight(user?.gradeLevel, user), // Add user parameter for limits //
         getAssessments()
       ]);
       

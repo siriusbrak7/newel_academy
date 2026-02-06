@@ -594,20 +594,13 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
 };
 
 // storageService.ts - Add this function
-export const getCoursesLight = async (gradeLevel?: string): Promise<CourseStructure> => {
+export const getCoursesLight = async (gradeLevel?: string, user?: User): Promise<CourseStructure> => {
   console.time('getCoursesLight');
   console.log(`🚀 Fetching light courses (no materials)${gradeLevel ? ` for grade ${gradeLevel}` : ''}...`);
-  
+  console.log(`👤 User tier: ${user?.tier || 'not specified'}`);
+
   try {
-    // Get all subjects first to avoid ambiguous joins
-    const { data: subjectsData } = await supabase
-      .from('subjects')
-      .select('id, name');
-    
-    const subjectMap = new Map();
-    subjectsData?.forEach(s => subjectMap.set(s.id, s.name));
-    
-    // Fetch topics WITHOUT ambiguous join
+    // Build query
     let query = supabase
       .from('topics')
       .select(`
@@ -616,24 +609,45 @@ export const getCoursesLight = async (gradeLevel?: string): Promise<CourseStruct
         description,
         grade_level,
         subject_id,
-        checkpoints_required
+        subjects!inner (name)
       `)
-      .order('title', { ascending: true });
-    
-    // Add WHERE clause to filter by grade if provided
+      .order('title');
+
+    // Filter by grade level if provided
     if (gradeLevel) {
       query = query.eq('grade_level', gradeLevel);
     }
-    
+
     const { data: topicsData, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase error:', error.message);
+      console.timeEnd('getCoursesLight');
+      return {};
+    }
 
+    if (!topicsData || topicsData.length === 0) {
+      console.log(`📊 No topics found${gradeLevel ? ` for grade ${gradeLevel}` : ''}`);
+      console.timeEnd('getCoursesLight');
+      return {};
+    }
+
+    console.log(`📊 Found ${topicsData.length} topics${gradeLevel ? ` for grade ${gradeLevel}` : ''}`);
+
+    // Create subject map for fast lookup
+    const subjectMap = new Map<string, string>();
+    topicsData.forEach(topic => {
+      if (topic.subject_id && topic.subjects?.[0]?.name) {
+        subjectMap.set(topic.subject_id, topic.subjects[0].name);
+      }
+    });
+
+    // Build course structure
     const courses: CourseStructure = {};
-    
-    topicsData?.forEach(topic => {
+
+    topicsData.forEach(topic => {
       const subjectName = subjectMap.get(topic.subject_id) || 'General';
-      
+
       if (!courses[subjectName]) {
         courses[subjectName] = {};
       }
@@ -641,24 +655,66 @@ export const getCoursesLight = async (gradeLevel?: string): Promise<CourseStruct
       courses[subjectName][topic.id] = {
         id: topic.id,
         title: topic.title,
-        gradeLevel: topic.grade_level || '9',
+        gradeLevel: topic.grade_level,
         description: topic.description || '',
-        subtopics: [], // Empty for light version
-        materials: [], // Empty for light version
-        checkpoints_required: topic.checkpoints_required || 3
+        subtopics: [],
+        materials: [] // Will be loaded on demand
       };
     });
 
-    console.log(`✅ Light courses: ${Object.keys(courses).length} subjects, ${topicsData?.length || 0} topics`);
+    // 🔒 CRITICAL: APPLY FREE USER TOPIC LIMITS (2 topics per subject)
+    if (user?.tier === 'free') {
+      console.log('🔒 Applying free user limits: Maximum 2 topics per subject');
+      
+      let limitedCount = 0;
+      let originalCount = 0;
+      
+      Object.keys(courses).forEach(subject => {
+        const subjectTopics = courses[subject];
+        const topicIds = Object.keys(subjectTopics);
+        originalCount += topicIds.length;
+        
+        if (topicIds.length > 2) {
+          // Create new object with only first 2 topics
+          const limitedTopics: Record<string, Topic> = {};
+          
+          // Keep first 2 topics (already sorted by title from query)
+          const limitedIds = topicIds.slice(0, 2);
+          limitedIds.forEach(topicId => {
+            limitedTopics[topicId] = subjectTopics[topicId];
+          });
+          
+          courses[subject] = limitedTopics;
+          limitedCount += 2;
+          console.log(`   ${subject}: Limited to 2 topics (was ${topicIds.length})`);
+        } else {
+          limitedCount += topicIds.length;
+          console.log(`   ${subject}: ${topicIds.length} topics (no limit needed)`);
+        }
+      });
+      
+      console.log(`📊 Free user limits applied: ${originalCount} → ${limitedCount} topics`);
+    } else {
+      // Count total topics for premium/admin users
+      const totalTopics = Object.keys(courses).reduce((sum, subject) => {
+        return sum + Object.keys(courses[subject]).length;
+      }, 0);
+      console.log(`🎓 Premium/Admin user: All ${totalTopics} topics accessible`);
+    }
+
+    console.log(`✅ Course structure built:`, Object.keys(courses).map(subject => ({
+      subject,
+      topicCount: Object.keys(courses[subject]).length
+    })));
+
     console.timeEnd('getCoursesLight');
-    
     return courses;
   } catch (error) {
-    console.error('❌ Get light courses error:', error);
+    console.error('❌ Error in getCoursesLight:', error);
+    console.timeEnd('getCoursesLight');
     return {};
   }
 };
-
 // Function to load materials for a specific topic on demand
 
   // =====================================================
@@ -3357,9 +3413,10 @@ export const getStudentTopicPerformance = async (username: string, topicId: stri
 // Get topics filtered by student grade level
 // Get topics filtered by student grade level
 // In storageService.ts, update getTopicsForStudent:
-export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStructure> => {
+export const getTopicsForStudent = async (gradeLevel: string, user?: User): Promise<CourseStructure> => {
   console.log(`📊 Getting topics for grade level: "${gradeLevel}"`);
-  
+  console.log(`👤 User tier: ${user?.tier || 'none'}`);
+
   try {
     // Get topics for the student's grade only
     const { data: topicsData, error } = await supabase
@@ -3381,17 +3438,17 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
     }
 
     console.log(`📊 Found ${topicsData?.length || 0} accessible topics for grade ${gradeLevel}`);
-    
+
     if (!topicsData || topicsData.length === 0) {
       console.log(`📊 No topics found for grade ${gradeLevel}`);
       return {};
     }
-    
+
     const courses: CourseStructure = {};
-    
+
     topicsData.forEach((topic: any) => {
       const subjectName = (typeof topic.subjects === 'object' && topic.subjects?.name) ? topic.subjects.name : 'General';
-      
+
       if (!courses[subjectName]) {
         courses[subjectName] = {};
       }
@@ -3406,10 +3463,40 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
       };
     });
 
-    console.log(`📊 Courses by subject:`, Object.keys(courses).map(subject => ({
-      subject,
-      count: Object.keys(courses[subject]).length
-    })));
+    // 🔒 APPLY FREE USER LIMITS (2 topics per subject)
+    if (user?.tier === 'free') {
+      console.log('🔒 Applying free user limits: 2 topics per subject maximum');
+      
+      Object.keys(courses).forEach(subject => {
+        const subjectTopics = courses[subject];
+        const topicIds = Object.keys(subjectTopics);
+        
+        if (topicIds.length > 2) {
+          // Create new object with only first 2 topics
+          const limitedTopics: Record<string, Topic> = {};
+          
+          // Take first 2 topics (sorted by title from query)
+          topicIds.slice(0, 2).forEach(topicId => {
+            limitedTopics[topicId] = subjectTopics[topicId];
+          });
+          
+          courses[subject] = limitedTopics;
+          console.log(`   ${subject}: Limited to 2 topics (was ${topicIds.length})`);
+        } else {
+          console.log(`   ${subject}: ${topicIds.length} topics (no limit needed)`);
+        }
+      });
+    } else {
+      console.log('🎓 Premium/Admin user: All topics accessible');
+    }
+
+    // Calculate totals
+    let totalTopics = 0;
+    Object.keys(courses).forEach(subject => {
+      totalTopics += Object.keys(courses[subject]).length;
+    });
+
+    console.log(`📊 Final: ${totalTopics} topics across ${Object.keys(courses).length} subjects`);
     
     return courses;
   } catch (error) {
@@ -3417,7 +3504,6 @@ export const getTopicsForStudent = async (gradeLevel: string): Promise<CourseStr
     return {};
   }
 };
-
 // =====================================================
 // BACKWARD COMPATIBILITY NOTIFICATION FUNCTIONS
 // =====================================================
