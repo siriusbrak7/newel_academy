@@ -1,5 +1,6 @@
 ﻿// Dashboards.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { RestrictedTextArea } from '../RestrictedTextArea';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -2994,11 +2995,12 @@ const loadStudentPerformance = async (username: string) => {
           </div>
           <div>
             <label className="block text-white/60 text-xs sm:text-sm mb-1">Content</label>
-            <textarea
+            <RestrictedTextArea
               value={newAnnouncement.content}
               onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 sm:px-4 py-2 text-white focus:outline-none focus:border-cyan-500 min-h-[80px] sm:min-h-[100px] text-sm"
               placeholder="Share important information..."
+              restrictPaste={true}
             />
           </div>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">

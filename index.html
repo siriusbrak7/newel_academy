@@ -25,23 +25,22 @@
       // Detect and optimize for older devices (2016-2018)
       (function() {
         const oldDevicePatterns = [
-          /Android 6|Android 7/, // 2016-2017
-          /iPhone OS 10|iPhone OS 11/, // 2016-2017
-          /SamsungBrowser\/[1-5]/, // Old Samsung browsers
-          /Opera Mini/, // Feature phones
-          /BlackBerry/, // Legacy devices
+          /Android 6|Android 7/,
+          /iPhone OS 10|iPhone OS 11/,
+          /SamsungBrowser\/[1-5]/,
+          /Opera Mini/,
+          /BlackBerry/,
         ];
         
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         const isOldDevice = oldDevicePatterns.some(pattern => pattern.test(userAgent));
         const isMobile = /Mobi|Android/i.test(userAgent);
-        const memory = navigator.deviceMemory || 4; // Default to 4GB if unknown
+        const memory = navigator.deviceMemory || 4;
         
         if (isOldDevice || memory < 2) {
           document.documentElement.classList.add('old-device');
           console.log('📱 Old/low-memory device detected - optimizing performance');
           
-          // Create optimization styles
           const style = document.createElement('style');
           style.textContent = `
             .old-device * {
@@ -68,7 +67,6 @@
           document.head.appendChild(style);
         }
         
-        // Store device info for React
         window.deviceInfo = {
           isOldDevice,
           isMobile,
@@ -86,8 +84,8 @@
     <!-- Preload critical assets -->
     <link rel="preload" href="/index.tsx" as="script" type="module">
     
-    <!-- Tailwind CSS (defer non-critical) -->
-    <script defer src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (must load synchronously BEFORE the config block below) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Font Awesome (defer non-critical) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
@@ -103,7 +101,6 @@
         text-rendering: optimizeLegibility;
       }
       
-      /* Minimum touch target size (Apple Human Interface Guidelines) */
       button, 
       a[role="button"], 
       .mobile-tap-target {
@@ -111,47 +108,41 @@
         min-width: 44px !important;
       }
       
-      /* Prevent iOS text size adjustment */
       html {
         -webkit-text-size-adjust: 100%;
         -ms-text-size-adjust: 100%;
         text-size-adjust: 100%;
       }
       
-      /* Smooth scrolling for iOS */
       * {
         -webkit-overflow-scrolling: touch;
       }
       
-      /* Safe area support for iPhone X+ */
       .safe-top { padding-top: env(safe-area-inset-top, 0px); }
       .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
       .safe-left { padding-left: env(safe-area-inset-left, 0px); }
       .safe-right { padding-right: env(safe-area-inset-right, 0px); }
       
-      /* MOBILE CSS ANIMATION FIX - Added missing fadeIn definition */
       @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
       }
       
-      /* Mobile typography optimizations */
       @media (max-width: 768px) {
         body {
-          font-size: 16px !important; /* Prevent iOS zoom on input focus */
+          font-size: 16px !important;
           line-height: 1.6 !important;
         }
         
         input, textarea, select {
-          font-size: 16px !important; /* Prevent iOS zoom */
+          font-size: 16px !important;
         }
         
-        /* Disable heavy animations on mobile for better performance */
         .animate-fade-in,
         .animate-fade-in-up,
         .animate-float,
         .animate-pulse {
-          animation: fadeIn 0.5s ease-in-out !important; /* Now properly defined */
+          animation: fadeIn 0.5s ease-in-out !important;
         }
         
         .cyber-box-glow,
@@ -163,7 +154,7 @@
       }
     </style>
     
-    <!-- Custom Animations (Performance Optimized) -->
+    <!-- Tailwind Config (runs AFTER the CDN script above has loaded) -->
     <script>
       tailwind.config = {
         theme: {
@@ -245,7 +236,6 @@
         pointer-events: none;
       }
       
-      /* Star Field (Simplified for mobile) */
       .star-field {
         position: absolute !important;
         top: 0;
@@ -267,7 +257,6 @@
         animation: twinkle 3s ease-in-out infinite;
       }
       
-      /* Floating Space Icons (Minimal for mobile) */
       .space-icon {
         position: absolute;
         font-size: 20px;
@@ -291,7 +280,6 @@
         font-family: 'Share Tech Mono', monospace !important;
       }
       
-      /* Cyber Grid (Lightweight for mobile) */
       .cyber-grid {
         position: absolute !important;
         top: 0;
@@ -301,13 +289,12 @@
         background-image: 
           linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
           linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
-        background-size: 60px 60px; /* Larger grid for performance */
+        background-size: 60px 60px;
         z-index: 2;
         pointer-events: none;
         display: none;
       }
       
-      /* ===== CYBER TEXT & BOX GLOW (Performance Optimized) ===== */
       .cyber-text-glow {
         text-shadow: 
           0 0 5px rgba(0, 255, 65, 0.8),
@@ -323,7 +310,6 @@
 
       /* ===== MOBILE-SPECIFIC OPTIMIZATIONS ===== */
       @media (max-width: 768px) {
-        /* Hide complex theme elements on mobile for performance */
         .star-field,
         .constellation,
         .rocket,
@@ -337,12 +323,10 @@
           display: none !important;
         }
         
-        /* Simplify gradients for mobile */
         .cosmic-bg::before {
           opacity: 0.3;
         }
         
-        /* Adjust glow effects for mobile */
         .cyber-text-glow {
           text-shadow: 0 0 8px currentColor;
         }
@@ -351,31 +335,26 @@
           box-shadow: 0 0 10px currentColor;
         }
         
-        /* Touch-friendly adjustments */
         button, a[role="button"] {
           padding: 12px 16px !important;
         }
         
-        /* Better readability */
         h1 { font-size: 2rem !important; }
         h2 { font-size: 1.75rem !important; }
         h3 { font-size: 1.5rem !important; }
         p, span, li { font-size: 16px !important; line-height: 1.6 !important; }
       }
       
-      /* Extra small devices */
       @media (max-width: 360px) {
         h1 { font-size: 1.75rem !important; }
         h2 { font-size: 1.5rem !important; }
         .text-2xl { font-size: 1.25rem !important; }
         
-        /* Even simpler gradients */
         .cosmic-bg::before {
           opacity: 0.2;
         }
       }
       
-      /* Tablet optimizations */
       @media (min-width: 769px) and (max-width: 1024px) {
         .space-icon { font-size: 24px; opacity: 0.3; }
         .cyber-grid { background-size: 40px 40px; }
@@ -384,7 +363,6 @@
     
     <!-- 33 Neuroscience Facts -->
     <script>
-      // 33 Neuroscience Facts - Optimized loading
       const neuroscienceFacts = [
         "The human brain has about 86 billion neurons.",
         "Sleep is crucial for memory consolidation.",
@@ -423,7 +401,6 @@
 
       window.neuroscienceFacts = neuroscienceFacts;
       
-      // Initialize function
       window.initNeuroscienceFacts = function() {
         return neuroscienceFacts;
       };
@@ -458,7 +435,6 @@
         createThemeElements() {
           if (!this.themeContainer) return;
           
-          // Only create minimal elements for mobile
           if (!this.isMobile && !this.isOldDevice) {
             if (!document.querySelector('.star-field')) {
               const starField = document.createElement('div');
@@ -513,7 +489,6 @@
           const starField = document.querySelector('.star-field');
           if (starField) {
             starField.innerHTML = '';
-            // Reduced star count for performance
             for (let i = 0; i < 80; i++) {
               const star = document.createElement('div');
               star.className = 'star';
@@ -549,7 +524,6 @@
         themeManager.initialize();
       });
       
-      // Optimized resize handler
       let resizeTimeout;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
@@ -557,7 +531,7 @@
           if (themeManager.currentTheme === 'Cyber-Dystopian' && !themeManager.isMobile) {
             // Simplified resize handling
           }
-        }, 500); // Longer delay for mobile
+        }, 500);
       });
 
       window.ThemeManager = themeManager;
@@ -576,10 +550,8 @@
     
     <!-- Mobile Performance Script -->
     <script>
-      // Additional mobile optimizations
       document.addEventListener('touchstart', function() {}, {passive: true});
       
-      // Prevent double-tap zoom
       let lastTouchEnd = 0;
       document.addEventListener('touchend', function(event) {
         const now = (new Date()).getTime();
@@ -589,7 +561,6 @@
         lastTouchEnd = now;
       }, false);
       
-      // Load CSS for older devices
       if (window.deviceInfo && window.deviceInfo.isOldDevice) {
         const oldDeviceCSS = `
           .mobile-tap-target { padding: 14px 18px !important; }

@@ -5,6 +5,7 @@ import Confetti from '../Confetti';
 import { supabase } from '../../services/supabaseClient';
 import { saveTheorySubmission } from '../../services/theoryGradingService';
 import { gradeQuiz, submitQuizWithAnswers } from '../../src/utils/quiz-utils';
+import { RestrictedTextArea } from '@/RestrictedTextArea';
 
 // --- Types ---
 interface Checkpoint {
@@ -476,12 +477,13 @@ export const CheckpointQuiz: React.FC<CheckpointQuizProps> = ({
               })}
             </div>
           ) : (
-            <textarea
+            <RestrictedTextArea
               className="w-full h-48 bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-purple-400 outline-none resize-none focus:ring-1 focus:ring-purple-400"
               placeholder="Type your answer here..."
               value={String(answers[q.id] || '')}
               onChange={(e) => handleAnswerChange(e.target.value, q.id)}
               aria-label="Type your answer"
+              restrictPaste={true}
             />
           )}
         </div>

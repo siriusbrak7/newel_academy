@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CourseStructure, Material, Topic } from '../../types'; // Add Topic type
 import { getCourses, uploadFileToSupabase, saveTopic, cache, cacheKey } from '../../services/storageService';
 import { Upload, File, Link as LinkIcon, FileText, Plus, X, CheckCircle } from 'lucide-react';
+import { RestrictedTextArea } from '@/RestrictedTextArea';
 
 
 interface QuickMaterialUploadProps {
@@ -300,12 +301,13 @@ const filteredTopics = React.useMemo(() => {
                 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30"
               />
             ) : (
-              <textarea
+              <RestrictedTextArea
                 value={materialForm.content}
                 onChange={(e) => setMaterialForm(prev => ({ ...prev, content: e.target.value }))}
                 placeholder="Enter material content..."
                 rows={4}
                 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-white/30"
+                restrictPaste={true}
               />
             )}
           </div>

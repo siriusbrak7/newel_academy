@@ -5,6 +5,7 @@ import { getAITutorResponse } from "../../services/geminiService";
 import { saveSubmission } from '../../services/storageService';
 import { Timer, CheckCircle, Loader2, X } from 'lucide-react';
 import Confetti from '../Confetti';
+import { RestrictedTextArea } from '@/RestrictedTextArea';
 
 interface QuizProps {
   title: string;
@@ -510,11 +511,12 @@ export const QuizInterface: React.FC<QuizProps> = ({
             </div>
           ) : (
             <div>
-              <textarea
+              <RestrictedTextArea
                 className="w-full h-48 bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-cyan-400 outline-none resize-none"
                 placeholder="Type your detailed reflective essay here..."
                 value={String(answers[q.id] || '')}
                 onChange={(e) => handleAnswerChange(e.target.value, q.id)}
+                restrictPaste={true}
               />
               <div className="text-xs text-white/50 mt-2">
                 Answer length: {String(answers[q.id])?.length || 0} characters

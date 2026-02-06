@@ -73,6 +73,7 @@ import {
   Trash2, Edit, Eye, Users, BarChart, Calendar, Check, X, 
   Sparkles, MessageSquare, User as UserIcon, BookOpen, Clock
 } from 'lucide-react';
+import { RestrictedTextArea } from '@/RestrictedTextArea';
 
 export const TeacherAssessmentReview: React.FC = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -520,11 +521,12 @@ export const TeacherAssessmentReview: React.FC = () => {
                     
                     <div>
                       <label className="block text-white/60 text-sm mb-1">Feedback</label>
-                      <textarea
+                      <RestrictedTextArea
                         className="w-full bg-black/20 border border-white/10 rounded p-2 text-white text-sm h-32"
                         value={teacherFeedback}
                         onChange={(e) => setTeacherFeedback(e.target.value)}
                         placeholder="Provide constructive feedback..."
+                        restrictPaste={true}
                       />
                     </div>
                     

@@ -26,9 +26,6 @@ import {
 import { CheckpointQuiz } from './CheckpointQuiz';
 import { QuizInterface } from './QuizInterface';
 
-// Cache for topic data
-const topicCache = new Map();
-
 export const TopicDetailCheckpoints: React.FC = () => {
   const { subject, topicId } = useParams<{ subject: string; topicId: string }>();
   const navigate = useNavigate();
@@ -47,44 +44,47 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   
-  // Loading states - SEPARATED for better UX
   const [loading, setLoading] = useState({
-    essential: true,    // User, topic basics, checkpoints
-    materials: false,   // Materials (lazy load)
+    essential: true,
+    materials: false,
     finalAssessment: false,
     progress: false
   });
   
   const [error, setError] = useState<string | null>(null);
   
-  // Final assessment completion state
   const [hasPassedFinalAssessment, setHasPassedFinalAssessment] = useState(false);
   const [finalAssessmentScore, setFinalAssessmentScore] = useState(0);
   const [finalAssessmentCompletionDate, setFinalAssessmentCompletionDate] = useState('');
 
-  // Store checkpoint results for review
   const [checkpointResults, setCheckpointResults] = useState<Record<string, any>>({});
+  const [checkpointQuestions, setCheckpointQuestions] = useState<Record<string, Question[]>>({});
   const [showReviewForCheckpoint, setShowReviewForCheckpoint] = useState<string | null>(null);
 
-  // Materials lazy loading state
   const [materialsLoaded, setMaterialsLoaded] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
 
-  // =====================================================
-  // OPTIMIZATION 1: CACHE CHECKPOINT PROGRESS
-  // =====================================================
-  const getCachedProgress = useCallback(async (username: string, topicId: string) => {
-    const key = cacheKey('progress', `${username}_${topicId}`);
+  // Helper: safely decode a URI component only if it looks encoded
+  const safeDecode = useCallback((value: string) => {
+    try {
+      return value.includes('%') ? decodeURIComponent(value) : value;
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const getCachedProgress = useCallback(async (username: string, tid: string) => {
+    const key = cacheKey('progress', `${username}_${tid}`);
     const cached = await cache.get(key, 2 * 60 * 1000);
     if (cached) return cached;
 
-    const progress = await getStudentCheckpointProgress(username, topicId);
+    const progress = await getStudentCheckpointProgress(username, tid);
     cache.set(key, progress, 2 * 60 * 1000);
     return progress;
   }, []);
 
   // =====================================================
-  // OPTIMIZATION 2: LOAD ESSENTIAL DATA FIRST
+  // LOAD ESSENTIAL DATA
   // =====================================================
   useEffect(() => {
     const loadEssentialData = async () => {
@@ -93,16 +93,14 @@ export const TopicDetailCheckpoints: React.FC = () => {
         return;
       }
 
-      // Decode URL parameters
-      const decodedSubject = decodeURIComponent(subject);
-      const decodedTopicId = decodeURIComponent(topicId);
+      const decodedSubject = safeDecode(subject);
+      const decodedTopicId = safeDecode(topicId);
 
       console.time('loadTopicEssentialData');
       
       try {
         setError(null);
         
-        // 1. Get user (fast - prefer cache, fallback to localStorage)
         let storedUser = await cache.get('newel_currentUser', 60 * 60 * 1000);
         if (!storedUser) storedUser = getStoredSession();
         if (!storedUser) {
@@ -111,7 +109,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
         }
         setUser(storedUser);
 
-        // 2. Load basic topic info (NO MATERIALS initially)
         console.log(`📥 Loading topic basics: ${decodedTopicId} in ${decodedSubject}...`);
         const courses = await getCoursesLight(storedUser.gradeLevel);
         const topicData = courses[decodedSubject]?.[decodedTopicId];
@@ -122,13 +119,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
           return;
         }
         
-        // Set basic topic data WITHOUT materials
         setTopic({
           ...topicData,
-          materials: [] // Empty initially
+          materials: []
         });
 
-        // 3. Load checkpoints and progress in parallel
         const [checkpointsData, progressData] = await Promise.all([
           getTopicCheckpoints(decodedTopicId),
           getCachedProgress(storedUser.username, decodedTopicId)
@@ -138,21 +133,18 @@ export const TopicDetailCheckpoints: React.FC = () => {
           setError('No checkpoints found for this topic. Please contact your teacher.');
           setCheckpoints([]);
         } else {
-          // Filter out checkpoint 5 (theory) - handle separately
-          const checkpointsToShow = checkpointsData.filter(cp => cp.checkpoint_number !== 5);
+          const checkpointsToShow = checkpointsData.filter((cp: any) => cp.checkpoint_number !== 5);
           setCheckpoints(checkpointsToShow);
         }
 
         setCheckpointProgress(progressData);
 
-        // 4. Check unlock status (checkpoint 4 passed)
         const checkpoint4 = checkpointsData?.find((cp: any) => cp.checkpoint_number === 4);
         if (checkpoint4) {
           const checkpoint4Progress = progressData[checkpoint4.id];
           setIsUnlocked(checkpoint4Progress?.passed || false);
         }
 
-        // 5. Check final assessment status
         const checkpoint5 = checkpointsData?.find((cp: any) => cp.checkpoint_number === 5);
         if (checkpoint5) {
           const checkpoint5Progress = progressData[checkpoint5.id];
@@ -169,42 +161,38 @@ export const TopicDetailCheckpoints: React.FC = () => {
         console.timeEnd('loadTopicEssentialData');
         console.log('✅ Essential topic data loaded');
 
-        // 6. Lazy load materials after 500ms delay (non-blocking)
         setTimeout(() => {
           loadTopicMaterials(decodedTopicId);
         }, 500);
 
-      } catch (error) {
-        console.error('❌ Error loading topic:', error);
+      } catch (err) {
+        console.error('❌ Error loading topic:', err);
         setError('Failed to load topic data. Please try again.');
         setLoading(prev => ({ ...prev, essential: false }));
       }
     };
 
     loadEssentialData();
-  }, [subject, topicId, navigate, getCachedProgress]);
+  }, [subject, topicId, navigate, getCachedProgress, safeDecode]);
 
   // =====================================================
-  // OPTIMIZATION 3: LAZY LOAD MATERIALS
+  // LAZY LOAD MATERIALS (safe decode)
   // =====================================================
-  const loadTopicMaterials = async (targetTopicId = topicId) => {
+  const loadTopicMaterials = async (alreadyDecodedId?: string) => {
+    const targetTopicId = alreadyDecodedId || (topicId ? safeDecode(topicId) : null);
     if (!targetTopicId || materialsLoaded) return;
-    
-    // Decode if needed (though usually passed decoded)
-    const decodedId = decodeURIComponent(targetTopicId);
 
     console.time('loadTopicMaterials');
     setLoading(prev => ({ ...prev, materials: true }));
     
     try {
-      console.log(`📚 Lazy loading materials for topic: ${decodedId}`);
-      const loadedMaterials = await getTopicMaterials(decodedId);
+      console.log(`📚 Lazy loading materials for topic: ${targetTopicId}`);
+      const loadedMaterials = await getTopicMaterials(targetTopicId);
       
       setMaterials(loadedMaterials);
       setMaterialsLoaded(true);
       
-      // Update topic with materials
-      setTopic(prev => ({
+      setTopic((prev: any) => ({
         ...prev,
         materials: loadedMaterials
       }));
@@ -212,20 +200,20 @@ export const TopicDetailCheckpoints: React.FC = () => {
       console.timeEnd('loadTopicMaterials');
       console.log(`✅ Loaded ${loadedMaterials.length} materials`);
       
-    } catch (error) {
-      console.error('❌ Error loading materials:', error);
+    } catch (err) {
+      console.error('❌ Error loading materials:', err);
     } finally {
       setLoading(prev => ({ ...prev, materials: false }));
     }
   };
 
   // =====================================================
-  // OPTIMIZATION 4: LAZY LOAD FINAL ASSESSMENT
+  // LAZY LOAD FINAL ASSESSMENT
   // =====================================================
   const loadFinalAssessment = async () => {
     if (finalAssessment || !topicId) return;
     
-    const decodedTopicId = decodeURIComponent(topicId);
+    const decodedTopicId = safeDecode(topicId);
     setLoading(prev => ({ ...prev, finalAssessment: true }));
     
     try {
@@ -235,17 +223,16 @@ export const TopicDetailCheckpoints: React.FC = () => {
       if (finalAssess) {
         await loadFinalAssessmentQuestions(finalAssess.id);
       }
-    } catch (error) {
-      console.error('❌ Error loading final assessment:', error);
+    } catch (err) {
+      console.error('❌ Error loading final assessment:', err);
     } finally {
       setLoading(prev => ({ ...prev, finalAssessment: false }));
     }
   };
 
-  // Load final assessment questions
   const loadFinalAssessmentQuestions = async (finalAssessmentId: string) => {
     try {
-      const { data: questionsData, error } = await supabase
+      const { data: questionsData, error: fetchError } = await supabase
         .from('final_assessment_questions')
         .select(`
           question_id,
@@ -255,9 +242,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
         `)
         .eq('final_assessment_id', finalAssessmentId)
         .order('sort_order', { ascending: true })
-        .limit(10); // Limit to 10 questions
+        .limit(10);
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
       if (questionsData && questionsData.length > 0) {
         const formattedQuestions: Question[] = questionsData
@@ -283,13 +270,13 @@ export const TopicDetailCheckpoints: React.FC = () => {
           setFinalAssessmentQuestions(formattedQuestions);
         }
       }
-    } catch (error) {
-      console.error('❌ Error loading final questions:', error);
+    } catch (err) {
+      console.error('❌ Error loading final questions:', err);
     }
   };
 
   // =====================================================
-  // OPTIMIZATION 5: PROGRESS CALCULATION (MEMOIZED)
+  // PROGRESS CALCULATION (MEMOIZED)
   // =====================================================
   const progress = useMemo(() => {
     if (!checkpoints.length) {
@@ -321,7 +308,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
   }, [checkpoints, checkpointProgress, hasPassedFinalAssessment]);
 
   // =====================================================
-  // OPTIMIZATION 6: CHECKPOINT HANDLERS
+  // CHECKPOINT HANDLERS
   // =====================================================
   const handleCheckpointComplete = async (
     checkpointId: string, 
@@ -334,36 +321,40 @@ export const TopicDetailCheckpoints: React.FC = () => {
       return;
     }
 
-    const decodedTopicId = decodeURIComponent(topicId || '');
-    const decodedSubject = decodeURIComponent(subject || '');
+    const decodedTopicId = safeDecode(topicId || '');
+    const decodedSubject = safeDecode(subject || '');
 
     try {
-      // Cache results for review
+      // Cache results AND questions for review
       if (results) {
         setCheckpointResults(prev => ({
           ...prev,
           [checkpointId]: { score, passed, results }
         }));
       }
+
+      // Store the questions used in this checkpoint for review later
+      if (activeCheckpoint?.questions) {
+        setCheckpointQuestions(prev => ({
+          ...prev,
+          [checkpointId]: activeCheckpoint.questions
+        }));
+      }
       
-      // Save progress
       await saveCheckpointProgress(user.username, checkpointId, score, passed);
       
-      // Update local progress (clear cache)
       const progressKey = cacheKey('progress', `${user.username}_${decodedTopicId}`);
       cache.clear(progressKey);
 
       const newProgress = await getStudentCheckpointProgress(user.username, decodedTopicId);
       setCheckpointProgress(newProgress);
 
-      // Check if checkpoint 4 was passed
       const completedCheckpoint = checkpoints.find(cp => cp.id === checkpointId);
       const isCheckpoint4 = completedCheckpoint?.checkpoint_number === 4;
 
       if (isCheckpoint4 && passed) {
         setIsUnlocked(true);
         
-        // Notify topic progress
         try {
           const progressPercentage = Math.round((Object.keys(newProgress).filter(id => newProgress[id]?.passed).length / checkpoints.length) * 100);
           if (progressPercentage >= 80) {
@@ -380,15 +371,14 @@ export const TopicDetailCheckpoints: React.FC = () => {
       }
 
       if (passed) {
-        // Quick success feedback
         const event = new CustomEvent('showToast', {
           detail: { message: '🎉 Checkpoint Passed!', type: 'success' }
         });
         window.dispatchEvent(event);
       }
 
-    } catch (error) {
-      console.error('Error saving progress:', error);
+    } catch (err) {
+      console.error('Error saving progress:', err);
       alert('Failed to save progress.');
     }
   };
@@ -396,17 +386,16 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const handleFinalAssessmentComplete = async (score: number, passed: boolean) => {
     if (!user || !subject || !topicId) return;
 
-    const decodedTopicId = decodeURIComponent(topicId);
-    const decodedSubject = decodeURIComponent(subject);
+    const decodedTopicId = safeDecode(topicId);
+    const decodedSubject = safeDecode(subject);
 
     try {
       setHasPassedFinalAssessment(passed);
       setFinalAssessmentScore(score);
       setFinalAssessmentCompletionDate(new Date().toLocaleDateString());
 
-      // Find checkpoint 5 and save progress
       const checkpointsData = await getTopicCheckpoints(decodedTopicId);
-      const checkpoint5 = checkpointsData.find(cp => cp.checkpoint_number === 5);
+      const checkpoint5 = checkpointsData.find((cp: any) => cp.checkpoint_number === 5);
       
       if (checkpoint5) {
         await saveCheckpointProgress(user.username, checkpoint5.id, score, passed);
@@ -425,13 +414,13 @@ export const TopicDetailCheckpoints: React.FC = () => {
         });
         window.dispatchEvent(event);
       }
-    } catch (error) {
-      console.error('Error updating final assessment:', error);
+    } catch (err) {
+      console.error('Error updating final assessment:', err);
     }
   };
 
   // =====================================================
-  // OPTIMIZATION 7: START CHECKPOINT WITH CACHED QUESTIONS
+  // START CHECKPOINT WITH CACHED QUESTIONS
   // =====================================================
   const startCheckpoint = async (checkpoint: any) => {
     try {
@@ -442,11 +431,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
         return;
       }
       
-      // Determine number of questions based on checkpoint type
-      let questionsToShow = checkpoint.checkpoint_number === 4 ? 20 : 5;
+      const questionsToShow = checkpoint.checkpoint_number === 4 ? 20 : 5;
       let questionsToUse = allCheckpointQuestions;
       
-      // Randomize if we have more questions than needed
       if (allCheckpointQuestions.length > questionsToShow) {
         const shuffled = [...allCheckpointQuestions];
         for (let i = shuffled.length - 1; i > 0; i--) {
@@ -456,7 +443,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         questionsToUse = shuffled.slice(0, questionsToShow);
       }
       
-      const formattedQuestions: Question[] = questionsToUse.map(q => ({
+      const formattedQuestions: Question[] = questionsToUse.map((q: any) => ({
         id: q.id,
         text: q.text,
         type: q.type || 'MCQ',
@@ -467,13 +454,19 @@ export const TopicDetailCheckpoints: React.FC = () => {
         explanation: q.explanation || ''
       }));
       
+      // Store questions for this checkpoint so review can access them
+      setCheckpointQuestions(prev => ({
+        ...prev,
+        [checkpoint.id]: formattedQuestions
+      }));
+      
       setActiveCheckpoint({
         ...checkpoint,
         questions: formattedQuestions
       });
       
-    } catch (error) {
-      console.error('Error starting checkpoint:', error);
+    } catch (err) {
+      console.error('Error starting checkpoint:', err);
       alert('Failed to load checkpoint.');
     }
   };
@@ -488,7 +481,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
       return;
     }
     
-    // Lazy load final assessment if not loaded
     if (!finalAssessment) {
       await loadFinalAssessment();
     }
@@ -502,7 +494,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
   };
 
   // =====================================================
-  // OPTIMIZATION 8: AI TUTOR (DEBOUNCED)
+  // AI TUTOR
   // =====================================================
   const handleAskAi = async () => {
     if (!aiQuestion.trim() || !topic || aiLoading) return;
@@ -514,8 +506,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
         `Topic: ${topic.title}. Student level: ${user?.gradeLevel}`
       );
       setAiAnswer(resp);
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err) {
+      console.error('Error:', err);
       setAiAnswer("Sorry, I couldn't process your question.");
     } finally {
       setAiLoading(false);
@@ -523,12 +515,11 @@ export const TopicDetailCheckpoints: React.FC = () => {
   };
 
   // =====================================================
-  // RENDER LOADING STATES
+  // RENDER: LOADING STATE
   // =====================================================
   if (loading.essential) {
     return (
       <div className="max-w-6xl mx-auto p-8 space-y-6">
-        {/* Header Skeleton */}
         <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-white/10 rounded-3xl p-8">
           <div className="flex justify-between items-start">
             <div className="space-y-3">
@@ -539,7 +530,6 @@ export const TopicDetailCheckpoints: React.FC = () => {
           </div>
         </div>
         
-        {/* Materials Section Skeleton */}
         <div className="space-y-4">
           <div className="h-8 w-48 bg-white/10 rounded animate-pulse"></div>
           <div className="grid gap-3">
@@ -563,6 +553,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
     );
   }
 
+  // =====================================================
+  // RENDER: ERROR STATE
+  // =====================================================
   if (error || !user || !topic) {
     return (
       <div className="max-w-6xl mx-auto p-8 text-center">
@@ -614,12 +607,12 @@ export const TopicDetailCheckpoints: React.FC = () => {
         />
       )}
 
-      {/* Review Modal */}
+      {/* Review Modal — uses stored questions from checkpointQuestions */}
       {showReviewForCheckpoint && checkpointResults[showReviewForCheckpoint] && (
         <CheckpointQuiz
           checkpointId={showReviewForCheckpoint}
           checkpointTitle={`Review: ${checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.title || 'Checkpoint'}`}
-          questions={checkpoints.find(cp => cp.id === showReviewForCheckpoint)?.questions || []}
+          questions={checkpointQuestions[showReviewForCheckpoint] || []}
           passThreshold={80}
           onComplete={() => {}}
           onClose={() => setShowReviewForCheckpoint(null)}
@@ -690,7 +683,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             <div className="flex items-center gap-4 text-sm">
               <span className="text-white/50">Grade {topic.gradeLevel}</span>
               <span className="text-white/50">•</span>
-              <span className="text-white/50">{decodeURIComponent(subject || '')}</span>
+              <span className="text-white/50">{safeDecode(subject || '')}</span>
             </div>
           </div>
           
@@ -712,7 +705,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
       <div className="grid md:grid-cols-3 gap-8">
         {/* Left Column - Materials & Checkpoints */}
         <div className="md:col-span-2 space-y-8">
-          {/* Materials Section with Lazy Loading */}
+          {/* Materials Section */}
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -779,7 +772,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             )}
             
             {/* Biolens Integration for Biology */}
-            {subject && decodeURIComponent(subject) === 'Biology' && (
+            {subject && safeDecode(subject) === 'Biology' && (
               <div className="bg-green-900/20 p-4 rounded-xl border border-green-500/30 mt-4">
                 <h4 className="text-green-300 font-bold mb-2 flex items-center gap-2">
                   <Brain size={16} /> Biolens Interactive
@@ -797,7 +790,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
             )}
           </section>
 
-          {/* Detailed How-to Guide */}
+          {/* How-to Guide */}
           <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-white/10 rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-white/10 p-2 rounded-lg">
@@ -892,14 +885,14 @@ export const TopicDetailCheckpoints: React.FC = () => {
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
               {checkpoints.map((checkpoint) => {
-                const progress = checkpointProgress[checkpoint.id];
+                const cpProgress = checkpointProgress[checkpoint.id];
                 const hasResults = checkpointResults[checkpoint.id];
                 
                 return (
-                  <div key={checkpoint.id} className={`p-4 rounded-xl border ${progress?.passed ? 'bg-green-900/10 border-green-500/30' : 'bg-white/5 border-white/10'}`}>
+                  <div key={checkpoint.id} className={`p-4 rounded-xl border ${cpProgress?.passed ? 'bg-green-900/10 border-green-500/30' : 'bg-white/5 border-white/10'}`}>
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-bold text-white">Checkpoint {checkpoint.checkpoint_number}</h3>
-                      {progress?.passed && <CheckCircle size={14} className="text-green-400" />}
+                      {cpProgress?.passed && <CheckCircle size={14} className="text-green-400" />}
                     </div>
                     <p className="text-sm text-white/60 mb-4">{checkpoint.title}</p>
                     {checkpoint.checkpoint_number === 4 && (
@@ -912,15 +905,15 @@ export const TopicDetailCheckpoints: React.FC = () => {
                       <button
                         onClick={() => startCheckpoint(checkpoint)}
                         className={`flex-grow py-2 rounded-lg text-sm font-medium ${
-                          progress?.passed 
+                          cpProgress?.passed 
                             ? 'bg-white/10 text-white hover:bg-white/20' 
                             : 'bg-cyan-600 text-white hover:bg-cyan-700'
                         }`}
                       >
-                        {progress?.passed ? 'Retake' : 'Start'}
+                        {cpProgress?.passed ? 'Retake' : 'Start'}
                       </button>
                       
-                      {progress?.passed && hasResults && (
+                      {cpProgress?.passed && hasResults && (
                         <button
                           onClick={() => reviewCheckpoint(checkpoint.id)}
                           className="px-3 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1"
@@ -971,7 +964,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
                 </div>
                 <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full bg-purple-500 transition-all duration-500`} 
+                    className="h-full bg-purple-500 transition-all duration-500" 
                     style={{ width: hasPassedFinalAssessment ? '100%' : '0%' }} 
                   />
                 </div>

@@ -18,6 +18,7 @@ import {
   Plus, Save, Brain, Eye, Edit, X, CheckCircle, Timer, List, 
   ArrowLeft, Wand2, Loader2, ClipboardList, FileText, PenTool 
 } from 'lucide-react';
+import { RestrictedTextArea } from '@/RestrictedTextArea';
 
 export const AssessmentManager: React.FC = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -400,10 +401,11 @@ export const AssessmentManager: React.FC = () => {
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-white text-sm font-bold mb-2">Feedback to Student</label>
-                  <textarea 
+                  <RestrictedTextArea 
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white text-sm h-24 focus:border-cyan-500 outline-none"
                     value={editFeedback}
                     onChange={e => setEditFeedback(e.target.value)}
+                    restrictPaste={true}
                   />
                 </div>
               </div>
