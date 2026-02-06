@@ -2402,7 +2402,114 @@ export const getUserNotifications = async (username: string): Promise<Notificati
 };
 
 // Add near other notification functions in storageService.ts
-export const sendNotification = async (userId: string, text: string, type: 'info' | 'success' | 'warning' | 'alert', metadata?: any): Promise<boolean> => {
+// =======================
+// NOTIFICATION FUNCTIONS - FIXED sendNotification
+// =======================
+
+// Send a notification to a user by username (with preference checking)
+export const sendNotification = async (
+  username: string,
+  text: string,
+  type: 'info' | 'success' | 'warning' | 'alert' = 'info',
+  metadata?: any,
+  bypassPreferences: boolean = false // For critical system alerts
+): Promise<boolean> => {
+  console.log(`🔔 Sending notification to ${username}:`, { text, type, bypassPreferences });
+  
+  try {
+    // Get user ID
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+    
+    if (userError || !userData) {
+      console.error(`❌ User ${username} not found:`, userError?.message);
+      return false;
+    }
+    
+    // Check user preferences unless bypassing
+    if (!bypassPreferences) {
+      const { data: preferences } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userData.id)
+        .single();
+      
+      if (preferences) {
+        // Filter based on notification content and user preferences
+        if (text.includes('New submission') && !preferences.submission_graded) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (text.includes('Assessment graded') && !preferences.submission_graded) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (text.includes('New material') && !preferences.course_updates) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (text.includes('New assessment') && !preferences.new_assessments) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (text.includes('Leaderboard') && !preferences.leaderboard_updates) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (text.includes('completed') && text.includes('%') && !preferences.topic_completed) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (type === 'info' && metadata?.teacher && !preferences.teacher_announcements) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+        if (type === 'alert' && metadata?.admin && !preferences.admin_alerts) {
+          console.log(`⏭️ Skipping notification (preferences disabled) for ${username}`);
+          return false;
+        }
+      }
+    }
+    
+    // Create notification with expiration (7 days default)
+    const notificationData = {
+      user_id: userData.id,
+      text: text,
+      type: type,
+      read: false,
+      metadata: metadata || {},
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString() // 7 days
+    };
+    
+    const { error } = await supabase
+      .from('notifications')
+      .insert([notificationData]);
+    
+    if (error) {
+      console.error('❌ Error inserting notification:', error);
+      return false;
+    }
+    
+    console.log(`✅ Notification sent to ${username}`);
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error in sendNotification:', error);
+    return false;
+  }
+};
+
+// Keep the old version as a low-level helper (for internal use)
+export const sendNotificationDirect = async (
+  userId: string,
+  text: string,
+  type: 'info' | 'success' | 'warning' | 'alert' = 'info',
+  metadata?: any
+): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from('notifications')
@@ -2412,7 +2519,8 @@ export const sendNotification = async (userId: string, text: string, type: 'info
         type: type,
         read: false,
         metadata: metadata || null,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString()
       });
 
     return !error;
@@ -2423,12 +2531,12 @@ export const sendNotification = async (userId: string, text: string, type: 'info
 };
 
 // Simple test function to verify notifications work
-export const testNotifications = async (userId: string): Promise<boolean> => {
+export const testNotifications = async (username: string): Promise<boolean> => {
   return await sendNotification(
-    userId, 
-    '🎉 Notifications are working! System is operational.', 
+    username,
+    '🎉 Notifications are working! System is operational.',
     'success',
-    { actionUrl: '/dashboard' }
+    { actionUrl: '/dashboard', test: true }
   );
 };
 

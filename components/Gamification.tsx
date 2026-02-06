@@ -1,5 +1,5 @@
 // components/Gamification.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Trophy, Zap, TrendingUp, Users, Star, Award, Timer, Target, 
@@ -21,7 +21,6 @@ interface LeaderboardData {
   assessments: LeaderboardEntry[];
 }
 
-// FIX 1: Updated Interface to include missing properties causing errors
 interface SprintQuestion {
   id: string;
   text: string;
@@ -30,8 +29,8 @@ interface SprintQuestion {
   topic: string;
   type: string;
   explanation?: string;
-  difficulty?: string;   // Added
-  options?: string[];    // Added
+  difficulty?: string;
+  options?: string[];
 }
 
 export const SprintChallenge: React.FC = () => {
@@ -44,14 +43,26 @@ export const SprintChallenge: React.FC = () => {
   const [userAnswer, setUserAnswer] = useState('');
   const [username, setUsername] = useState('');
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
+  const [streak, setStreak] = useState(0);
+
+  // Refs to avoid stale closures in timer
+  const scoreRef = useRef(score);
+  const usernameRef = useRef(username);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep refs in sync
+  useEffect(() => { scoreRef.current = score; }, [score]);
+  useEffect(() => { usernameRef.current = username; }, [username]);
 
   // Initialize questions from database
-  const loadRandomQuestions = async () => {
+  const loadRandomQuestions = useCallback(async () => {
     try {
       setLoadingQuestions(true);
       console.log('🎮 Loading questions for Sprint Challenge from ALL checkpoints...');
 
-      // STRATEGY 1: Get questions via checkpoint questions join (BEST)
+      // STRATEGY 1: Get questions via checkpoint questions join
       const { data: checkpointQuestions, error: cpError } = await supabase
         .from('checkpoint_questions')
         .select(`
@@ -81,21 +92,19 @@ export const SprintChallenge: React.FC = () => {
       if (!cpError && checkpointQuestions && checkpointQuestions.length > 0) {
         console.log(`✅ Found ${checkpointQuestions.length} questions from checkpoints`);
         
-        // FIX 2: Handle potential array structure from Supabase join safely
         const sprintQuestions: SprintQuestion[] = checkpointQuestions
           .map((cpq: any) => {
-            // Normalize: If 'questions' is an array, take the first item, otherwise use it as is
             const qData = Array.isArray(cpq.questions) ? cpq.questions[0] : cpq.questions;
             return { ...cpq, questions: qData };
           })
-          .filter((cpq) => cpq.questions && cpq.questions.text) // Safe filter
+          .filter((cpq) => cpq.questions && cpq.questions.text)
           .map((cpq) => {
             const q = cpq.questions;
-            const subject = Array.isArray(q.topics) 
+            const subjectName = Array.isArray(q.topics) 
               ? q.topics[0]?.subjects?.name 
               : q.topics?.subjects?.name || 'General';
             
-            const topic = Array.isArray(q.topics)
+            const topicName = Array.isArray(q.topics)
               ? q.topics[0]?.title
               : q.topics?.title || 'General';
             
@@ -103,8 +112,8 @@ export const SprintChallenge: React.FC = () => {
               id: q.id,
               text: q.text,
               answer: q.correct_answer || q.model_answer || '',
-              subject: subject,
-              topic: topic,
+              subject: subjectName,
+              topic: topicName,
               type: q.type || 'MCQ',
               explanation: q.explanation || '',
               difficulty: q.difficulty || 'IGCSE',
@@ -112,10 +121,14 @@ export const SprintChallenge: React.FC = () => {
             };
           });
 
-        // Shuffle and select questions
-        const shuffled = [...sprintQuestions].sort(() => Math.random() - 0.5);
-        const selectedQuestions = shuffled.slice(0, 20);
-        setQuestions(selectedQuestions);
+        // Fisher-Yates shuffle
+        const shuffled = [...sprintQuestions];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        setQuestions(shuffled.slice(0, 20));
         setLoadingQuestions(false);
         return;
       }
@@ -159,7 +172,6 @@ export const SprintChallenge: React.FC = () => {
 
       console.log(`✅ Found ${allQuestions.length} total questions`);
 
-      // Transform database questions to SprintQuestion format
       const sprintQuestions: SprintQuestion[] = allQuestions
         .filter((q: any) => q.text && q.text.trim().length > 0)
         .map((q: any) => {
@@ -186,19 +198,22 @@ export const SprintChallenge: React.FC = () => {
 
       console.log(`✅ Transformed ${sprintQuestions.length} valid questions`);
 
-      // Shuffle and select 20 random questions
-      const shuffled = [...sprintQuestions].sort(() => Math.random() - 0.5);
-      const selectedQuestions = shuffled.slice(0, 20);
+      // Fisher-Yates shuffle
+      const shuffled = [...sprintQuestions];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
 
-      setQuestions(selectedQuestions);
+      setQuestions(shuffled.slice(0, 20));
       setLoadingQuestions(false);
-      console.log(`🎮 Loaded ${selectedQuestions.length} random questions`);
+      console.log(`🎮 Loaded ${Math.min(shuffled.length, 20)} random questions`);
     } catch (error) {
       console.error('❌ Error loading random questions:', error);
       setQuestions(getSampleQuestions());
       setLoadingQuestions(false);
     }
-  };
+  }, []);
 
   // Fallback sample questions
   const getSampleQuestions = (): SprintQuestion[] => {
@@ -304,10 +319,8 @@ export const SprintChallenge: React.FC = () => {
   };
 
   useEffect(() => {
-    // Load questions on component mount
     loadRandomQuestions();
     
-    // Get username from localStorage
     const storedUser = localStorage.getItem('newel_currentUser');
     if (storedUser) {
       try {
@@ -317,17 +330,19 @@ export const SprintChallenge: React.FC = () => {
         console.error('Failed to parse user:', e);
       }
     }
-  }, []);
+  }, [loadRandomQuestions]);
 
+  // Timer effect — uses refs to avoid stale closures
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setInterval>;
     if (isRunning && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
             setIsRunning(false);
             setGameOver(true);
-            saveScore();
+            // Use ref for current score
+            persistScore(scoreRef.current);
             return 0;
           }
           return prev - 1;
@@ -335,88 +350,153 @@ export const SprintChallenge: React.FC = () => {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isRunning, timeLeft]);
+  }, [isRunning]);
+
+  // Persist score to backend (uses passed value, not stale state)
+  const persistScore = async (finalScore: number) => {
+    const currentUsername = usernameRef.current;
+    if (!currentUsername) {
+      console.log('No username found, score not saved');
+      return;
+    }
+    
+    try {
+      await saveSprintScore(currentUsername, finalScore);
+      console.log('✅ Score saved to leaderboard:', finalScore);
+    } catch (error) {
+      console.error('❌ Failed to save score:', error);
+    }
+  };
 
   const startGame = async () => {
-    // Reload fresh random questions for each game
     await loadRandomQuestions();
     setTimeLeft(222);
     setScore(0);
     setCurrentQuestion(0);
     setGameOver(false);
     setUserAnswer('');
+    setSelectedOption(null);
+    setLastAnswerCorrect(null);
+    setStreak(0);
     setIsRunning(true);
+    
+    // Focus the input after a tick
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const checkAnswer = () => {
+  const advanceQuestion = useCallback((newScore: number) => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(prev => prev + 1);
+      setSelectedOption(null);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
+      setGameOver(true);
+      setIsRunning(false);
+      persistScore(newScore);
+    }
+    setUserAnswer('');
+  }, [currentQuestion, questions.length]);
+
+  const checkAnswer = useCallback(() => {
     if (!isRunning || gameOver) return;
     
     const currentQ = questions[currentQuestion];
     if (!currentQ) return;
     
+    const trimmedAnswer = userAnswer.trim();
+    if (!trimmedAnswer && selectedOption === null) return;
+    
     let correct = false;
     
-    if (currentQ.type === 'MCQ') {
-      // For MCQ, check if answer matches any of the options (case-insensitive)
-      const userAnswerLower = userAnswer.trim().toLowerCase();
-      const correctAnswerLower = currentQ.answer.toLowerCase();
+    if (currentQ.type === 'MCQ' && currentQ.options && currentQ.options.length > 0) {
+      const correctAnswerLower = currentQ.answer.toLowerCase().trim();
       
-      // Check if it's an exact match
-      correct = userAnswerLower === correctAnswerLower;
-      
-      // Also check if it matches any of the options (if options exist)
-      if (!correct && currentQ.options && currentQ.options.length > 0) {
-        correct = currentQ.options.some(option => 
-          option.toLowerCase() === userAnswerLower
-        );
+      // Option 1: User clicked an MCQ option
+      if (selectedOption !== null) {
+        const selectedText = currentQ.options[selectedOption];
+        correct = selectedText?.toLowerCase().trim() === correctAnswerLower;
+      } else {
+        const userAnswerLower = trimmedAnswer.toLowerCase();
+        
+        // Option 2: User typed a letter like A, B, C, D
+        const letterIndex = 'abcd'.indexOf(userAnswerLower);
+        if (userAnswerLower.length === 1 && letterIndex !== -1 && letterIndex < currentQ.options.length) {
+          const mappedOption = currentQ.options[letterIndex];
+          correct = mappedOption?.toLowerCase().trim() === correctAnswerLower;
+        } else {
+          // Option 3: User typed the full answer text
+          correct = userAnswerLower === correctAnswerLower;
+        }
       }
     } else {
-      // For THEORY questions, do partial matching
-      const userAnswerLower = userAnswer.trim().toLowerCase();
-      const correctAnswerLower = currentQ.answer.toLowerCase();
+      // THEORY question — partial match with minimum length guard
+      const userAnswerLower = trimmedAnswer.toLowerCase();
+      const correctAnswerLower = currentQ.answer.toLowerCase().trim();
       
-      // More lenient matching for theory questions
-      correct = userAnswerLower.includes(correctAnswerLower) || 
-                correctAnswerLower.includes(userAnswerLower) ||
-                userAnswerLower === correctAnswerLower;
+      if (userAnswerLower.length >= 2) {
+        // Exact match
+        correct = userAnswerLower === correctAnswerLower;
+        
+        // Contained match (both directions) — only if answer/input is meaningful length
+        if (!correct && userAnswerLower.length >= 3) {
+          const correctWords = correctAnswerLower.split(/\s+/).filter(w => w.length > 2);
+          const userWords = userAnswerLower.split(/\s+/).filter(w => w.length > 2);
+          
+          // Check if user's key words appear in the correct answer or vice versa
+          if (correctWords.length > 0 && userWords.length > 0) {
+            const matchingWords = userWords.filter(uw => 
+              correctWords.some(cw => cw.includes(uw) || uw.includes(cw))
+            );
+            correct = matchingWords.length >= Math.max(1, Math.ceil(correctWords.length * 0.5));
+          }
+        }
+      }
     }
     
+    // Flash feedback
+    setLastAnswerCorrect(correct);
+    setTimeout(() => setLastAnswerCorrect(null), 600);
+    
+    let newScore = score;
     if (correct) {
-      setScore(prev => prev + 100);
-      console.log('✅ Correct!');
+      const streakBonus = streak >= 3 ? 50 : 0;
+      const pointsEarned = 100 + streakBonus;
+      newScore = score + pointsEarned;
+      setScore(newScore);
+      setStreak(prev => prev + 1);
+      console.log(`✅ Correct! +${pointsEarned}pts${streakBonus ? ' (streak bonus!)' : ''}`);
     } else {
+      setStreak(0);
       console.log('❌ Incorrect. Correct answer:', currentQ.answer);
     }
     
-    // Move to next question or end game
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
-    } else {
-      setGameOver(true);
-      setIsRunning(false);
-      saveScore();
-    }
-    
-    setUserAnswer('');
+    advanceQuestion(newScore);
+  }, [isRunning, gameOver, questions, currentQuestion, userAnswer, selectedOption, score, streak, advanceQuestion]);
+
+  const skipQuestion = useCallback(() => {
+    if (!isRunning || gameOver) return;
+    setStreak(0);
+    advanceQuestion(score);
+  }, [isRunning, gameOver, score, advanceQuestion]);
+
+  const handleSelectOption = (index: number) => {
+    if (!isRunning || gameOver) return;
+    setSelectedOption(index);
+    setUserAnswer(questions[currentQuestion]?.options?.[index] || '');
   };
 
-  const saveScore = async () => {
-    if (!username) {
-      console.log('No username found, score not saved');
-      return;
-    }
-    
-    try {
-      await saveSprintScore(username, score);
-      console.log('✅ Score saved to leaderboard:', score);
-    } catch (error) {
-      console.error('❌ Failed to save score:', error);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       checkAnswer();
+    }
+    // Quick letter shortcuts for MCQ
+    const currentQ = questions[currentQuestion];
+    if (currentQ?.type === 'MCQ' && currentQ.options && currentQ.options.length > 0) {
+      const key = e.key.toLowerCase();
+      const letterIndex = 'abcd'.indexOf(key);
+      if (letterIndex !== -1 && letterIndex < currentQ.options.length && !userAnswer) {
+        handleSelectOption(letterIndex);
+      }
     }
   };
 
@@ -428,12 +508,12 @@ export const SprintChallenge: React.FC = () => {
 
   const getCurrentQuestionInfo = () => {
     const q = questions[currentQuestion];
-    if (!q) return { subject: '', topic: '', difficulty: '' };
+    if (!q) return { subject: '', topic: '', difficulty: '', type: '' };
     
     return {
       subject: q.subject,
       topic: q.topic,
-      difficulty: q.difficulty,
+      difficulty: q.difficulty || 'IGCSE',
       type: q.type === 'MCQ' ? 'Multiple Choice' : 'Theory'
     };
   };
@@ -450,14 +530,35 @@ export const SprintChallenge: React.FC = () => {
         <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border border-white/20 p-8 rounded-2xl">
           <div className="flex justify-between items-center mb-6">
             <div className="text-center">
-              <div className="text-5xl font-bold text-cyan-400 font-mono">{formatTime(timeLeft)}</div>
+              <div className={`text-5xl font-bold font-mono transition-colors ${
+                timeLeft <= 30 ? 'text-red-400 animate-pulse' : 
+                timeLeft <= 60 ? 'text-yellow-400' : 'text-cyan-400'
+              }`}>
+                {formatTime(timeLeft)}
+              </div>
               <div className="text-white/60 text-sm">time remaining</div>
             </div>
             <div className="text-center">
               <div className="text-5xl font-bold text-yellow-400 font-mono">{score}</div>
               <div className="text-white/60 text-sm">points</div>
+              {streak >= 3 && (
+                <div className="text-orange-400 text-xs font-bold mt-1 animate-bounce">
+                  🔥 {streak} streak!
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Answer feedback flash */}
+          {lastAnswerCorrect !== null && (
+            <div className={`text-center py-2 rounded-lg mb-3 font-bold text-sm transition-all ${
+              lastAnswerCorrect 
+                ? 'bg-green-500/20 text-green-400' 
+                : 'bg-red-500/20 text-red-400'
+            }`}>
+              {lastAnswerCorrect ? '✅ Correct!' : '❌ Wrong!'}
+            </div>
+          )}
           
           {loadingQuestions ? (
             <div className="text-center py-12">
@@ -492,40 +593,59 @@ export const SprintChallenge: React.FC = () => {
                   {questions[currentQuestion]?.text || "Loading question..."}
                 </div>
                 
+                {/* Clickable MCQ Options */}
                 {questions[currentQuestion]?.type === 'MCQ' && 
                  questions[currentQuestion]?.options &&
-                 questions[currentQuestion]?.options.length > 0 && (
+                 questions[currentQuestion]?.options!.length > 0 && (
                   <div className="space-y-2 mb-4">
-                    <p className="text-white/60 text-sm">Options:</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <p className="text-white/60 text-sm">Click an option or type the letter:</p>
+                    <div className="grid grid-cols-1 gap-2">
                       {questions[currentQuestion].options?.map((option, idx) => (
-                        <div key={idx} className="bg-white/5 p-3 rounded-lg text-white/80 text-sm">
-                          {String.fromCharCode(65 + idx)}. {option}
-                        </div>
+                        <button
+                          key={idx}
+                          onClick={() => handleSelectOption(idx)}
+                          disabled={!isRunning}
+                          className={`text-left p-3 rounded-lg text-sm transition-all ${
+                            selectedOption === idx
+                              ? 'bg-cyan-500/30 border border-cyan-400 text-white'
+                              : 'bg-white/5 border border-white/10 text-white/80 hover:bg-white/10'
+                          } ${!isRunning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <span className="font-bold text-cyan-400 mr-2">
+                            {String.fromCharCode(65 + idx)}.
+                          </span>
+                          {option}
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
                 
-                <input
-                  type="text"
-                  value={userAnswer}
-                  onChange={(e) => setUserAnswer(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={
-                    questions[currentQuestion]?.type === 'MCQ' 
-                      ? "Enter the letter or answer..." 
-                      : "Type your answer..."
-                  }
-                  className="w-full p-4 bg-white/10 border border-white/20 rounded-lg text-white text-lg placeholder-white/40"
-                  disabled={!isRunning}
-                />
+                {/* Text input for theory OR alternative MCQ input */}
+                {questions[currentQuestion]?.type !== 'MCQ' && (
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your answer..."
+                    className="w-full p-4 bg-white/10 border border-white/20 rounded-lg text-white text-lg placeholder-white/40"
+                    disabled={!isRunning}
+                    autoFocus
+                  />
+                )}
                 
-                <div className="text-white/40 text-sm mt-3">
-                  {questions[currentQuestion]?.type === 'MCQ' 
-                    ? "Type the letter (A, B, C, D) or the full answer" 
-                    : "Short answer expected"}
-                </div>
+                {questions[currentQuestion]?.type === 'MCQ' && (
+                  <div className="text-white/40 text-sm mt-3">
+                    Click an option above, or press A/B/C/D, then Enter to submit
+                  </div>
+                )}
+                {questions[currentQuestion]?.type !== 'MCQ' && (
+                  <div className="text-white/40 text-sm mt-3">
+                    Short answer expected — press Enter to submit
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-4">
@@ -545,17 +665,7 @@ export const SprintChallenge: React.FC = () => {
                       Submit Answer →
                     </button>
                     <button
-                      onClick={() => {
-                        // Skip current question
-                        if (currentQuestion < questions.length - 1) {
-                          setCurrentQuestion(prev => prev + 1);
-                          setUserAnswer('');
-                        } else {
-                          setGameOver(true);
-                          setIsRunning(false);
-                          saveScore();
-                        }
-                      }}
+                      onClick={skipQuestion}
                       className="px-4 bg-white/10 text-white/70 rounded-lg hover:bg-white/20 transition"
                     >
                       Skip
@@ -581,9 +691,14 @@ export const SprintChallenge: React.FC = () => {
           ) : (
             <div className="text-center py-8">
               <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white mb-2">Time's Up!</h3>
+              <h3 className="text-2xl font-bold text-white mb-2">
+                {timeLeft === 0 ? "Time's Up!" : "Sprint Complete!"}
+              </h3>
               <p className="text-white/70 mb-2">Final Score:</p>
-              <p className="text-5xl font-bold text-yellow-400 mb-6">{score}</p>
+              <p className="text-5xl font-bold text-yellow-400 mb-2">{score}</p>
+              {streak >= 3 && (
+                <p className="text-orange-400 text-sm mb-4">Best streak: {streak} 🔥</p>
+              )}
               <p className="text-white/60 mb-6">
                 You answered {currentQuestion} of {questions.length} questions
               </p>
@@ -618,7 +733,7 @@ export const SprintChallenge: React.FC = () => {
               </li>
               <li className="flex items-start gap-2">
                 <Star className="text-yellow-400 mt-1" size={16} />
-                <span><strong>+100 points</strong> for each correct answer</span>
+                <span><strong>+100 points</strong> per correct answer, <strong>+50 bonus</strong> for 3+ streaks</span>
               </li>
               <li className="flex items-start gap-2">
                 <Brain className="text-cyan-400 mt-1" size={16} />
@@ -626,7 +741,7 @@ export const SprintChallenge: React.FC = () => {
               </li>
               <li className="flex items-start gap-2">
                 <BookOpen className="text-purple-400 mt-1" size={16} />
-                <span>Includes <strong>MCQ and Theory</strong> questions from your courses</span>
+                <span><strong>Click options</strong> for MCQ or <strong>type answers</strong> for theory</span>
               </li>
               <li className="flex items-start gap-2">
                 <Trophy className="text-yellow-400 mt-1" size={16} />
@@ -670,12 +785,12 @@ export const SprintChallenge: React.FC = () => {
               <Brain className="text-cyan-400" /> Tips for Success
             </h3>
             <ul className="space-y-2 text-white/60 text-sm">
-              <li>• <strong>Press Enter</strong> to quickly submit answers</li>
-              <li>• For MCQ: Type the <strong>letter (A, B, C, D)</strong> or the full answer</li>
-              <li>• Theory questions accept <strong>partial matches</strong></li>
+              <li>• <strong>Click options</strong> directly for fastest MCQ answers</li>
+              <li>• Press <strong>A, B, C, D</strong> keys as shortcuts for MCQ</li>
+              <li>• Press <strong>Enter</strong> to quickly submit answers</li>
+              <li>• Build <strong>streaks of 3+</strong> for bonus points</li>
               <li>• Skip questions you don't know to save time</li>
               <li>• Practice all subjects for better scores</li>
-              <li>• Check the leaderboard for competitive targets</li>
             </ul>
           </div>
           
@@ -691,7 +806,9 @@ export const SprintChallenge: React.FC = () => {
   );
 };
 
-// LeaderboardView component remains the same as before
+// =====================================================
+// LEADERBOARD VIEW
+// =====================================================
 export const LeaderboardView: React.FC = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData>({
     academic: [],
@@ -709,7 +826,6 @@ export const LeaderboardView: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Get username from localStorage
         const storedUser = localStorage.getItem('newel_currentUser');
         if (storedUser) {
           try {
@@ -720,35 +836,20 @@ export const LeaderboardView: React.FC = () => {
           }
         }
         
-        // Fetch leaderboards - ONLY REAL DATA
         const data = await getLeaderboards();
         console.log('📊 Leaderboard data loaded:', data);
         
-        // Ensure data structure
         const safeData = {
           academic: Array.isArray(data?.academic) ? data.academic : [],
           challenge: Array.isArray(data?.challenge) ? data.challenge : [],
           assessments: Array.isArray(data?.assessments) ? data.assessments : []
         };
         
-        // Set only real data - NO DEMO DATA
         setLeaderboardData(safeData);
         
-        // Log if any leaderboard is empty
-        if (safeData.academic.length === 0) {
-          console.log('Academic leaderboard is empty - no academic data yet');
-        }
-        if (safeData.challenge.length === 0) {
-          console.log('Challenge leaderboard is empty - no challenge data yet');
-        }
-        if (safeData.assessments.length === 0) {
-          console.log('Assessments leaderboard is empty - no assessment data yet');
-        }
-        
-      } catch (error) {
-        console.error('❌ Error loading leaderboards:', error);
+      } catch (err) {
+        console.error('❌ Error loading leaderboards:', err);
         setError('Failed to load leaderboards. Please try again later.');
-        // Set empty data on error - NO DEMO DATA
         setLeaderboardData({
           academic: [],
           challenge: [],
@@ -938,7 +1039,7 @@ export const LeaderboardView: React.FC = () => {
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'academic' | 'challenge' | 'assessments')}
               className={`flex-1 px-6 py-4 font-semibold transition flex items-center justify-center gap-2 ${
                 activeTab === tab.id
                   ? 'bg-cyan-600 text-white'
