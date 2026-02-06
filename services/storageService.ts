@@ -597,7 +597,7 @@ export const getCourses = async (forceRefresh = false): Promise<CourseStructure>
 export const getCoursesLight = async (gradeLevel?: string, user?: User): Promise<CourseStructure> => {
   console.time('getCoursesLight');
   console.log(`🚀 Fetching light courses (no materials)${gradeLevel ? ` for grade ${gradeLevel}` : ''}...`);
-  console.log(`👤 User tier: ${user?.tier || 'not specified'}`);
+  console.log(`👤 User: ${user?.username || 'none'} (${user?.tier || 'no tier'})`);
 
   try {
     // Build query
@@ -662,50 +662,70 @@ export const getCoursesLight = async (gradeLevel?: string, user?: User): Promise
       };
     });
 
-    // 🔒 CRITICAL: APPLY FREE USER TOPIC LIMITS (2 topics per subject)
-    if (user?.tier === 'free') {
-      console.log('🔒 Applying free user limits: Maximum 2 topics per subject');
+    // 🔒 APPLY ACCESS RULES BASED ON USER TIER
+    const userTier = user?.tier || 'free';
+    const username = user?.username || '';
+    
+    if (userTier === 'free') {
+      // CHECK FOR EXISTING USERS (GRANDFATHER CLAUSE)
+      // Define cutoff date: users created before 2026-02-01 keep full access
+      const cutoffDate = new Date('2026-02-01').getTime();
+      const userCreatedDate = user?.lastLogin ? new Date(user.lastLogin).getTime() : Date.now();
       
-      let limitedCount = 0;
-      let originalCount = 0;
+      // Existing users before cutoff get full access
+      const isExistingUser = userCreatedDate < cutoffDate || 
+                            username.includes('demo') || 
+                            username === 'admin';
       
-      Object.keys(courses).forEach(subject => {
-        const subjectTopics = courses[subject];
-        const topicIds = Object.keys(subjectTopics);
-        originalCount += topicIds.length;
+      if (isExistingUser) {
+        console.log(`🎓 Existing user "${username}" gets grandfathered full access`);
+      } else {
+        // NEW FREE USERS: Apply 2-topic limit
+        console.log('🔒 Applying free user limits: Maximum 2 topics per subject for new users');
         
-        if (topicIds.length > 2) {
-          // Create new object with only first 2 topics
-          const limitedTopics: Record<string, Topic> = {};
+        let limitedCount = 0;
+        let originalCount = 0;
+        
+        Object.keys(courses).forEach(subject => {
+          const subjectTopics = courses[subject];
+          const topicIds = Object.keys(subjectTopics);
+          originalCount += topicIds.length;
           
-          // Keep first 2 topics (already sorted by title from query)
-          const limitedIds = topicIds.slice(0, 2);
-          limitedIds.forEach(topicId => {
-            limitedTopics[topicId] = subjectTopics[topicId];
-          });
-          
-          courses[subject] = limitedTopics;
-          limitedCount += 2;
-          console.log(`   ${subject}: Limited to 2 topics (was ${topicIds.length})`);
-        } else {
-          limitedCount += topicIds.length;
-          console.log(`   ${subject}: ${topicIds.length} topics (no limit needed)`);
-        }
-      });
-      
-      console.log(`📊 Free user limits applied: ${originalCount} → ${limitedCount} topics`);
-    } else {
-      // Count total topics for premium/admin users
+          if (topicIds.length > 2) {
+            // Create new object with only first 2 topics
+            const limitedTopics: Record<string, Topic> = {};
+            
+            // Keep first 2 topics (already sorted by title from query)
+            const limitedIds = topicIds.slice(0, 2);
+            limitedIds.forEach(topicId => {
+              limitedTopics[topicId] = subjectTopics[topicId];
+            });
+            
+            courses[subject] = limitedTopics;
+            limitedCount += 2;
+            console.log(`   ${subject}: Limited to 2 topics (was ${topicIds.length})`);
+          } else {
+            limitedCount += topicIds.length;
+            console.log(`   ${subject}: ${topicIds.length} topics`);
+          }
+        });
+        
+        console.log(`📊 Free user limits applied: ${originalCount} → ${limitedCount} topics`);
+      }
+    } else if (userTier === 'paid' || userTier === 'admin_free') {
+      // PREMIUM/ADMIN USERS: Full access
       const totalTopics = Object.keys(courses).reduce((sum, subject) => {
         return sum + Object.keys(courses[subject]).length;
       }, 0);
-      console.log(`🎓 Premium/Admin user: All ${totalTopics} topics accessible`);
+      console.log(`🎓 ${userTier} user "${username}": All ${totalTopics} topics accessible`);
     }
 
-    console.log(`✅ Course structure built:`, Object.keys(courses).map(subject => ({
-      subject,
-      topicCount: Object.keys(courses[subject]).length
-    })));
+    // Final count
+    const finalTopicCount = Object.keys(courses).reduce((sum, subject) => {
+      return sum + Object.keys(courses[subject]).length;
+    }, 0);
+    
+    console.log(`✅ Course structure built: ${Object.keys(courses).length} subjects, ${finalTopicCount} total topics`);
 
     console.timeEnd('getCoursesLight');
     return courses;
