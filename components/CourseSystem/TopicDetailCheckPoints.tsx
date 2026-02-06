@@ -12,6 +12,8 @@ import {
   getCoursesLight,
   getTopicMaterials,
   notifyTopic80PercentComplete,
+  cache,
+  cacheKey
 } from '../../services/storageService';
 import { getAITutorResponse } from '../../services/geminiService';
 import { supabase } from '../../services/supabaseClient';
@@ -72,23 +74,12 @@ export const TopicDetailCheckpoints: React.FC = () => {
   // OPTIMIZATION 1: CACHE CHECKPOINT PROGRESS
   // =====================================================
   const getCachedProgress = useCallback(async (username: string, topicId: string) => {
-    const cacheKey = `progress_${username}_${topicId}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      // 2 minute cache for progress
-      if (Date.now() - timestamp < 2 * 60 * 1000) {
-        return data;
-      }
-    }
-    
+    const key = cacheKey('progress', `${username}_${topicId}`);
+    const cached = await cache.get(key, 2 * 60 * 1000);
+    if (cached) return cached;
+
     const progress = await getStudentCheckpointProgress(username, topicId);
-    sessionStorage.setItem(cacheKey, JSON.stringify({
-      data: progress,
-      timestamp: Date.now()
-    }));
-    
+    cache.set(key, progress, 2 * 60 * 1000);
     return progress;
   }, []);
 
@@ -111,8 +102,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
       try {
         setError(null);
         
-        // 1. Get user (fast - from localStorage)
-        const storedUser = getStoredSession();
+        // 1. Get user (fast - prefer cache, fallback to localStorage)
+        let storedUser = await cache.get('newel_currentUser', 60 * 60 * 1000);
+        if (!storedUser) storedUser = getStoredSession();
         if (!storedUser) {
           navigate('/');
           return;
@@ -358,9 +350,9 @@ export const TopicDetailCheckpoints: React.FC = () => {
       await saveCheckpointProgress(user.username, checkpointId, score, passed);
       
       // Update local progress (clear cache)
-      const progressKey = `progress_${user.username}_${decodedTopicId}`;
-      sessionStorage.removeItem(progressKey);
-      
+      const progressKey = cacheKey('progress', `${user.username}_${decodedTopicId}`);
+      cache.clear(progressKey);
+
       const newProgress = await getStudentCheckpointProgress(user.username, decodedTopicId);
       setCheckpointProgress(newProgress);
 

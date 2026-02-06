@@ -10,7 +10,9 @@ import {
   saveSubmission, 
   getStoredSession,
   createNotification, 
-  notifyNewAssessment
+  notifyNewAssessment,
+  cache,
+  cacheKey
 } from '../../services/storageService';
 import { 
   Plus, Save, Brain, Eye, Edit, X, CheckCircle, Timer, List, 
@@ -46,10 +48,26 @@ export const AssessmentManager: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const a = await getAssessments();
-        const s = await getSubmissions();
-        setAssessments(a);
-        setSubmissions(s);
+        const aKey = cacheKey('assessments', 'all');
+        const sKey = cacheKey('submissions', 'all');
+
+        const cachedA = await cache.get<Assessment[]>(aKey, 30 * 60 * 1000);
+        if (cachedA) {
+          setAssessments(cachedA);
+        } else {
+          const a = await getAssessments();
+          setAssessments(a);
+          try { cache.set(aKey, a, 30 * 60 * 1000); } catch (e) {}
+        }
+
+        const cachedS = await cache.get<Submission[]>(sKey, 5 * 60 * 1000);
+        if (cachedS) {
+          setSubmissions(cachedS);
+        } else {
+          const s = await getSubmissions();
+          setSubmissions(s);
+          try { cache.set(sKey, s, 5 * 60 * 1000); } catch (e) {}
+        }
       } catch (error) {
         console.error('Error loading assessments:', error);
       }
@@ -135,32 +153,31 @@ export const AssessmentManager: React.FC = () => {
     createdBy: user.username
   };
   
-  try {
-    await saveAssessment(newAssessment);
-    
-    // Add notification trigger after assessment is created
     try {
-      const currentUsername = "teacher_demo"; // Replace with actual user
-// OR if you have user in props/context:
-// const currentUsername = user?.username || 'teacher';
+      await saveAssessment(newAssessment);
 
-    await notifyNewAssessment(
-      currentUsername, // Fixed variable name
-      newAssessment.title,
-      newAssessment.subject,
-      newAssessment.targetGrade
-    );
+      // Invalidate assessments cache so teachers/students see new assessment
+      try { cache.clear(cacheKey('assessments', 'all')); } catch (e) {}
+
+      // Add notification trigger after assessment is created
+      try {
+        const currentUsername = user?.username || (await cache.get('newel_currentUser', 60 * 60 * 1000))?.username || 'teacher_demo';
+        await notifyNewAssessment(
+          currentUsername,
+          newAssessment.title,
+          newAssessment.subject,
+          newAssessment.targetGrade
+        );
+      } catch (error) {
+        console.error('Failed to send assessment notification:', error);
+      }
+
+      console.log('📢 Assessment published:', newAssessment.title);
+      alert("Assessment Published! Students can now see this in their 'My Assignments'.");
     } catch (error) {
-      console.error('Failed to send assessment notification:', error);
-      // Continue anyway - don't block assessment creation
+      console.error('Error saving assessment or sending notification:', error);
+      alert("There was an issue publishing the assessment.");
     }
-    console.log('📢 Notification sent:', { teacher: user.username, assessment: newAssessment.title });
-
-    alert("Assessment Published! Students can now see this in their 'My Assignments'.");
-  } catch (error) {
-    console.error('Error saving assessment or sending notification:', error);
-    alert("There was an issue publishing the assessment.");
-  }
   
   setForm({ title: '', subject: 'Biology', targetGrade: '9' });
   setQuestions([]);
@@ -228,14 +245,18 @@ export const AssessmentManager: React.FC = () => {
         newelGraded: true
       };
       await saveSubmission(gradedSub);
+      // Invalidate submissions cache as we save graded submissions
+      try { cache.clear(cacheKey('submissions', 'all')); } catch (e) {}
       count++;
     }
 
     setIsGrading(false);
     setGradeProgress('');
     
+    const sKey = cacheKey('submissions', 'all');
     const refreshed = await getSubmissions();
     setSubmissions(refreshed);
+    try { cache.set(sKey, refreshed, 5 * 60 * 1000); } catch (e) {}
 
     alert(`Batch graded ${count} submissions!`);
   };
@@ -257,7 +278,7 @@ export const AssessmentManager: React.FC = () => {
     };
     
     await saveSubmission(updated);
-    
+    try { cache.clear(cacheKey('submissions', 'all')); } catch (e) {}
     const refreshed = await getSubmissions();
     setSubmissions(refreshed);
 

@@ -46,7 +46,7 @@ export const authService = {
 
     console.log('✅ Authentication successful:', username);
 
-    // Return User object
+    // Return User object with tier and subscription fields
     const user: User = {
       username: data.username,
       role: data.role,
@@ -58,7 +58,13 @@ export const authService = {
       lastLogin: Date.now(),
       loginHistory: data.login_history 
         ? data.login_history.map((d: string) => new Date(d).getTime())
-        : []
+        : [],
+      // Subscription tier fields
+      tier: data.tier || 'free',
+      queryCount: data.query_count || 0,
+      queryResetTime: data.query_reset_time || new Date().toISOString(),
+      subscriptionEndsAt: data.subscription_ends_at || undefined,
+      paystackSubscriptionCode: data.paystack_subscription_code || undefined,
     };
 
     // Update last login time
@@ -122,17 +128,26 @@ export const authService = {
       return { success: false, message: 'Username already exists' };
     }
 
-    // Create new user
+    // Determine tier and approval status
+    // - Students/teachers default to 'free' tier and are auto-approved
+    // - Admins get 'admin_free' tier and are auto-approved
+    const tier = userData.role === 'admin' ? 'admin_free' : 'free';
+    const approved = userData.role === 'admin' || userData.role === 'student' || userData.role === 'teacher';
+
+    // Create new user with tier fields
     const { error } = await supabase
       .from('users')
       .insert({
         username: userData.username,
         password_hash: simpleHash(userData.password),
         role: userData.role,
-        approved: userData.role === 'admin', // Auto-approve admins
+        approved: approved,
         security_question: userData.securityQuestion,
         security_answer: userData.securityAnswer.toLowerCase(),
         grade_level: userData.gradeLevel || null,
+        tier: tier,
+        query_count: 0,
+        query_reset_time: new Date().toISOString(),
         created_at: new Date().toISOString()
       });
 
@@ -142,7 +157,7 @@ export const authService = {
       success: true, 
       message: userData.role === 'admin' 
         ? 'Admin account created successfully!' 
-        : 'Registration successful! Awaiting admin approval.' 
+        : `Registration successful! You can start learning with your ${tier} account.`
     };
   } catch (error: any) {
     console.error('❌ Registration error:', error);
@@ -271,11 +286,16 @@ export const userService = {
         securityQuestion: dbUser.security_question || '',
         securityAnswer: dbUser.security_answer || '',
         gradeLevel: dbUser.grade_level || undefined,
+        subscriptionEndsAt: dbUser.subscription_ends_at || undefined,
+        paystackSubscriptionCode: dbUser.paystack_subscription_code || undefined,
         assignedStudents: dbUser.assigned_students || undefined,
         lastLogin: dbUser.last_login ? new Date(dbUser.last_login).getTime() : undefined,
-        loginHistory: dbUser.login_history 
+        loginHistory: dbUser.login_history
           ? dbUser.login_history.map((d: string) => new Date(d).getTime())
-          : undefined
+          : undefined,
+        tier: 'admin_free',
+        queryCount: 0,
+        queryResetTime: ''
       }));
     } catch (error) {
       console.error('❌ Get users error:', error);

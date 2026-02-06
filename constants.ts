@@ -51,14 +51,20 @@ export const DEMO_USERS: Omit<User, 'password'>[] = [
     role: 'admin',
     approved: true,
     securityQuestion: SECURITY_QUESTIONS[4],
-    securityAnswer: 'newelacademy'
+    securityAnswer: 'newelacademy',
+    tier: 'admin_free',
+    queryCount: 0,
+    queryResetTime: new Date().toISOString()
   },
   {
     username: 'teacher_demo',
     role: 'teacher',
     approved: true,
     securityQuestion: SECURITY_QUESTIONS[0],
-    securityAnswer: 'demo'
+    securityAnswer: 'demo',
+    tier: 'free',
+    queryCount: 0,
+    queryResetTime: new Date().toISOString()
   },
   {
     username: 'student_demo',
@@ -66,7 +72,10 @@ export const DEMO_USERS: Omit<User, 'password'>[] = [
     approved: true,
     gradeLevel: '12', 
     securityQuestion: SECURITY_QUESTIONS[1],
-    securityAnswer: 'demo'
+    securityAnswer: 'demo',
+    tier: 'free',
+    queryCount: 0,
+    queryResetTime: new Date().toISOString()
   }
 ];
 

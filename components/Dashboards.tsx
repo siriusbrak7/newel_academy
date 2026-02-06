@@ -42,6 +42,7 @@ import {
   getStudentSubjectPerformance,
   getStudentCheckpointScores
 } from '../services/storageService';
+import { cache } from '../services/storageService';
 import { 
   Check, 
   X, 
@@ -363,11 +364,21 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     courses: CourseStructure;
     pendingAssessments: Assessment[];
   }> => {
-    // Check cache first (5 minute cache for essential data)
-    if (!forceRefresh && dataCache.essential && dataCache.timestamp && 
-        (Date.now() - dataCache.timestamp < 5 * 60 * 1000)) {
-      console.log('📦 Using cached essential data');
-      return dataCache.essential;
+    // Check centralized cache first (5 minute cache for essential data)
+    const cacheKey = `newel_dashboard_essential_${user.username}`;
+    if (!forceRefresh) {
+      try {
+        const cached = await cache.get(cacheKey, 5 * 60 * 1000);
+        if (cached) {
+          console.log('📦 Using cached essential data (centralized)');
+          // Keep local state in sync
+          setDataCache({ essential: cached, timestamp: Date.now() });
+          return cached;
+        }
+      } catch (e) {
+        // fallback to fresh fetch
+        console.warn('Cache read failed for essential data', e);
+      }
     }
     
     console.time('loadEssentialData');
@@ -389,17 +400,18 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         !allSubmissions.some(s => s.assessmentId === a.id && s.username === user.username)
       ).slice(0, 3);
       
-      // Cache the essential data
+      // Cache the essential data (centralized)
       const essentialData = {
         progress: progressData,
         courses: coursesData,
         pendingAssessments: pending
       };
-      
-      setDataCache({
-        essential: essentialData,
-        timestamp: Date.now()
-      });
+      try {
+        cache.set(cacheKey, essentialData, 5 * 60 * 1000);
+      } catch (e) {
+        console.warn('Failed to set cache for essential data', e);
+      }
+      setDataCache({ essential: essentialData, timestamp: Date.now() });
       
       console.timeEnd('loadEssentialData');
       console.log('✅ Essential data loaded:', {
@@ -421,21 +433,25 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
   // FIXED: PERFORMANCE DATA LOADING WITH FALLBACK
   // =====================================================
   const loadPerformanceData = async (forceRefresh = false) => {
-    // Check cache first (5 minute cache for performance data)
-    const now = Date.now();
-    const cacheValid = performanceCache.lastUpdated && 
-                      (now - performanceCache.lastUpdated < 5 * 60 * 1000) && 
-                      !forceRefresh;
-    
-    if (cacheValid && performanceCache.subjectPerformance) {
-      console.log('📊 Using cached performance data');
-      const labels = Object.keys(performanceCache.subjectPerformance);
-      const scores = Object.values(performanceCache.subjectPerformance);
-      setSubjectLabels(labels);
-      setSubjectScores(scores);
-      generateAdvice(scores);
-      setLoadingStates(prev => ({ ...prev, performance: false }));
-      return;
+    // Check centralized cache first (5 minute cache for performance data)
+    const perfCacheKey = `newel_performance_${user.username}`;
+    if (!forceRefresh) {
+      try {
+        const cachedPerf = await cache.get(perfCacheKey, 5 * 60 * 1000);
+        if (cachedPerf && cachedPerf.subjectPerformance) {
+          console.log('📊 Using cached performance data (centralized)');
+          setPerformanceCache({ subjectPerformance: cachedPerf.subjectPerformance, lastUpdated: Date.now() });
+          const labels = Object.keys(cachedPerf.subjectPerformance);
+          const scores = Object.values(cachedPerf.subjectPerformance);
+          setSubjectLabels(labels as string[]);
+          setSubjectScores(scores as number[]);
+          generateAdvice(scores as number[]);
+          setLoadingStates(prev => ({ ...prev, performance: false }));
+          return;
+        }
+      } catch (e) {
+        console.warn('Perf cache read failed', e);
+      }
     }
     
     setLoadingStates(prev => ({ ...prev, performance: true }));
@@ -488,11 +504,13 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
         }
       }
       
-      // Update cache
-      setPerformanceCache({
-        subjectPerformance,
-        lastUpdated: Date.now()
-      });
+      // Update centralized cache and local state
+      try {
+        cache.set(perfCacheKey, { subjectPerformance }, 5 * 60 * 1000);
+      } catch (e) {
+        console.warn('Failed to set performance cache', e);
+      }
+      setPerformanceCache({ subjectPerformance, lastUpdated: Date.now() });
       
       if (Object.keys(subjectPerformance).length > 0) {
         const labels = Object.keys(subjectPerformance);
@@ -699,7 +717,10 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     
     try {
       if (force || !dataCache.essential) {
-        // Clear cache and reload everything
+        // If force, clear centralized essential cache for this user then reload
+        if (force) {
+          try { cache.clear(`newel_dashboard_essential_${user.username}`); } catch (e) {}
+        }
         const essentialData = await loadEssentialData(true);
         setProgress(essentialData.progress);
         setCourses(essentialData.courses);
@@ -712,6 +733,9 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
       }
       
       // Always reload performance data (with potential cache)
+      if (force) {
+        try { cache.clear(`newel_performance_${user.username}`); } catch (e) {}
+      }
       await loadPerformanceData(force);
       
       console.log('✅ Refresh complete');
@@ -2043,16 +2067,20 @@ const loadStudentPerformance = async (username: string) => {
   // OPTIMIZATION 2: CACHED STUDENT COURSE DATA LOADING
   // =====================================================
   const loadStudentCourseData = async (username: string, forceRefresh = false) => {
-    // Check cache first (2-minute cache)
-    const cacheKey = username;
+    // Check centralized cache first (2-minute cache)
+    const cacheKey = `newel_student_${username}`;
     const now = Date.now();
-    const cacheEntry = studentDataCache[cacheKey];
-    const isCacheValid = cacheEntry && (now - cacheEntry.timestamp < 2 * 60 * 1000) && !forceRefresh;
-    
-    if (isCacheValid) {
-      console.log(`📊 Using cached student data for ${username}`);
-      setStudentCourseData(cacheEntry.data);
-      return;
+    if (!forceRefresh) {
+      try {
+        const cached = await cache.get(cacheKey, 2 * 60 * 1000);
+        if (cached) {
+          console.log(`📊 Using cached student data for ${username} (centralized)`);
+          setStudentCourseData(cached);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to read student cache', e);
+      }
     }
     
     console.log(`📊 Loading course data for ${username}...`);
@@ -2107,7 +2135,12 @@ const loadStudentPerformance = async (username: string) => {
         }
       };
       
-      // Update cache
+      // Update centralized cache and local cache state
+      try {
+        cache.set(cacheKey, studentData, 2 * 60 * 1000);
+      } catch (e) {
+        console.warn('Failed to set student cache', e);
+      }
       setStudentDataCache(prev => ({
         ...prev,
         [cacheKey]: {

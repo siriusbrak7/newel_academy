@@ -1,7 +1,7 @@
 // components/TeacherTools/QuickMaterialUpload.tsx
 import React, { useState, useEffect } from 'react';
 import { CourseStructure, Material, Topic } from '../../types'; // Add Topic type
-import { getCourses, uploadFileToSupabase, saveTopic } from '../../services/storageService';
+import { getCourses, uploadFileToSupabase, saveTopic, cache, cacheKey } from '../../services/storageService';
 import { Upload, File, Link as LinkIcon, FileText, Plus, X, CheckCircle } from 'lucide-react';
 
 
@@ -32,8 +32,15 @@ export const QuickMaterialUpload: React.FC<QuickMaterialUploadProps> = ({ onUplo
     const loadCoursesData = async () => {
       setLoading(true);
       try {
-        const coursesData = await getCourses();
-        setCourses(coursesData);
+        const key = cacheKey('courses', 'all');
+        const cached = await cache.get<CourseStructure>(key, 30 * 60 * 1000);
+        if (cached) {
+          setCourses(cached);
+        } else {
+          const coursesData = await getCourses();
+          setCourses(coursesData);
+          try { cache.set(key, coursesData, 30 * 60 * 1000); } catch (e) {}
+        }
       } catch (error) {
         console.error('Error loading courses:', error);
       } finally {
@@ -110,6 +117,9 @@ const filteredTopics = React.useMemo(() => {
       };
       
       await saveTopic(selectedSubject, updatedTopic);
+      
+      // Invalidate courses cache so users see new material
+      try { cache.clear(cacheKey('courses', 'all')); } catch (e) {}
       
       // Reset form
       setMaterialForm({ title: '', type: 'file', content: '' });

@@ -6,6 +6,23 @@ export type Role = 'admin' | 'teacher' | 'student';
 export type Theme = 'Cosmic' | 'Cyber-Dystopian';
 export type QuestionFormat = 'plain_text' | 'table' | 'image' | 'diagram' | 'code' | 'multipart';
 
+export interface TierFeatures {
+  aiTutor: boolean;
+  unlimitedQueries: boolean;
+  advancedAssessments: boolean;
+  classManagement: boolean;
+  customAssessments: boolean;
+  adminDashboard: boolean;
+  export: boolean;
+  prioritySupport: boolean;
+  maxStorage: number;
+  maxCourses: number;
+  maxStudents: number;
+  maxQueries: number;
+  resetHours: number;
+  unlimitedTopics: boolean;
+}
+
 // =======================
 // USER & AUTH
 // =======================
@@ -21,6 +38,26 @@ export interface User {
   assignedStudents?: string[];
   lastLogin?: number;
   loginHistory?: number[];
+  tier: 'free' | 'paid' | 'admin_free';
+  queryCount: number;
+  queryResetTime: string;
+  // Make subscription fields optional
+  subscriptionEndsAt?: string | number | Date;
+  paystackSubscriptionCode?: string;
+}
+
+export interface Payment {
+  id: string;
+  userId: string;
+  username: string;
+  amount: number;
+  currency: string;
+  paystackReference: string;
+  status: 'pending' | 'success' | 'failed' | 'reversed';
+  planType: 'monthly' | 'yearly';
+  createdAt: string;
+  updatedAt: string;
+  metadata?: any;
 }
 
 export interface AuthState {

@@ -108,7 +108,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
             approved: true,
             securityQuestion: formData.securityQuestion,
             securityAnswer: formData.securityAnswer.toLowerCase(),
-            lastLogin: Date.now()
+            lastLogin: Date.now(),
+            tier: 'admin_free',
+            queryCount: 0,
+            queryResetTime: new Date().toISOString()
           };
           setTimeout(() => onLogin(adminUser), 1500);
         } else {

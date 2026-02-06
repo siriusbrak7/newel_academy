@@ -8,6 +8,7 @@ import {
   getStudentCheckpointProgress,
   getCourses
 } from '../../services/storageService';
+import { cache, cacheKey } from '../../services/storageService';
 import { ChevronRight, FileText, ArrowLeft, Lock } from 'lucide-react';
 import { CourseSkeleton } from './CourseSkeleton';
 
@@ -56,7 +57,13 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         for (const subject in mergedCourses) {
           for (const topicId in mergedCourses[subject]) {
             try {
-              const cpProgress = await getStudentCheckpointProgress(user.username, topicId);
+              const key = cacheKey('progress', `${user.username}_${topicId}`);
+              const cached = await cache.get(key, 2 * 60 * 1000);
+              let cpProgress = cached;
+              if (!cpProgress) {
+                cpProgress = await getStudentCheckpointProgress(user.username, topicId);
+                try { cache.set(key, cpProgress, 2 * 60 * 1000); } catch (e) {}
+              }
               checkpointData[topicId] = cpProgress;
             } catch (error) {
               console.error(`Error loading checkpoint progress for ${topicId}:`, error);
@@ -262,7 +269,7 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
                               alert('Complete previous topics to unlock this one');
                             } else {
                               // Force topic load by clearing cache
-                              sessionStorage.removeItem(`progress_${user.username}_${topic.id}`);
+                              try { cache.clear(cacheKey('progress', `${user.username}_${topic.id}`)); } catch (e) {}
                             }
                           }}
                           className={`flex items-center gap-1 text-sm font-medium ${

@@ -19,6 +19,7 @@ const LeaderboardView = React.lazy(() => import('./components/Gamification').the
 const AITutorChat = React.lazy(() => import('./components/AITutorChat'));
 
 import { ImageOptimizer } from './components/ImageOptimizer';
+import ErrorBoundary from './components/ErrorBoundary';
 import { User, Theme, AuthState } from './types';
 import { DEFAULT_THEME } from './constants';
 import { initializeSupabase, sessionService } from './services/supabaseService';
@@ -38,7 +39,7 @@ import {
   X,
   User as UserIcon // Aliased to avoid conflict with User type
 } from 'lucide-react';
-import { getUserNotifications } from './services/storageService';
+import { getUserNotifications, cache } from './services/storageService';
 
 // Loading fallback component
 const LoadingScreen: React.FC = () => (
@@ -579,6 +580,11 @@ const App: React.FC = () => {
 
   // Handle logout
   const handleLogout = () => {
+    try {
+      cache.clearAll();
+    } catch (e) {
+      // ignore
+    }
     sessionService.clearSession();
     setAuth({ loggedIn: false, user: null });
     setSidebarOpen(false);
@@ -730,8 +736,9 @@ const App: React.FC = () => {
       )}
 
       <main className="flex-grow container mx-auto px-4 py-8">
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
+        <ErrorBoundary onReset={() => window.location.reload()}>
+          <Suspense fallback={<LoadingScreen />}>
+            <Routes>
             <Route
               path="/"
               element={
@@ -800,8 +807,9 @@ const App: React.FC = () => {
                 </div>
               }
             />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       <footer className={`text-center py-8 border-t backdrop-blur-sm ${theme === 'Cyber-Dystopian' ? 'text-green-300/30 border-green-500/10 bg-black/50' : 'text-white/30 border-white/10 bg-black/20'}`}>

@@ -7,7 +7,9 @@ import {
   saveTopic, 
   uploadFileToSupabase,
   getTopicQuestions,
-  deleteMaterial
+  deleteMaterial,
+  cache,
+  cacheKey
 } from '../../services/storageService';
 import { 
   Plus, Save, Upload, File, Link as LinkIcon, FileText, 
@@ -56,9 +58,22 @@ export const CourseManager: React.FC = () => {
 
   const loadCourses = async () => {
     console.log('🔄 Loading courses...');
+    const key = cacheKey('courses', 'all');
+    try {
+      const cached = await cache.get<CourseStructure>(key, 30 * 60 * 1000);
+      if (cached) {
+        console.log('📦 Courses cache hit');
+        setCourses(cached);
+        return;
+      }
+    } catch (e) {
+      // ignore cache failures
+    }
+
     const coursesData = await getCourses();
     console.log('✅ Courses loaded:', coursesData);
     setCourses(coursesData);
+    try { cache.set(key, coursesData, 30 * 60 * 1000); } catch (e) {}
   };
 
   // Get the currently editing topic
@@ -149,7 +164,8 @@ export const CourseManager: React.FC = () => {
       console.log('✅ Topic saved:', savedTopic);
       
       if (savedTopic && savedTopic.id) {
-        // Refresh courses
+        // Invalidate cached courses and refresh
+        try { cache.clear(cacheKey('courses', 'all')); } catch (e) {}
         await loadCourses();
         
         // Select the new topic
@@ -256,7 +272,8 @@ export const CourseManager: React.FC = () => {
       });
       
       if (savedTopic) {
-        // Force refresh
+        // Invalidate cached courses and refresh
+        try { cache.clear(cacheKey('courses', 'all')); } catch (e) {}
         await loadCourses();
         
         // Reselect topic
@@ -312,8 +329,9 @@ export const CourseManager: React.FC = () => {
       const savedTopic = await saveTopic(activeSubject, updatedTopic);
       
       if (savedTopic) {
-        // Refresh
-        await loadCourses();
+      // Invalidate cached courses and refresh
+      try { cache.clear(cacheKey('courses', 'all')); } catch (e) {}
+      await loadCourses();
         
         // If material has a real ID, also delete from materials table
         if (materialId && !materialId.startsWith('temp_')) {

@@ -27,6 +27,124 @@ export const clearCoursesCache = (): void => {
 };
 
 // =====================================================
+// CENTRALIZED CACHE API
+// - Prefer sessionStorage for temporary/runtime caches
+// - Keys should follow `newel_[feature]_[key]`
+// - Exposes: cache.get(key, ttlMs), cache.set(key, data, ttlMs), cache.clear(key), cache.clearAll(prefix)
+// - Uses an in-memory Map for fast reads and keeps TTL metadata
+// =====================================================
+
+type CacheEntry = { data: any; timestamp: number; ttl: number };
+const inMemoryCache = new Map<string, CacheEntry>();
+
+function safeGetStorage(useLocal = false): Storage | null {
+  try {
+    return useLocal ? localStorage : sessionStorage;
+  } catch (e) {
+    return null;
+  }
+}
+
+export const cache = {
+  async get<T = any>(key: string, ttl: number = 5 * 60 * 1000, useLocalStorage = false): Promise<T | null> {
+    const now = Date.now();
+
+    // Fast path: in-memory
+    const mem = inMemoryCache.get(key);
+    if (mem && now - mem.timestamp < mem.ttl) {
+      return mem.data as T;
+    }
+
+    const storage = safeGetStorage(useLocalStorage);
+    if (!storage) return mem ? (mem.data as T) : null;
+
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.timestamp && parsed.data !== undefined) {
+        if (now - parsed.timestamp < ttl) {
+          // update in-memory cache
+          inMemoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp, ttl });
+          return parsed.data as T;
+        } else {
+          // stale
+          try { storage.removeItem(key); } catch {}
+          return null;
+        }
+      }
+    } catch (e) {
+      // defensive: corrupt data
+      try { storage.removeItem(key); } catch {}
+      return null;
+    }
+
+    return null;
+  },
+
+  set(key: string, data: any, ttl: number = 5 * 60 * 1000, useLocalStorage = false): void {
+    const now = Date.now();
+    inMemoryCache.set(key, { data, timestamp: now, ttl });
+    const storage = safeGetStorage(useLocalStorage);
+    if (!storage) return;
+
+    try {
+      storage.setItem(key, JSON.stringify({ data, timestamp: now }));
+    } catch (e) {
+      // ignore storage set failures (quota, private mode)
+    }
+  },
+
+  clear(key: string): void {
+    inMemoryCache.delete(key);
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  },
+
+  clearAll(prefix: string = 'newel_'): void {
+    // clear in-memory
+    for (const k of Array.from(inMemoryCache.keys())) {
+      if (k.startsWith(prefix)) inMemoryCache.delete(k);
+    }
+
+    // clear web storage
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith(prefix)) sessionStorage.removeItem(k);
+      }
+    } catch {}
+
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+      }
+    } catch {}
+  }
+};
+
+// Periodic cleanup for in-memory cache entries that have expired.
+// Runs in the background and prunes entries every `CLEANUP_INTERVAL_MS`.
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+setInterval(() => {
+  try {
+    const now = Date.now();
+    for (const [key, entry] of Array.from(inMemoryCache.entries())) {
+      if (now - entry.timestamp >= entry.ttl) {
+        inMemoryCache.delete(key);
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+}, CLEANUP_INTERVAL_MS);
+
+// =====================================================
 // DEMO ACCOUNT CONFIGURATION
 // =====================================================
 const DEMO_ACCOUNTS = ['admin', 'teacher_demo', 'student_demo'];
@@ -132,6 +250,12 @@ export const saveSession = (user: User | null) => {
     localStorage.setItem('newel_currentUser', JSON.stringify(user));
   } else {
     localStorage.removeItem('newel_currentUser');
+    try {
+      // Clear runtime caches on logout to avoid stale data leaking between sessions
+      cache.clearAll('newel_');
+    } catch (e) {
+      // ignore
+    }
   }
 };
 
@@ -139,8 +263,6 @@ export const saveSession = (user: User | null) => {
 // AUTHENTICATION (Supabase Auth)
 // =====================================================
 export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
-  
-  
   try {
     // Sign in with password
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -168,11 +290,8 @@ export const authenticateUser = async (username: string, password: string): Prom
     }
 
     if (!profile.approved) {
-      
       return null;
     }
-
-    
 
     return {
       username: profile.username,
@@ -183,7 +302,14 @@ export const authenticateUser = async (username: string, password: string): Prom
       gradeLevel: profile.grade_level || undefined,
       assignedStudents: profile.assigned_students || undefined,
       lastLogin: Date.now(),
-      loginHistory: profile.login_history ? profile.login_history.map((d: string) => new Date(d).getTime()) : undefined
+      loginHistory: profile.login_history ? profile.login_history.map((d: string) => new Date(d).getTime()) : undefined,
+      // ADD THESE TIER FIELDS:
+      tier: profile.tier || 'admin_free',
+      queryCount: profile.query_count || 0,
+      queryResetTime: profile.query_reset_time || new Date().toISOString(),
+      // ADD SUBSCRIPTION FIELDS:
+      subscriptionEndsAt: profile.subscription_ends_at || undefined,
+      paystackSubscriptionCode: profile.paystack_subscription_code || undefined
     };
   } catch (error) {
     console.error('Authentication error:', error);
@@ -195,8 +321,6 @@ export const authenticateUser = async (username: string, password: string): Prom
 // USER MANAGEMENT
 // =====================================================
 export const getUsers = async (): Promise<Record<string, User>> => {
-  
-  
   try {
     const { data, error } = await supabase
       .from('users')
@@ -215,11 +339,17 @@ export const getUsers = async (): Promise<Record<string, User>> => {
         gradeLevel: dbUser.grade_level || undefined,
         assignedStudents: dbUser.assigned_students || undefined,
         lastLogin: dbUser.last_login ? new Date(dbUser.last_login).getTime() : undefined,
-        loginHistory: dbUser.login_history ? dbUser.login_history.map((d: string) => new Date(d).getTime()) : undefined
+        loginHistory: dbUser.login_history ? dbUser.login_history.map((d: string) => new Date(d).getTime()) : undefined,
+        // ADD TIER FIELDS:
+        tier: dbUser.tier || 'admin_free',
+        queryCount: dbUser.query_count || 0,
+        queryResetTime: dbUser.query_reset_time || new Date().toISOString(),
+        // ADD SUBSCRIPTION FIELDS:
+        subscriptionEndsAt: dbUser.subscription_ends_at || undefined,
+        paystackSubscriptionCode: dbUser.paystack_subscription_code || undefined
       };
     });
 
-    
     return users;
   } catch (error) {
     console.error('Get users error:', error);
@@ -259,7 +389,11 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
       gradeLevel: data.grade_level || undefined,
       assignedStudents: data.assigned_students || undefined,
       lastLogin: data.last_login ? new Date(data.last_login).getTime() : undefined,
-      loginHistory: data.login_history ? data.login_history.map((d: string) => new Date(d).getTime()) : undefined
+      loginHistory: data.login_history ? data.login_history.map((d: string) => new Date(d).getTime()) : undefined,
+      // ADD TIER FIELDS:
+      tier: data.tier || 'admin_free',
+      queryCount: data.query_count || 0,
+      queryResetTime: data.query_reset_time || new Date().toISOString()
     };
   } catch (error) {
     console.error('Get user error:', error);
@@ -268,8 +402,6 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
 };
 
 export const saveUser = async (user: User & { password?: string }): Promise<void> => {
-  
-  
   try {
     let userId: string;
 
@@ -304,6 +436,10 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
       security_answer: user.securityAnswer,
       grade_level: user.gradeLevel || null,
       assigned_students: user.assignedStudents || null,
+      // ADD TIER FIELDS:
+      tier: user.tier || 'free',
+      query_count: user.queryCount || 0,
+      query_reset_time: user.queryResetTime || new Date().toISOString(),
       last_login: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -314,7 +450,6 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
     
     if (error) throw error;
     
-    
   } catch (error) {
     console.error('Save user error:', error);
     throw error;
@@ -322,8 +457,6 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
 };
 
 export const deleteUser = async (username: string): Promise<void> => {
-  
-  
   try {
     // Get user ID
     const { data: user } = await supabase
@@ -345,7 +478,6 @@ export const deleteUser = async (username: string): Promise<void> => {
       .eq('id', user.id);
     
     if (error) throw error;
-    
     
   } catch (error) {
     console.error('Delete user error:', error);
@@ -1502,6 +1634,9 @@ export const createAnnouncementLegacy = async (
 // =====================================================
 // STATISTICS - FIXED FOR DEPLOYMENT
 // =====================================================
+// =====================================================
+// STATISTICS - FIXED FOR DEPLOYMENT
+// =====================================================
 export const calculateUserStats = (user: User) => {
   const history = user.loginHistory || [];
   if (history.length === 0) return { activeDays: 0, streak: 0 };
@@ -1556,7 +1691,7 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
     // Get all users (excluding demo accounts)
     const { data: usersData, error: usersError } = await supabase
       .from('users')
-      .select('username, grade_level, login_history, last_login, role, created_at')
+      .select('username, grade_level, login_history, last_login, role, created_at, tier, query_count, query_reset_time, subscription_ends_at, paystack_subscription_code')
       .eq('approved', true)
       .eq('role', 'student')
       .not('username', 'in', `(${DEMO_ACCOUNTS.map(a => `'${a}'`).join(',')})`);
@@ -1634,7 +1769,7 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
         completionRate = 0;
       }
 
-      // Calculate user stats
+      // Calculate user stats using actual user data
       const { activeDays, streak } = calculateUserStats({
         username: user.username,
         role: user.role,
@@ -1642,8 +1777,14 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
         securityQuestion: '',
         securityAnswer: '',
         gradeLevel: user.grade_level,
+        assignedStudents: undefined,
+        lastLogin: user.last_login ? new Date(user.last_login).getTime() : undefined,
         loginHistory: user.login_history?.map((d: string) => new Date(d).getTime()),
-        lastLogin: user.last_login ? new Date(user.last_login).getTime() : undefined
+        tier: user.tier || 'free',
+        queryCount: user.query_count || 0,
+        queryResetTime: user.query_reset_time || new Date().toISOString(),
+        subscriptionEndsAt: user.subscription_ends_at || undefined,
+        paystackSubscriptionCode: user.paystack_subscription_code || undefined
       });
 
       // Only include students with some activity or for reporting
@@ -2607,6 +2748,73 @@ export const exportAllData = async (): Promise<string> => {
     throw error;
   }
 };
+
+// Ensure notifications table exists (best-effort runtime check)
+export const ensureNotificationsTableExists = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      console.error('Notifications table missing or inaccessible:', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Error checking notifications table:', e);
+    return false;
+  }
+};
+
+// Subscribe to realtime notifications for a user. Returns a channel object you can pass to `unsubscribeFromNotifications`.
+export const subscribeToNotifications = async (
+  username: string,
+  onInsert: (notification: any) => void
+): Promise<any | null> => {
+  try {
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (userError || !userData) {
+      console.error('Cannot subscribe: user not found', userError);
+      return null;
+    }
+
+    const userId = userData.id;
+
+    const channel = supabase.channel(`notifications_user_${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (payload) => {
+        try {
+          if (payload && payload.new) onInsert(payload.new);
+        } catch (e) {
+          console.error('Error in notification onInsert callback', e);
+        }
+      })
+      .subscribe();
+
+    return channel;
+  } catch (error) {
+    console.error('Error subscribing to notifications:', error);
+    return null;
+  }
+};
+
+export const unsubscribeFromNotifications = async (channel: any): Promise<void> => {
+  try {
+    if (!channel) return;
+    await supabase.removeChannel(channel);
+  } catch (e) {
+    console.error('Error unsubscribing from notifications channel:', e);
+  }
+};
+
+// Standardized cache key helper
+export const cacheKey = (feature: string, id: string) => `newel_${feature}_${id}`;
 
 export const importAllData = async (jsonString: string): Promise<boolean> => {
   console.log('📥 Importing data...');
