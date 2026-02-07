@@ -778,9 +778,14 @@ const App: React.FC = () => {
                   </RequireAuth>
                 }
               />  
-            <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetailCheckpoints />
-    </RequireAuth>
-  } />
+            <Route
+              path="/topic/:subject/:topicId"
+              element={
+                <RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}>
+                  <TopicDetailCheckpoints />
+                </RequireAuth>
+              }
+            />
 
             <Route
               path="/assessments"

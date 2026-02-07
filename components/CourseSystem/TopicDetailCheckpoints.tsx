@@ -63,6 +63,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
   const [materialsLoaded, setMaterialsLoaded] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [resolvedTopicId, setResolvedTopicId] = useState<string | null>(null);
 
   // Helper: safely decode a URI component only if it looks encoded
   const safeDecode = useCallback((value: string) => {
@@ -71,6 +72,14 @@ export const TopicDetailCheckpoints: React.FC = () => {
     } catch {
       return value;
     }
+  }, []);
+
+  const slugify = useCallback((value: string) => {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }, []);
 
   const getCachedProgress = useCallback(async (username: string, tid: string) => {
@@ -111,13 +120,24 @@ export const TopicDetailCheckpoints: React.FC = () => {
 
         console.log(`📥 Loading topic basics: ${decodedTopicId} in ${decodedSubject}...`);
         const courses = await getCoursesLight(storedUser.gradeLevel);
-        const topicData = courses[decodedSubject]?.[decodedTopicId];
+        let topicData = courses[decodedSubject]?.[decodedTopicId];
+        let actualTopicId = decodedTopicId;
+
+        if (!topicData && courses[decodedSubject]) {
+          const entries = Object.entries(courses[decodedSubject]);
+          const match = entries.find(([, t]) => slugify(t.title) === decodedTopicId);
+          if (match) {
+            actualTopicId = match[0];
+            topicData = match[1];
+          }
+        }
         
         if (!topicData) {
           console.error('Topic not found:', decodedSubject, decodedTopicId);
           navigate('/courses');
           return;
         }
+        setResolvedTopicId(actualTopicId);
         
         setTopic({
           ...topicData,
@@ -125,8 +145,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
         });
 
         const [checkpointsData, progressData] = await Promise.all([
-          getTopicCheckpoints(decodedTopicId),
-          getCachedProgress(storedUser.username, decodedTopicId)
+          getTopicCheckpoints(actualTopicId),
+          getCachedProgress(storedUser.username, actualTopicId)
         ]);
         
         if (!checkpointsData || checkpointsData.length === 0) {
@@ -162,7 +182,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
         console.log('✅ Essential topic data loaded');
 
         setTimeout(() => {
-          loadTopicMaterials(decodedTopicId);
+          loadTopicMaterials(actualTopicId);
         }, 500);
 
       } catch (err) {
@@ -173,13 +193,14 @@ export const TopicDetailCheckpoints: React.FC = () => {
     };
 
     loadEssentialData();
-  }, [subject, topicId, navigate, getCachedProgress, safeDecode]);
+  }, [subject, topicId, navigate, getCachedProgress, safeDecode, slugify]);
 
   // =====================================================
   // LAZY LOAD MATERIALS (safe decode)
   // =====================================================
   const loadTopicMaterials = async (alreadyDecodedId?: string) => {
-    const targetTopicId = alreadyDecodedId || (topicId ? safeDecode(topicId) : null);
+    const targetTopicId =
+      alreadyDecodedId || resolvedTopicId || (topicId ? safeDecode(topicId) : null);
     if (!targetTopicId || materialsLoaded) return;
 
     console.time('loadTopicMaterials');
@@ -213,7 +234,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const loadFinalAssessment = async () => {
     if (finalAssessment || !topicId) return;
     
-    const decodedTopicId = safeDecode(topicId);
+    const decodedTopicId = resolvedTopicId || safeDecode(topicId);
     setLoading(prev => ({ ...prev, finalAssessment: true }));
     
     try {
@@ -321,7 +342,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
       return;
     }
 
-    const decodedTopicId = safeDecode(topicId || '');
+    const decodedTopicId = resolvedTopicId || safeDecode(topicId || '');
     const decodedSubject = safeDecode(subject || '');
 
     try {
@@ -386,7 +407,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
   const handleFinalAssessmentComplete = async (score: number, passed: boolean) => {
     if (!user || !subject || !topicId) return;
 
-    const decodedTopicId = safeDecode(topicId);
+    const decodedTopicId = resolvedTopicId || safeDecode(topicId);
     const decodedSubject = safeDecode(subject);
 
     try {
