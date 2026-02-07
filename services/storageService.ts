@@ -1670,64 +1670,36 @@ export const saveAnnouncement = async (announcement: Announcement): Promise<Anno
   }
 };
 
+// services/storageService.ts
 export const getAnnouncements = async (): Promise<Announcement[]> => {
   try {
+    // FIXED: Remove the "columns=" parameter, use proper select
     const { data, error } = await supabase
       .from('announcements')
-      .select('*')
+      .select('id, title, content, author_name, author, created_at, expires_at, active')
+      .eq('active', true)
+      .gte('expires_at', new Date().toISOString()) // Only future announcements
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    
-    const now = new Date();
-    const announcements: Announcement[] = [];
-    
-    // Process and filter expired announcements
-    for (const item of (data || [])) {
-      // Check if announcement is expired
-      if (item.expires_at && new Date(item.expires_at) < now) {
-        // Delete expired announcement
-        try {
-          await supabase
-            .from('announcements')
-            .delete()
-            .eq('id', item.id);
-          console.log(`🗑️ Deleted expired announcement: ${item.title}`);
-        } catch (deleteError) {
-          console.error('Error deleting expired announcement:', deleteError);
-        }
-        continue; // Skip adding to list
-      }
-      
-        // Convert to frontend format (camelCase)
-      announcements.push(dbToFrontendAnnouncement(item));
+    if (error) {
+      console.error('Error fetching announcements:', error);
+      return [];
     }
-    
-    return announcements;
+
+    return (data || []).map(ann => ({
+      id: ann.id,
+      title: ann.title,
+      content: ann.content,
+      authorName: ann.author_name,
+      author: ann.author,
+      createdAt: ann.created_at,
+      expiresAt: ann.expires_at
+    }));
+
   } catch (error) {
-    console.error('Get announcements error:', error);
+    console.error('Error in getAnnouncements:', error);
     return [];
   }
-};
-
-// Backward compatibility wrapper
-export const createAnnouncementLegacy = async (
-  title: string, 
-  content: string, 
-  authorName: string
-): Promise<Announcement> => {
-  const announcementData: Announcement = {
-    id: `temp-${Date.now()}`, // Temporary ID for frontend
-    title,
-    content,
-    authorName: authorName,
-    author: undefined, // No UUID
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
-    updatedAt: undefined
-  };
-  
-  return await saveAnnouncement(announcementData);
 };
 
 // =====================================================

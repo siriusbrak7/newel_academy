@@ -297,16 +297,19 @@ export interface TheorySubmission {
 // =======================
 
 // FRONTEND INTERFACE (camelCase for consistency in UI code)
+// types.ts - Update Announcement interface
+// In types.ts - Update the Announcement interface
 export interface Announcement {
   id: string;
   title: string;
   content: string;
-  authorName: string;      // Display name for UI
-  createdAt: string;       // ISO string
-  expiresAt: string;       // ISO string
-  // Optional fields
-  author?: string;         // UUID from database (optional)
-  updatedAt?: string;      // ISO string from database
+  authorName: string;
+  author: string;
+  createdAt: string;
+  expiresAt: string;
+  // Add this if your database has updated_at
+  updatedAt?: string; // Optional property
+  active?: boolean; // Optional property
 }
 
 // DATABASE INTERFACE (what matches your Supabase schema)

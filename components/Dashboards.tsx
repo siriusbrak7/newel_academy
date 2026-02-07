@@ -2180,14 +2180,16 @@ const loadStudentPerformance = async (username: string) => {
 
     try {
       // Fixed: Use correct field names for the new interface
+      // Fix the saveAnnouncement call:
       await saveAnnouncement({
-        id: `temp-${Date.now()}`, // Temporary ID for frontend
+        id: `temp-${Date.now()}`,
         title: newAnnouncement.title,
         content: newAnnouncement.content,
-        authorName: user.username,
+        authorName: user.username,  // Use snake_case for Supabase
         author: user.username,
-        createdAt: new Date().toISOString(), // Required field
-        expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString()
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
+        
       });
       
       setNewAnnouncement({ title: '', content: '' });
@@ -2241,6 +2243,40 @@ const loadStudentPerformance = async (username: string) => {
             ))}
           </div>
         </div>
+
+        // Add this button to test announcements
+        <button 
+          onClick={async () => {
+            try {
+              // Test fetch
+              const { data, error } = await supabase
+                .from('announcements')
+                .select('*')
+                .limit(1);
+              console.log('Announcements test:', data, error);
+              
+              // Test create
+              const { data: createData, error: createError } = await supabase
+                .from('announcements')
+                .insert({
+                  title: 'Test Announcement',
+                  content: 'Testing announcements system',
+                  author_name: user.username,
+                  author: user.username,
+                  created_at: new Date().toISOString(),
+                  expires_at: new Date(Date.now() + 48*60*60*1000).toISOString(),
+                  active: true
+                })
+                .select();
+              console.log('Create test:', createData, createError);
+            } catch (err) {
+              console.error('Test failed:', err);
+            }
+          }}
+          className="text-xs bg-red-500/20 text-red-300 p-2 rounded"
+        >
+          Test Announcements
+        </button>
         
         {/* Stats Cards Skeleton - Mobile Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
