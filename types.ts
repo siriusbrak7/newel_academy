@@ -43,8 +43,19 @@ export interface User {
   queryResetTime: string;
   // Make subscription fields optional
   subscriptionEndsAt?: string | number | Date;
+  
   paystackSubscriptionCode?: string;
+  isPremium: boolean; 
+  createdAt: number; // Timestamp of registration
+  status: 'active' | 'pending' | 'suspended'; 
+  // New fields for teacher approval and premium
+  registrationDate?: string;
+  fullName?: string;
+  email?: string;
 }
+
+
+
 
 export interface Payment {
   id: string;

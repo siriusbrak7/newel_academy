@@ -54,7 +54,10 @@ export const DEMO_USERS: Omit<User, 'password'>[] = [
     securityAnswer: 'newelacademy',
     tier: 'admin_free',
     queryCount: 0,
-    queryResetTime: new Date().toISOString()
+    queryResetTime: new Date().toISOString(),
+    isPremium: true,
+    createdAt: Date.now(),
+    status: 'active'
   },
   {
     username: 'teacher_demo',
@@ -64,7 +67,10 @@ export const DEMO_USERS: Omit<User, 'password'>[] = [
     securityAnswer: 'demo',
     tier: 'free',
     queryCount: 0,
-    queryResetTime: new Date().toISOString()
+    queryResetTime: new Date().toISOString(),
+    isPremium: false,
+    createdAt: Date.now(),
+    status: 'active'
   },
   {
     username: 'student_demo',
@@ -75,7 +81,10 @@ export const DEMO_USERS: Omit<User, 'password'>[] = [
     securityAnswer: 'demo',
     tier: 'free',
     queryCount: 0,
-    queryResetTime: new Date().toISOString()
+    queryResetTime: new Date().toISOString(),
+    isPremium: false,
+    createdAt: Date.now(),
+    status: 'active'
   }
 ];
 

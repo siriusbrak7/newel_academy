@@ -1633,26 +1633,28 @@ export const AdminDashboard: React.FC = () => {
     assessments: LeaderboardEntry[];
   }>({ academic: [], challenge: [], assessments: [] });
   const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const refreshData = async () => {
     setLoading(true);
     try {
-      const [usersData, assessmentsData, announcementsData, leaderboardsData] = await Promise.all([
-        getUsers(),
-        getAssessments(),
-        getAnnouncements(),
-        getLeaderboards()
-      ]);
-      
-      // Convert users object to array
-      const usersArray = Object.values(usersData).filter(u => !['admin', 'teacher_demo', 'student_demo'].includes(u.username));
+      const [usersData, assessmentsData, announcementsData, leaderboardsData] =
+        await Promise.all([
+          getUsers(),
+          getAssessments(),
+          getAnnouncements(),
+          getLeaderboards(),
+        ]);
+
+      const usersArray = Object.values(usersData).filter(
+        u => !['admin', 'teacher_demo', 'student_demo'].includes(u.username)
+      );
+
       setUsers(usersArray);
       setAssessments(assessmentsData);
       setAnnouncements(announcementsData);
       setLeaderboards(leaderboardsData);
-    } catch (error) {
-      console.error('Error refreshing admin dashboard:', error);
+    } catch (err) {
+      console.error('Admin dashboard refresh failed:', err);
     } finally {
       setLoading(false);
     }
@@ -1660,44 +1662,58 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     refreshData();
-  }, [refreshKey]);
+  }, []);
 
   const approveUser = async (username: string) => {
-    const user = users.find(u => u.username === username);
-    if (!user) return;
-    
-    user.approved = true;
-    await saveUser(user);
-    setRefreshKey(k => k + 1);
+    const target = users.find(u => u.username === username);
+    if (!target) return;
+
+    const updated: User = { ...target, approved: true, status: 'active' };
+
+    setUsers(prev =>
+      prev.map(u => (u.username === username ? updated : u))
+    );
+
+    try {
+      await saveUser(updated);
+    } catch (err) {
+      console.error('Approve failed:', err);
+      refreshData();
+    }
+  };
+
+  const togglePremium = async (username: string) => {
+    const target = users.find(u => u.username === username);
+    if (!target) return;
+
+    const updated = { ...target, isPremium: !target.isPremium };
+
+    setUsers(prev =>
+      prev.map(u => (u.username === username ? updated : u))
+    );
+
+    try {
+      await saveUser(updated);
+    } catch (err) {
+      console.error('Premium toggle failed:', err);
+      refreshData();
+    }
   };
 
   const deleteUserHandler = async (username: string) => {
     if (!confirm(`Delete user ${username}? This cannot be undone.`)) return;
-    await deleteUser(username);
-    setRefreshKey(k => k + 1);
-  };
-
-  const exportData = async () => {
     try {
-      const data = { users, assessments, announcements, leaderboards };
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `newel-export-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed');
+      await deleteUser(username);
+      refreshData();
+    } catch (err) {
+      console.error('Delete failed:', err);
     }
   };
 
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto p-8 text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto"></div>
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500 mx-auto" />
         <p className="mt-4 text-white/60">Loading admin dashboard...</p>
       </div>
     );
@@ -1705,97 +1721,20 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-4xl font-bold text-white">Admin Dashboard</h1>
-        <div className="flex gap-3">
-          <button 
-            onClick={refreshData} 
-            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <RefreshCw size={16} /> Refresh
-          </button>
-          <button 
-            onClick={exportData} 
-            className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <Download size={16} /> Export Data
-          </button>
-          <button 
-            onClick={() => setRefreshKey(k => k + 1)} 
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <RefreshCw size={16} /> Force Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/60 text-sm">Total Users</p>
-              <p className="text-3xl font-bold text-white">{users.length}</p>
-            </div>
-            <UsersIcon className="text-cyan-400" size={32} />
-          </div>
-          <div className="mt-4 flex gap-2 text-sm">
-            <span className="bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
-              {users.filter(u => u.role === 'student').length} Students
-            </span>
-            <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">
-              {users.filter(u => u.role === 'teacher').length} Teachers
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/60 text-sm">Pending Approvals</p>
-              <p className="text-3xl font-bold text-white">{users.filter(u => !u.approved).length}</p>
-            </div>
-            <AlertCircle className="text-yellow-400" size={32} />
-          </div>
-          <p className="text-white/40 text-sm mt-2">Users waiting for access</p>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/60 text-sm">Active Assessments</p>
-              <p className="text-3xl font-bold text-white">{assessments.length}</p>
-            </div>
-            <ClipboardList className="text-green-400" size={32} />
-          </div>
-          <p className="text-white/40 text-sm mt-2">Available for students</p>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/60 text-sm">Active Announcements</p>
-              <p className="text-3xl font-bold text-white">{announcements.length}</p>
-            </div>
-            <Megaphone className="text-orange-400" size={32} />
-          </div>
-          <p className="text-white/40 text-sm mt-2">Current notifications</p>
-        </div>
+        <button
+          onClick={refreshData}
+          className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* User Management */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">User Management</h2>
-          <div className="flex gap-2">
-            <span className="bg-cyan-500/20 text-cyan-300 px-3 py-1 rounded text-sm">
-              {users.filter(u => u.approved).length} Approved
-            </span>
-            <span className="bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded text-sm">
-              {users.filter(u => !u.approved).length} Pending
-            </span>
-          </div>
-        </div>
+        <h2 className="text-2xl font-bold text-white mb-6">User Management</h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-white/80">
@@ -1803,53 +1742,75 @@ export const AdminDashboard: React.FC = () => {
               <tr>
                 <th className="py-3 px-4">Username</th>
                 <th className="py-3 px-4">Role</th>
-                <th className="py-3 px-4">Grade Level</th>
+                <th className="py-3 px-4">Grade</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Premium</th>
                 <th className="py-3 px-4">Last Login</th>
                 <th className="py-3 px-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map(user => (
-                <tr key={user.username} className="border-b border-white/5 hover:bg-white/5">
+                <tr
+                  key={user.username}
+                  className="border-b border-white/5 hover:bg-white/5"
+                >
                   <td className="py-3 px-4 font-medium">{user.username}</td>
+
                   <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      user.role === 'admin' ? 'bg-red-500/20 text-red-400' :
-                      user.role === 'teacher' ? 'bg-purple-500/20 text-purple-400' :
-                      'bg-cyan-500/20 text-cyan-400'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs ${
+                        user.role === 'teacher'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : 'bg-cyan-500/20 text-cyan-400'
+                      }`}
+                    >
                       {user.role}
                     </span>
                   </td>
+
                   <td className="py-3 px-4">{user.gradeLevel || 'N/A'}</td>
+
                   <td className="py-3 px-4">
                     {user.approved ? (
-                      <span className="flex items-center gap-1 text-green-400">
-                        <Check size={14} /> Approved
-                      </span>
+                      <span className="text-green-400">Approved</span>
                     ) : (
-                      <span className="flex items-center gap-1 text-yellow-400">
-                        <AlertCircle size={14} /> Pending
-                      </span>
+                      <span className="text-yellow-400">Pending</span>
                     )}
                   </td>
+
                   <td className="py-3 px-4">
-                    {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                    <button
+                      onClick={() => togglePremium(user.username)}
+                      className={`px-3 py-1 rounded text-xs ${
+                        user.isPremium
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-gray-600 hover:bg-gray-700'
+                      } text-white transition-colors`}
+                    >
+                      {user.isPremium ? 'Premium' : 'Free'}
+                    </button>
                   </td>
+
+                  <td className="py-3 px-4">
+                    {user.lastLogin
+                      ? new Date(user.lastLogin).toLocaleDateString()
+                      : 'Never'}
+                  </td>
+
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
                       {!user.approved && (
                         <button
                           onClick={() => approveUser(user.username)}
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs"
                         >
                           Approve
                         </button>
                       )}
                       <button
                         onClick={() => deleteUserHandler(user.username)}
-                        className="bg-red-600/20 hover:bg-red-600/40 text-red-300 px-3 py-1 rounded text-xs transition-colors"
+                        className="bg-red-600/20 hover:bg-red-600/40 text-red-300 px-3 py-1 rounded text-xs"
                       >
                         Delete
                       </button>
@@ -1862,100 +1823,15 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {users.length === 0 && (
-          <div className="text-center py-12">
-            <UsersIcon className="text-white/20 mx-auto mb-4" size={48} />
-            <p className="text-white/40">No users found</p>
-            <p className="text-white/30 text-sm mt-1">Users will appear here once registered</p>
+          <div className="text-center py-12 text-white/40">
+            No users found
           </div>
         )}
-      </div>
-
-      {/* Leaderboard Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Trophy className="text-yellow-400" /> Academic Leaderboard
-          </h3>
-          <div className="space-y-3">
-            {leaderboards.academic.slice(0, 5).map((entry, i) => (
-              <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
-                    i === 2 ? 'bg-amber-700/20 text-amber-400' :
-                    'bg-white/5 text-white/60'
-                  }`}>
-                    {i + 1}
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">{entry.username}</p>
-                    <p className="text-white/40 text-xs">Grade {entry.gradeLevel || '?'}</p>
-                  </div>
-                </div>
-                <span className="text-green-400 font-bold">{entry.score}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Zap className="text-orange-400" /> 222-Sprint Challenge
-          </h3>
-          <div className="space-y-3">
-            {leaderboards.challenge.slice(0, 5).map((entry, i) => (
-              <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
-                    i === 2 ? 'bg-amber-700/20 text-amber-400' :
-                    'bg-white/5 text-white/60'
-                  }`}>
-                    {i + 1}
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">{entry.username}</p>
-                    <p className="text-white/40 text-xs">Grade {entry.gradeLevel || '?'}</p>
-                  </div>
-                </div>
-                <span className="text-orange-400 font-bold">{entry.score} pts</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <BarChart3 className="text-cyan-400" /> Assessment Performance
-          </h3>
-          <div className="space-y-3">
-            {leaderboards.assessments.slice(0, 5).map((entry, i) => (
-              <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                    i === 1 ? 'bg-gray-400/20 text-gray-300' :
-                    i === 2 ? 'bg-amber-700/20 text-amber-400' :
-                    'bg-white/5 text-white/60'
-                  }`}>
-                    {i + 1}
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">{entry.username}</p>
-                    <p className="text-white/40 text-xs">Grade {entry.gradeLevel || '?'}</p>
-                  </div>
-                </div>
-                <span className="text-cyan-400 font-bold">{entry.score}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
 };
+
 
 
 // =====================================================

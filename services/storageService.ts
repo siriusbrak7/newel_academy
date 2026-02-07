@@ -309,7 +309,10 @@ export const authenticateUser = async (username: string, password: string): Prom
       queryResetTime: profile.query_reset_time || new Date().toISOString(),
       // ADD SUBSCRIPTION FIELDS:
       subscriptionEndsAt: profile.subscription_ends_at || undefined,
-      paystackSubscriptionCode: profile.paystack_subscription_code || undefined
+      paystackSubscriptionCode: profile.paystack_subscription_code || undefined,
+      isPremium: profile.is_premium || false,
+      createdAt: profile.created_at ? new Date(profile.created_at).getTime() : Date.now(),
+      status: profile.status || (profile.approved ? 'active' : 'pending')
     };
   } catch (error) {
     console.error('Authentication error:', error);
@@ -346,7 +349,10 @@ export const getUsers = async (): Promise<Record<string, User>> => {
         queryResetTime: dbUser.query_reset_time || new Date().toISOString(),
         // ADD SUBSCRIPTION FIELDS:
         subscriptionEndsAt: dbUser.subscription_ends_at || undefined,
-        paystackSubscriptionCode: dbUser.paystack_subscription_code || undefined
+        paystackSubscriptionCode: dbUser.paystack_subscription_code || undefined,
+        isPremium: dbUser.is_premium || false,
+        createdAt: dbUser.created_at ? new Date(dbUser.created_at).getTime() : Date.now(),
+        status: dbUser.status || (dbUser.approved ? 'active' : 'pending')
       };
     });
 
@@ -393,7 +399,12 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
       // ADD TIER FIELDS:
       tier: data.tier || 'admin_free',
       queryCount: data.query_count || 0,
-      queryResetTime: data.query_reset_time || new Date().toISOString()
+      queryResetTime: data.query_reset_time || new Date().toISOString(),
+      subscriptionEndsAt: data.subscription_ends_at || undefined,
+      paystackSubscriptionCode: data.paystack_subscription_code || undefined,
+      isPremium: data.is_premium || false,
+      createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+      status: data.status || (data.approved ? 'active' : 'pending')
     };
   } catch (error) {
     console.error('Get user error:', error);
@@ -440,6 +451,9 @@ export const saveUser = async (user: User & { password?: string }): Promise<void
       tier: user.tier || 'free',
       query_count: user.queryCount || 0,
       query_reset_time: user.queryResetTime || new Date().toISOString(),
+      status: user.status,
+      is_premium: user.isPremium,
+      created_at: new Date(user.createdAt || Date.now()).toISOString(),
       last_login: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -488,10 +502,19 @@ export const deleteUser = async (username: string): Promise<void> => {
 // =====================================================
 // COURSE MANAGEMENT
 // =====================================================
-// storageService.ts - Updated getCourses function
-// =====================================================
-// COURSE MANAGEMENT - OPTIMIZED WITH CACHING
-// =====================================================
+export const isPremiumUser = (user: User): boolean => {
+  // Check premium flag
+  if (user.isPremium) return true;
+  
+  // Legacy users registered before cutoff get full access
+  if (user.registrationDate) {
+    const registrationDate = new Date(user.registrationDate);
+    const cutoffDate = new Date('2024-01-01'); // Example cutoff
+    return registrationDate < cutoffDate;
+  }
+  
+  return false;
+};
 // FIXED VERSION - Remove ambiguous join
 // In storageService.ts
 export const getCourses = async (forceRefresh = false): Promise<CourseStructure> => {
@@ -1767,7 +1790,7 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
     // Get all users (excluding demo accounts)
     const { data: usersData, error: usersError } = await supabase
       .from('users')
-      .select('username, grade_level, login_history, last_login, role, created_at, tier, query_count, query_reset_time, subscription_ends_at, paystack_subscription_code')
+      .select('username, grade_level, login_history, last_login, role, created_at, tier, query_count, query_reset_time, subscription_ends_at, paystack_subscription_code, is_premium, status, approved')
       .eq('approved', true)
       .eq('role', 'student')
       .not('username', 'in', `(${DEMO_ACCOUNTS.map(a => `'${a}'`).join(',')})`);
@@ -1860,7 +1883,10 @@ export const getAllStudentStats = async (): Promise<StudentStats[]> => {
         queryCount: user.query_count || 0,
         queryResetTime: user.query_reset_time || new Date().toISOString(),
         subscriptionEndsAt: user.subscription_ends_at || undefined,
-        paystackSubscriptionCode: user.paystack_subscription_code || undefined
+        paystackSubscriptionCode: user.paystack_subscription_code || undefined,
+        isPremium: user.is_premium || false,
+        createdAt: user.created_at ? new Date(user.created_at).getTime() : Date.now(),
+        status: user.status || (user.approved ? 'active' : 'pending')
       });
 
       // Only include students with some activity or for reporting

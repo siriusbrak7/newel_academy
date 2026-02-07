@@ -398,80 +398,104 @@ export const SprintChallenge: React.FC = () => {
   }, [currentQuestion, questions.length]);
 
   const checkAnswer = useCallback(() => {
-    if (!isRunning || gameOver) return;
+  if (!isRunning || gameOver) return;
+  
+  const currentQ = questions[currentQuestion];
+  if (!currentQ) return;
+  
+  const trimmedAnswer = userAnswer.trim();
+  if (!trimmedAnswer && selectedOption === null) return;
+  
+  let correct = false;
+  
+  if (currentQ.type === 'MCQ' && currentQ.options && currentQ.options.length > 0) {
+    const correctAnswerLower = currentQ.answer.toLowerCase().trim();
     
-    const currentQ = questions[currentQuestion];
-    if (!currentQ) return;
-    
-    const trimmedAnswer = userAnswer.trim();
-    if (!trimmedAnswer && selectedOption === null) return;
-    
-    let correct = false;
-    
-    if (currentQ.type === 'MCQ' && currentQ.options && currentQ.options.length > 0) {
-      const correctAnswerLower = currentQ.answer.toLowerCase().trim();
-      
-      // Option 1: User clicked an MCQ option
-      if (selectedOption !== null) {
-        const selectedText = currentQ.options[selectedOption];
-        correct = selectedText?.toLowerCase().trim() === correctAnswerLower;
-      } else {
-        const userAnswerLower = trimmedAnswer.toLowerCase();
-        
-        // Option 2: User typed a letter like A, B, C, D
-        const letterIndex = 'abcd'.indexOf(userAnswerLower);
-        if (userAnswerLower.length === 1 && letterIndex !== -1 && letterIndex < currentQ.options.length) {
-          const mappedOption = currentQ.options[letterIndex];
-          correct = mappedOption?.toLowerCase().trim() === correctAnswerLower;
-        } else {
-          // Option 3: User typed the full answer text
-          correct = userAnswerLower === correctAnswerLower;
-        }
-      }
+    // Option 1: User clicked an MCQ option
+    if (selectedOption !== null) {
+      const selectedText = currentQ.options[selectedOption];
+      // FIX: Compare selected option text with correct_answer
+      correct = selectedText?.toLowerCase().trim() === correctAnswerLower;
     } else {
-      // THEORY question — partial match with minimum length guard
       const userAnswerLower = trimmedAnswer.toLowerCase();
-      const correctAnswerLower = currentQ.answer.toLowerCase().trim();
       
-      if (userAnswerLower.length >= 2) {
-        // Exact match
+      // Option 2: User typed a letter like A, B, C, D
+      const letterIndex = 'abcd'.indexOf(userAnswerLower);
+      if (userAnswerLower.length === 1 && letterIndex !== -1 && letterIndex < currentQ.options.length) {
+        const mappedOption = currentQ.options[letterIndex];
+        // FIX: Compare mapped option with correct_answer
+        correct = mappedOption?.toLowerCase().trim() === correctAnswerLower;
+      } else {
+        // Option 3: User typed the full answer text (compare with correct_answer)
         correct = userAnswerLower === correctAnswerLower;
+      }
+    }
+  } else {
+    // THEORY question — partial match
+    const userAnswerLower = trimmedAnswer.toLowerCase();
+    const correctAnswerLower = currentQ.answer.toLowerCase().trim();
+    
+    if (userAnswerLower.length >= 2) {
+      // Exact match
+      correct = userAnswerLower === correctAnswerLower;
+      
+      // Contained match
+      if (!correct && userAnswerLower.length >= 3) {
+        const correctWords = correctAnswerLower.split(/\s+/).filter(w => w.length > 2);
+        const userWords = userAnswerLower.split(/\s+/).filter(w => w.length > 2);
         
-        // Contained match (both directions) — only if answer/input is meaningful length
-        if (!correct && userAnswerLower.length >= 3) {
-          const correctWords = correctAnswerLower.split(/\s+/).filter(w => w.length > 2);
-          const userWords = userAnswerLower.split(/\s+/).filter(w => w.length > 2);
-          
-          // Check if user's key words appear in the correct answer or vice versa
-          if (correctWords.length > 0 && userWords.length > 0) {
-            const matchingWords = userWords.filter(uw => 
-              correctWords.some(cw => cw.includes(uw) || uw.includes(cw))
-            );
-            correct = matchingWords.length >= Math.max(1, Math.ceil(correctWords.length * 0.5));
-          }
+        if (correctWords.length > 0 && userWords.length > 0) {
+          const matchingWords = userWords.filter(uw => 
+            correctWords.some(cw => cw.includes(uw) || uw.includes(cw))
+          );
+          correct = matchingWords.length >= Math.max(1, Math.ceil(correctWords.length * 0.5));
         }
       }
     }
-    
-    // Flash feedback
-    setLastAnswerCorrect(correct);
-    setTimeout(() => setLastAnswerCorrect(null), 600);
-    
-    let newScore = score;
-    if (correct) {
-      const streakBonus = streak >= 3 ? 50 : 0;
-      const pointsEarned = 100 + streakBonus;
-      newScore = score + pointsEarned;
-      setScore(newScore);
-      setStreak(prev => prev + 1);
-      console.log(`✅ Correct! +${pointsEarned}pts${streakBonus ? ' (streak bonus!)' : ''}`);
-    } else {
-      setStreak(0);
-      console.log('❌ Incorrect. Correct answer:', currentQ.answer);
-    }
-    
-    advanceQuestion(newScore);
-  }, [isRunning, gameOver, questions, currentQuestion, userAnswer, selectedOption, score, streak, advanceQuestion]);
+  }
+  
+  // Flash feedback
+  setLastAnswerCorrect(correct);
+  setTimeout(() => setLastAnswerCorrect(null), 600);
+  
+  let newScore = score;
+  if (correct) {
+    const streakBonus = streak >= 3 ? 50 : 0;
+    const pointsEarned = 100 + streakBonus;
+    newScore = score + pointsEarned;
+    setScore(newScore);
+    setStreak(prev => prev + 1);
+    console.log(`✅ Correct! +${pointsEarned}pts${streakBonus ? ' (streak bonus!)' : ''}`);
+  } else {
+    setStreak(0);
+    // FIX: Show the actual correct answer for debugging
+    console.log('❌ Incorrect. Correct answer:', currentQ.answer, 
+                'Options:', currentQ.options, 
+                'Your selection:', selectedOption !== null ? currentQ.options?.[selectedOption] : userAnswer);
+  }
+  
+  advanceQuestion(newScore);
+}, [isRunning, gameOver, questions, currentQuestion, userAnswer, selectedOption, score, streak, advanceQuestion]);
+
+const logQuestionDebugInfo = (question: SprintQuestion) => {
+  console.log('🔍 Question Debug:', {
+    text: question.text,
+    answer: question.answer,
+    options: question.options,
+    type: question.type,
+    'Answer in options?': question.options?.includes(question.answer),
+    'Answer matches which option?': question.options?.findIndex(opt => 
+      opt.toLowerCase().trim() === question.answer.toLowerCase().trim()
+    )
+  });
+};
+
+// Update your useEffect for loading questions to include debug logging
+useEffect(() => {
+  if (questions.length > 0 && currentQuestion < questions.length) {
+    logQuestionDebugInfo(questions[currentQuestion]);
+  }
+}, [currentQuestion, questions]);
 
   const skipQuestion = useCallback(() => {
     if (!isRunning || gameOver) return;
@@ -779,6 +803,27 @@ export const SprintChallenge: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Add this after the game stats section or before the question display */}
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              onClick={() => {
+                const q = questions[currentQuestion];
+                console.log('🧪 Debug Question:', {
+                  question: q.text,
+                  correctAnswer: q.answer,
+                  options: q.options,
+                  'Answer in options?': q.options?.includes(q.answer),
+                  'Case-insensitive match?': q.options?.map(opt => 
+                    opt.toLowerCase().trim() === q.answer.toLowerCase().trim()
+                  )
+                });
+              }}
+              className="text-xs bg-red-500/20 text-red-300 p-2 rounded mb-2"
+            >
+              Debug Current Question
+            </button>
+          )}
           
           <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
             <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">

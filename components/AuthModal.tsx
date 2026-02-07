@@ -1,9 +1,8 @@
-// components/AuthModal.tsx
 import React, { useState } from 'react';
 import { User, Role } from '../types';
 import { SECURITY_QUESTIONS } from '../constants';
 import { authService } from '../services/supabaseService';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 
 interface AuthModalProps {
   onLogin: (user: User) => void;
@@ -25,7 +24,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
     role: 'student' as Role,
     gradeLevel: '9',
     securityQuestion: SECURITY_QUESTIONS[0],
-    securityAnswer: ''
+    securityAnswer: '',
+    fullName: '', // Added for teacher registration
+    email: '' // Added for contact
   });
 
   const handleChange = (
@@ -53,8 +54,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
         return;
       }
 
-      if (!user.approved) {
-        setError('Account pending admin approval');
+      if (user.role === 'teacher' && !user.approved) {
+        setError('Account pending admin approval. You will be notified when approved.');
         return;
       }
 
@@ -87,6 +88,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
       return;
     }
 
+    // Additional validation for teachers
+    if (formData.role === 'teacher') {
+      if (!formData.fullName.trim()) {
+        setError('Full name is required for teacher registration');
+        setLoading(false);
+        return;
+      }
+      if (!formData.email.trim() || !formData.email.includes('@')) {
+        setError('Valid email is required for teacher registration');
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const result = await authService.register({
         username: formData.username,
@@ -94,13 +109,23 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
         role: formData.role,
         gradeLevel: formData.role === 'student' ? formData.gradeLevel : undefined,
         securityQuestion: formData.securityQuestion,
-        securityAnswer: formData.securityAnswer
+        securityAnswer: formData.securityAnswer,
+        fullName: formData.fullName,
+        email: formData.email,
+        isPremium: false, // All new users start as free
+        approved: formData.role !== 'teacher', // Teachers need approval, others auto-approved
+        status: formData.role === 'teacher' ? 'pending' : 'active',
+        registrationDate: new Date().toISOString()
       });
 
       if (result.success) {
-        setSuccess(result.message);
+        if (formData.role === 'teacher') {
+          setSuccess('✅ Teacher account submitted for admin approval. You will be notified when approved.');
+        } else {
+          setSuccess('✅ Registration successful! Please login.');
+        }
         
-        // If admin, auto-login
+        // Auto-login only for non-teacher roles
         if (formData.role === 'admin') {
           const adminUser: User = {
             username: formData.username,
@@ -111,16 +136,35 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
             lastLogin: Date.now(),
             tier: 'admin_free',
             queryCount: 0,
-            queryResetTime: new Date().toISOString()
+            queryResetTime: new Date().toISOString(),
+            isPremium: true, // Admins get premium by default
+            status: 'active',
+            registrationDate: new Date().toISOString(),
+            createdAt: Date.now()
           };
           setTimeout(() => onLogin(adminUser), 1500);
-        } else {
-          // Switch to login for regular users
+        } else if (formData.role !== 'teacher') {
+          // For students, switch to login
           setTimeout(() => {
             setSuccess('');
             setMode('login');
             setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
           }, 2000);
+        } else {
+          // For teachers, clear form and show success
+          setTimeout(() => {
+            setFormData({
+              username: '',
+              password: '',
+              confirmPassword: '',
+              role: 'student',
+              gradeLevel: '9',
+              securityQuestion: SECURITY_QUESTIONS[0],
+              securityAnswer: '',
+              fullName: '',
+              email: ''
+            });
+          }, 3000);
         }
       } else {
         setError(result.message);
@@ -206,6 +250,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
         </div>
       )}
 
+      {mode === 'register' && formData.role === 'teacher' && (
+        <div className="mb-4 bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 p-4 rounded">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={20} className="mt-0.5" />
+            <div>
+              <p className="font-bold">Teacher Registration Note:</p>
+              <p className="text-sm">Your account requires admin approval before you can access the platform.</p>
+              <p className="text-xs mt-1">You will be notified at the email you provide.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={
           mode === 'login'
@@ -226,6 +283,31 @@ const AuthModal: React.FC<AuthModalProps> = ({ onLogin, onClose }) => {
           required
           disabled={loading}
         />
+
+        {mode === 'register' && formData.role === 'teacher' && (
+          <>
+            <input
+              type="text"
+              name="fullName"
+              placeholder="Full Name"
+              value={formData.fullName}
+              onChange={handleChange}
+              className="w-full p-3 rounded bg-black/40 border border-white/10 text-white"
+              required
+              disabled={loading}
+            />
+            <input
+              type="email"
+              name="email"
+              placeholder="Email Address"
+              value={formData.email}
+              onChange={handleChange}
+              className="w-full p-3 rounded bg-black/40 border border-white/10 text-white"
+              required
+              disabled={loading}
+            />
+          </>
+        )}
 
         <input
           type="password"

@@ -6,10 +6,14 @@ import {
   getProgress, 
   canAccessTopic,
   getStudentCheckpointProgress,
-  getCourses
+  getCourses,
+  isPremiumUser // Add this function to storageService.ts
 } from '../../services/storageService';
 import { cache, cacheKey } from '../../services/storageService';
-import { ChevronRight, FileText, ArrowLeft, Lock } from 'lucide-react';
+import { 
+  ChevronRight, FileText, ArrowLeft, Lock, Crown, Zap,
+  AlertCircle, CheckCircle, Star
+} from 'lucide-react';
 import { CourseSkeleton } from './CourseSkeleton';
 
 interface StudentCourseListProps {
@@ -24,7 +28,20 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
   const [userProgress, setUserProgress] = useState<any>({});
   const [checkpointProgress, setCheckpointProgress] = useState<Record<string, any>>({});
   const [topicAccess, setTopicAccess] = useState<Record<string, boolean>>({});
+  const [isPremium, setIsPremium] = useState(false);
   const navigate = useNavigate();
+
+  // Check if user is premium or registered before cutoff
+  useEffect(() => {
+    const checkUserStatus = () => {
+      // Premium users have full access
+      const isUserPremium = user.isPremium || 
+                          (user.registrationDate && 
+                           new Date(user.registrationDate) < new Date('2024-01-01')); // Legacy users
+      setIsPremium(isUserPremium);
+    };
+    checkUserStatus();
+  }, [user]);
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -42,8 +59,22 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         setProgress(50);
         setLoadingStage('Loading your progress...');
         
-        // Use grade-specific courses directly
-        const mergedCourses = gradeSpecificCourses;
+        // Filter topics based on user status
+        const filteredCourses: CourseStructure = {};
+        Object.entries(gradeSpecificCourses).forEach(([subject, topics]) => {
+          const topicEntries = Object.entries(topics);
+          
+          if (isPremium) {
+            // Premium users get all topics
+            filteredCourses[subject] = Object.fromEntries(topicEntries);
+          } else {
+            // Free users get first 2 topics per subject
+            const firstTwoTopics = topicEntries.slice(0, 2);
+            filteredCourses[subject] = Object.fromEntries(firstTwoTopics);
+          }
+        });
+        
+        setCourses(filteredCourses);
         
         setProgress(70);
         setLoadingStage('Loading your progress...');
@@ -54,8 +85,8 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         
         // Load checkpoint progress for each topic
         const checkpointData: Record<string, any> = {};
-        for (const subject in mergedCourses) {
-          for (const topicId in mergedCourses[subject]) {
+        for (const subject in filteredCourses) {
+          for (const topicId in filteredCourses[subject]) {
             try {
               const key = cacheKey('progress', `${user.username}_${topicId}`);
               const cached = await cache.get(key, 2 * 60 * 1000);
@@ -77,8 +108,8 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         
         // Check access for each topic
         const accessMap: Record<string, boolean> = {};
-        for (const subject in mergedCourses) {
-          for (const topicId in mergedCourses[subject]) {
+        for (const subject in filteredCourses) {
+          for (const topicId in filteredCourses[subject]) {
             try {
               const canAccess = await canAccessTopic(user.username, topicId);
               accessMap[`${subject}-${topicId}`] = canAccess;
@@ -94,7 +125,6 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         setLoadingStage('Finalizing...');
         
         setTimeout(() => {
-          setCourses(mergedCourses);
           setLoading(false);
         }, 500); // Small delay for smooth transition
         
@@ -105,7 +135,7 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
     };
 
     loadAllData();
-  }, [user.gradeLevel, user.username]);
+  }, [user.gradeLevel, user.username, isPremium]);
 
   // Helper function to calculate topic completion percentage using checkpoints
   const getTopicCompletion = (subject: string, topicId: string) => {
@@ -131,6 +161,15 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
   const getTopicAccessStatus = (subject: string, topicId: string) => {
     const key = `${subject}-${topicId}`;
     return topicAccess[key] ?? null; // null means still loading
+  };
+
+  // Check if a topic is locked due to premium status
+  const isTopicLocked = (subject: string, topicId: string, topicIndex: number) => {
+    // Premium users have access to all topics
+    if (isPremium) return false;
+    
+    // Free users only get first 2 topics per subject
+    return topicIndex >= 2;
   };
 
   if (loading) {
@@ -169,7 +208,7 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
                 <span>Loading interactive materials and assessments</span>
               </li>
               <li className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full mt-1"></div>
+                <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full mt=1"></div>
                 <span>First load is slower - subsequent visits will be faster</span>
               </li>
             </ul>
@@ -181,11 +220,52 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
 
   return (
     <div className="max-w-7xl mx-auto px-4">
+      {/* Upgrade Banner for Free Users */}
+      {!isPremium && Object.keys(courses).length > 0 && (
+        <div className="mb-8 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border border-yellow-500/30 rounded-2xl p-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-yellow-500/20 rounded-xl">
+                <Crown className="text-yellow-400" size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">Unlock Full Access</h3>
+                <p className="text-white/70">
+                  You're viewing the first 2 topics per subject. 
+                  Upgrade to Premium for complete access to all {Object.values(courses).reduce((total, topics) => total + Object.keys(topics).length, 0)}+ topics!
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => alert('Contact admin at bbrak1235@gmail.com to upgrade to Premium')}
+              className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-amber-600 text-white font-bold rounded-lg hover:from-yellow-500 hover:to-amber-500 transition-all flex items-center gap-2"
+            >
+              <Zap size={18} /> Upgrade to Premium
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Premium User Badge */}
+      {isPremium && (
+        <div className="mb-6 bg-gradient-to-r from-cyan-900/20 to-purple-900/20 border border-cyan-500/30 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <Crown className="text-yellow-400" size={24} />
+            <div>
+              <h4 className="font-bold text-white">Premium Account</h4>
+              <p className="text-white/60 text-sm">Full access to all topics and features</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-8">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">My Courses</h2>
-            <p className="text-white/60">Grade {user.gradeLevel} Curriculum</p>
+            <p className="text-white/60">
+              Grade {user.gradeLevel} Curriculum • {isPremium ? 'Premium Access' : 'Free Tier'}
+            </p>
           </div>
           <button 
             onClick={() => navigate('/student-dashboard')} 
@@ -211,18 +291,34 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
         ) : (
           Object.entries(courses).map(([subject, topics]) => (
             <div key={subject} className="space-y-4">
-              <h3 className="text-2xl font-bold text-white border-b border-white/10 pb-2">
-                {subject}
-              </h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-white">
+                  {subject}
+                  {!isPremium && (
+                    <span className="ml-3 text-sm font-normal text-yellow-400">
+                      (2 of {Object.keys(topics).length} topics available)
+                    </span>
+                  )}
+                </h3>
+                {!isPremium && Object.keys(topics).length > 2 && (
+                  <button
+                    onClick={() => alert(`Upgrade to Premium to access all ${Object.keys(topics).length} topics in ${subject}`)}
+                    className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                  >
+                    <Lock size={14} /> Unlock All
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.values(topics).map((topic: any) => {
-                  const completion = getTopicCompletion(subject, topic.id);
-                  const canAccess = getTopicAccessStatus(subject, topic.id);
-                  const isLocked = canAccess === false;
+                {Object.entries(topics).map(([topicId, topic], index) => {
+                  const completion = getTopicCompletion(subject, topicId);
+                  const canAccess = getTopicAccessStatus(subject, topicId);
+                  const isLockedByPremium = isTopicLocked(subject, topicId, index);
+                  const isLocked = canAccess === false || isLockedByPremium;
                   
                   return (
                     <div
-                      key={topic.id}
+                      key={topicId}
                       className={`bg-white/5 border rounded-xl p-5 transition-all ${
                         isLocked 
                           ? 'border-red-500/30 opacity-60' 
@@ -236,7 +332,15 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
                             Grade {topic.gradeLevel} • {topic.subtopics?.length || 0} subtopics
                           </p>
                         </div>
-                        {isLocked && <Lock className="text-red-400" size={20} />}
+                        <div className="flex items-center gap-2">
+                          {isLockedByPremium && (
+                            <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 rounded-full">
+                              <Lock className="text-yellow-400" size={12} />
+                              <span className="text-yellow-400 text-xs">Premium</span>
+                            </div>
+                          )}
+                          {isLocked && !isLockedByPremium && <Lock className="text-red-400" size={20} />}
+                        </div>
                       </div>
                       
                       <p className="text-white/70 text-sm mb-4 line-clamp-2">
@@ -262,14 +366,18 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
                           {topic.materials?.length || 0} materials
                         </div>
                         <Link
-                          to={isLocked ? '#' : `/topic/${encodeURIComponent(subject)}/${topic.id}`}
+                          to={isLocked ? '#' : `/topic/${encodeURIComponent(subject)}/${topicId}`}
                           onClick={(e) => {
                             if (isLocked) {
                               e.preventDefault();
-                              alert('Complete previous topics to unlock this one');
+                              if (isLockedByPremium) {
+                                alert('This topic requires Premium access. Contact admin at bbrak1235@gmail.com to upgrade.');
+                              } else {
+                                alert('Complete previous topics to unlock this one');
+                              }
                             } else {
                               // Force topic load by clearing cache
-                              try { cache.clear(cacheKey('progress', `${user.username}_${topic.id}`)); } catch (e) {}
+                              try { cache.clear(cacheKey('progress', `${user.username}_${topicId}`)); } catch (e) {}
                             }
                           }}
                           className={`flex items-center gap-1 text-sm font-medium ${
@@ -278,7 +386,7 @@ export const StudentCourseList: React.FC<StudentCourseListProps> = ({ user }) =>
                               : 'text-cyan-400 hover:text-cyan-300'
                           }`}
                         >
-                          {isLocked ? 'Locked' : 'Continue'}
+                          {isLocked ? (isLockedByPremium ? 'Premium' : 'Locked') : 'Continue'}
                           {!isLocked && <ChevronRight size={16} />}
                         </Link>
                       </div>
