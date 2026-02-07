@@ -1066,7 +1066,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
               onClick={() => setShowAiAsk(true)}
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-lg font-medium hover:from-purple-500 hover:to-pink-500 transition-all flex items-center justify-center gap-2"
             >
-              <Wand2 size={16} /> Ask Newel AI Tutor
+              <Wand2 size={16} /> Ask Newel
             </button>
             <div className="mt-3 text-xs text-white/50 text-center">
               Available 24/7 • Instant explanations
