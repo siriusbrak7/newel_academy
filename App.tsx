@@ -12,7 +12,7 @@ const StudentCourseList = React.lazy(() => import('./components/CourseSystem').t
 const CourseManager = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.CourseManager })));
 const AssessmentManager = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.AssessmentManager })));
 const StudentAssessmentList = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.StudentAssessmentList })));
-const TopicDetail = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.TopicDetail })));
+const TopicDetailCheckpoints = React.lazy(() => import('./components/CourseSystem').then(m => ({ default: m.TopicDetailCheckpoints })));
 const TeacherAssessmentReview = React.lazy(() => import('./components/TeacherAssessmentReview').then(m => ({ default: m.TeacherAssessmentReview })));
 const SprintChallenge = React.lazy(() => import('./components/Gamification').then(m => ({ default: m.SprintChallenge })));
 const LeaderboardView = React.lazy(() => import('./components/Gamification').then(m => ({ default: m.LeaderboardView })));
@@ -778,7 +778,7 @@ const App: React.FC = () => {
                   </RequireAuth>
                 }
               />  
-            <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetail />
+            <Route path="/topic/:subject/:topicId" element={<RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}><TopicDetailCheckpoints />
     </RequireAuth>
   } />
 
