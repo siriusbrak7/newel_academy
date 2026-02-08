@@ -91,7 +91,11 @@ const Navbar: React.FC<NavbarProps> = ({
     if (!user?.username) return;
     
     try {
-      const notifications = await getUserNotifications(user.username);
+      if (!user.id) {
+        console.warn('Notifications skipped: missing user.id', user.username);
+        return;
+      }
+      const notifications = await getUserNotifications(user.id);
       setUserNotifications(notifications);
       setUnreadCount(notifications.filter(n => !n.read).length);
     } catch (error) {

@@ -647,7 +647,11 @@ export const StudentDashboard: React.FC<{ user: User }> = ({ user }) => {
     
     setLoadingStates(prev => ({ ...prev, notifications: true }));
     try {
-      const notifications = await getUserNotifications(user.username);
+      if (!user.id) {
+        console.warn('Notifications skipped: missing user.id', user.username);
+        return;
+      }
+      const notifications = await getUserNotifications(user.id);
       setUserNotifications(notifications.slice(0, 5)); // Only show 5 most recent
       setUnreadCount(notifications.filter(n => !n.read).length);
     } catch (error) {

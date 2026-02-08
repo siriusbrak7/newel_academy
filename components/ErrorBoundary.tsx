@@ -23,7 +23,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Log to console for now; can be extended to remote logging
     // eslint-disable-next-line no-console
-    console.error('ErrorBoundary caught an error', error, info);
+    console.error('ErrorBoundary caught an error', error);
+    // eslint-disable-next-line no-console
+    console.error('Component stack:', info.componentStack);
   }
 
   handleReset = () => {
@@ -33,6 +35,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   render() {
     if (this.state.hasError) {
+      const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV
+        ? true
+        : process.env.NODE_ENV === 'development';
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6">
           <div className="max-w-xl text-center">
@@ -52,6 +57,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 Reload Page
               </button>
             </div>
+            {isDev && this.state.error && (
+              <div className="mt-6 text-left bg-black/30 border border-white/10 rounded-lg p-4">
+                <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Debug Details</div>
+                <pre className="text-xs text-white/80 whitespace-pre-wrap">
+                  {this.state.error.stack || this.state.error.message}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       );

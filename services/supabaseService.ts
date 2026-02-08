@@ -24,6 +24,7 @@ export const authService = {
       if (data.password_hash !== simpleHash(password)) return null;
 
       const user: User = {
+        id: data.id,
         username: data.username,
         role: data.role,
         approved: data.approved,
@@ -208,6 +209,7 @@ export const userService = {
       const { data } = await supabase.from('users').select('*').order('username');
 
       return (data || []).map((u: any): User => ({
+        id: u.id,
         username: u.username,
         role: u.role,
         approved: u.approved,

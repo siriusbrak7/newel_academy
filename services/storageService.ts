@@ -294,6 +294,7 @@ export const authenticateUser = async (username: string, password: string): Prom
     }
 
     return {
+      id: profile.id,
       username: profile.username,
       role: profile.role,
       approved: profile.approved,
@@ -334,6 +335,7 @@ export const getUsers = async (): Promise<Record<string, User>> => {
     const users: Record<string, User> = {};
     data.forEach(dbUser => {
       users[dbUser.username] = {
+        id: dbUser.id,
         username: dbUser.username,
         role: dbUser.role,
         approved: dbUser.approved,
@@ -387,6 +389,7 @@ export const getUserByUsername = async (username: string): Promise<User | null> 
     if (error || !data) return null;
 
     return {
+      id: data.id,
       username: data.username,
       role: data.role,
       approved: data.approved,
@@ -2460,6 +2463,10 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
 // services/storageService.ts or similar
 export const getUserNotifications = async (userId: string) => {
   try {
+    if (!userId) {
+      console.warn('getUserNotifications called without userId. Using defaults.');
+      return DEFAULT_NOTIFICATION_SETTINGS;
+    }
     const { data, error } = await supabase
       .from('notification_preferences')
       .select('*')

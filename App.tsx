@@ -51,6 +51,12 @@ const LoadingScreen: React.FC = () => (
   </div>
 );
 
+const withRouteBoundary = (node: React.ReactNode) => (
+  <ErrorBoundary onReset={() => window.location.reload()}>
+    {node}
+  </ErrorBoundary>
+);
+
 // Declare ThemeManager from index.html
 declare global {
   interface Window {
@@ -521,8 +527,12 @@ const App: React.FC = () => {
             if (validated) {
               setAuth({ loggedIn: true, user: validated });
               // Load notifications after user is confirmed
-              const notifications = await getUserNotifications(validated.username);
-              console.log(`✅ ${notifications.length} notifications loaded`);
+              if (!validated.id) {
+                console.warn('Notifications skipped: missing user.id', validated.username);
+              } else {
+                const notifications = await getUserNotifications(validated.id);
+                console.log(`✅ ${notifications.length} notifications loaded`);
+              }
             } else {
               sessionService.clearSession();
             }
@@ -768,17 +778,17 @@ const App: React.FC = () => {
               }
             />
 
-            <Route path="/admin" element={<RequireAuth allowedRoles={['admin']} user={auth.user} loggedIn={auth.loggedIn}><AdminDashboard /></RequireAuth>} />
-            <Route path="/teacher-dashboard" element={<RequireAuth allowedRoles={['teacher']} user={auth.user} loggedIn={auth.loggedIn}><TeacherDashboard user={auth.user!} /></RequireAuth>} />
-            <Route path="/student-dashboard" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}><StudentDashboard user={auth.user!} /></RequireAuth>} />
+            <Route path="/admin" element={<RequireAuth allowedRoles={['admin']} user={auth.user} loggedIn={auth.loggedIn}>{withRouteBoundary(<AdminDashboard />)}</RequireAuth>} />
+            <Route path="/teacher-dashboard" element={<RequireAuth allowedRoles={['teacher']} user={auth.user} loggedIn={auth.loggedIn}>{withRouteBoundary(<TeacherDashboard user={auth.user!} />)}</RequireAuth>} />
+            <Route path="/student-dashboard" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}>{withRouteBoundary(<StudentDashboard user={auth.user!} />)}</RequireAuth>} />
 
             <Route
               path="/courses"
               element={
                 <RequireAuth allowedRoles={['teacher', 'student']} user={auth.user} loggedIn={auth.loggedIn}>
                   {auth.user?.role === 'teacher' 
-                    ? <CourseManager />
-                    : <StudentCourseList user={auth.user!} />}
+                    ? withRouteBoundary(<CourseManager />)
+                    : withRouteBoundary(<StudentCourseList user={auth.user!} />)}
                   </RequireAuth>
                 }
               />  
@@ -786,7 +796,7 @@ const App: React.FC = () => {
               path="/topic/:subject/:topicId"
               element={
                 <RequireAuth allowedRoles={['student', 'teacher']} user={auth.user} loggedIn={auth.loggedIn}>
-                  <TopicDetailCheckpoints />
+                  {withRouteBoundary(<TopicDetailCheckpoints />)}
                 </RequireAuth>
               }
             />
@@ -795,14 +805,14 @@ const App: React.FC = () => {
               path="/assessments"
               element={
                 <RequireAuth allowedRoles={['teacher', 'student', 'admin']} user={auth.user} loggedIn={auth.loggedIn}>
-                  {auth.user?.role === 'teacher' || auth.user?.role === 'admin' ? <AssessmentManager /> : <StudentAssessmentList user={auth.user!} />}
+                  {auth.user?.role === 'teacher' || auth.user?.role === 'admin' ? withRouteBoundary(<AssessmentManager />) : withRouteBoundary(<StudentAssessmentList user={auth.user!} />)}
                 </RequireAuth>
               }
             />
 
-            <Route path="/teacher-assessments" element={<RequireAuth allowedRoles={['teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}><TeacherAssessmentReview /></RequireAuth>} />
-            <Route path="/sprint-challenge" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}><SprintChallenge /></RequireAuth>} />
-            <Route path="/leaderboard" element={<RequireAuth allowedRoles={['student', 'teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}><LeaderboardView /></RequireAuth>} />
+            <Route path="/teacher-assessments" element={<RequireAuth allowedRoles={['teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}>{withRouteBoundary(<TeacherAssessmentReview />)}</RequireAuth>} />
+            <Route path="/sprint-challenge" element={<RequireAuth allowedRoles={['student']} user={auth.user} loggedIn={auth.loggedIn}>{withRouteBoundary(<SprintChallenge />)}</RequireAuth>} />
+            <Route path="/leaderboard" element={<RequireAuth allowedRoles={['student', 'teacher', 'admin']} user={auth.user} loggedIn={auth.loggedIn}>{withRouteBoundary(<LeaderboardView />)}</RequireAuth>} />
 
             <Route
               path="*"

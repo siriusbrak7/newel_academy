@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { aiQueryService, QueryQuota } from '../services/aiQueryService';
 import { useTierAccess } from '../services/accessControl';
@@ -21,31 +21,44 @@ export const DashboardIntegration: React.FC<DashboardIntegrationProps> = ({ user
   
   const tier = useTierAccess(user);
 
-  useEffect(() => {
-    initializeDashboard();
-  }, [user]);
-
   /**
    * Initialize dashboard by checking subscription status and loading quota
    */
-  const initializeDashboard = async () => {
+  const initializeDashboard = useCallback(async (isActiveRef: { current: boolean }) => {
     setLoading(true);
     try {
       // Check if subscription has expired
       const updatedUser = await checkSubscriptionExpiry(user);
-      if (updatedUser !== user) {
-        setUser(updatedUser);
+      if (isActiveRef.current && updatedUser) {
+        const hasChanged =
+          updatedUser.username !== user.username ||
+          updatedUser.tier !== user.tier ||
+          updatedUser.isPremium !== user.isPremium ||
+          updatedUser.status !== user.status ||
+          updatedUser.subscriptionEndsAt !== user.subscriptionEndsAt;
+        if (hasChanged) {
+          setUser(updatedUser);
+        }
       }
 
       // Load query quota
       const q = await aiQueryService.getQueryQuota(user);
-      setQuota(q);
+      if (isActiveRef.current) setQuota(q);
     } catch (error) {
       console.error('Error initializing dashboard:', error);
     } finally {
-      setLoading(false);
+      if (isActiveRef.current) setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    console.log('useEffect running: initializeDashboard');
+    const isActiveRef = { current: true };
+    initializeDashboard(isActiveRef);
+    return () => {
+      isActiveRef.current = false;
+    };
+  }, [initializeDashboard]);
 
   /**
    * Example: Make an AI query with quota checking
@@ -158,7 +171,8 @@ export const DashboardIntegration: React.FC<DashboardIntegrationProps> = ({ user
   const handleUpgradeComplete = async () => {
     setShowSubscription(false);
     // Refresh user data from server
-    initializeDashboard();
+    const isActiveRef = { current: true };
+    await initializeDashboard(isActiveRef);
   };
 
   if (loading) {
