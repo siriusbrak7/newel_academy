@@ -1170,6 +1170,133 @@ export const getAssessments = async (): Promise<Assessment[]> => {
   }
 };
 
+// Lightweight assessments fetch (no questions), with cached question counts
+export const getAssessmentsLight = async (): Promise<Assessment[]> => {
+  const cacheKey = 'assessments_light_v1';
+  const inFlightKey = `inflight_${cacheKey}`;
+
+  const cached = await cache.get<Assessment[]>(cacheKey, 10 * 60 * 1000);
+  if (cached) return cached;
+
+  // Request dedupe
+  const inflight = (globalThis as any)[inFlightKey] as Promise<Assessment[]> | undefined;
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    try {
+      const { data: assessmentsData, error: assessmentsError } = await supabase
+        .from('assessments')
+        .select('id, title, subject, target_grade, created_by, assigned_to, created_at')
+        .order('created_at', { ascending: false });
+
+      if (assessmentsError) throw assessmentsError;
+
+      // Fetch only minimal question metadata to compute counts
+      const { data: questionMeta, error: questionError } = await supabase
+        .from('questions')
+        .select('assessment_id, type');
+
+      if (questionError) {
+        console.warn('⚠️ Failed to load question metadata for counts:', questionError);
+      }
+
+      const counts = new Map<string, { total: number; mcq: number; theory: number }>();
+      (questionMeta || []).forEach((q: any) => {
+        if (!q.assessment_id) return;
+        const entry = counts.get(q.assessment_id) || { total: 0, mcq: 0, theory: 0 };
+        entry.total += 1;
+        if (q.type === 'MCQ') entry.mcq += 1;
+        if (q.type === 'THEORY') entry.theory += 1;
+        counts.set(q.assessment_id, entry);
+      });
+
+      const assessments: Assessment[] = (assessmentsData || []).map(item => {
+        const count = counts.get(item.id) || { total: 0, mcq: 0, theory: 0 };
+        return {
+          id: item.id,
+          title: item.title,
+          subject: item.subject || '',
+          questions: [],
+          assignedTo: item.assigned_to || [],
+          targetGrade: item.target_grade || 'all',
+          createdBy: item.created_by || 'system',
+          questionCount: count.total,
+          mcqCount: count.mcq,
+          theoryCount: count.theory
+        };
+      });
+
+      cache.set(cacheKey, assessments, 10 * 60 * 1000);
+      return assessments;
+    } catch (error) {
+      console.error('❌ Get assessments (light) error:', error);
+      return [];
+    } finally {
+      (globalThis as any)[inFlightKey] = undefined;
+    }
+  })();
+
+  (globalThis as any)[inFlightKey] = promise;
+  return promise;
+};
+
+// Fetch full questions for a single assessment (cached)
+export const getAssessmentQuestions = async (assessmentId: string): Promise<Question[]> => {
+  const cacheKey = `assessment_questions_${assessmentId}`;
+  const inFlightKey = `inflight_${cacheKey}`;
+
+  const cached = await cache.get<Question[]>(cacheKey, 30 * 60 * 1000);
+  if (cached) return cached;
+
+  const inflight = (globalThis as any)[inFlightKey] as Promise<Question[]> | undefined;
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    try {
+      const { data: questionsData, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('assessment_id', assessmentId)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+
+      const questions: Question[] = (questionsData || []).map((q: any) => ({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        difficulty: q.difficulty || 'IGCSE',
+        topic: q.topic || '',
+        options: q.options || [],
+        correctAnswer: q.correct_answer || '',
+        modelAnswer: q.model_answer,
+        format: q.format || 'plain_text',
+        metadata: q.metadata || {},
+        content: q.content || '',
+        topic_id: q.topic_id,
+        subtopic_name: q.subtopic_name,
+        explanation: q.explanation,
+        sort_order: q.sort_order
+      }));
+
+      cache.set(cacheKey, questions, 30 * 60 * 1000);
+      return questions;
+    } catch (error) {
+      console.error('❌ Get assessment questions error:', error);
+      return [];
+    } finally {
+      (globalThis as any)[inFlightKey] = undefined;
+    }
+  })();
+
+  (globalThis as any)[inFlightKey] = promise;
+  return promise;
+};
+
+export const prefetchAssessmentQuestions = (assessmentId: string): void => {
+  void getAssessmentQuestions(assessmentId);
+};
+
 export const saveAssessment = async (assessment: Assessment): Promise<void> => {
   
   
@@ -2319,83 +2446,39 @@ export const getStudentCourseProgress = async (username: string): Promise<any[]>
 // NOTIFICATION FUNCTIONS - UPDATED
 // =======================
 
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  course_updates: true,
+  new_assessments: true,
+  leaderboard_updates: true,
+  submission_graded: true,
+  topic_completed: true,
+  teacher_announcements: true,
+  admin_alerts: false
+};
+
 // Get notifications for a specific user with preferences
-export const getUserNotifications = async (username: string): Promise<Notification[]> => {
+// services/storageService.ts or similar
+export const getUserNotifications = async (userId: string) => {
   try {
-    // Get user ID
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
-    
-    if (userError || !userData) {
-      console.error(`❌ User ${username} not found:`, userError?.message);
-      return [];
-    }
-    
-    // Get user notification preferences
-    const { data: preferences } = await supabase
+    const { data, error } = await supabase
       .from('notification_preferences')
       .select('*')
-      .eq('user_id', userData.id)
-      .single();
+      .eq('user_id', userId)
+      .maybeSingle(); // Returns null instead of throwing error
     
-    // Fetch notifications
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userData.id)
-      .order('created_at', { ascending: false })
-      .limit(50); // Increased limit
-    
-    if (error) {
-      console.error('❌ Error fetching notifications:', error);
-      return [];
-    }
-    
-    const now = Date.now();
-    const validNotifications: Notification[] = [];
-    
-    // Process and filter notifications
-    for (const item of (data || [])) {
-      const expiresTime = item.expires_at ? new Date(item.expires_at).getTime() : 
-                         (item.created_at ? new Date(item.created_at).getTime() + (7 * 24 * 60 * 60 * 1000) : now + (7 * 24 * 60 * 60 * 1000));
-      
-      // Skip if expired
-      if (now > expiresTime) continue;
-      
-      // Skip if user has disabled this notification type
-      if (preferences) {
-        const metadata = item.metadata || {};
-        
-        // Filter based on notification content and user preferences
-        if (item.text.includes('New submission') && !preferences.submission_graded) continue;
-        if (item.text.includes('Assessment graded') && !preferences.submission_graded) continue;
-        if (item.text.includes('New material') && !preferences.course_updates) continue;
-        if (item.text.includes('New assessment') && !preferences.new_assessments) continue;
-        if (item.text.includes('Leaderboard') && !preferences.leaderboard_updates) continue;
-        if (item.text.includes('completed') && item.text.includes('%') && !preferences.topic_completed) continue;
-        if (item.type === 'info' && metadata.teacher && !preferences.teacher_announcements) continue;
-        if (item.type === 'alert' && metadata.admin && !preferences.admin_alerts) continue;
+    if (error || !data) {
+      if (error?.code === '406') {
+        console.warn('notification_preferences missing or not accessible (406). Using defaults.');
+      } else if (error) {
+        console.warn('No notification prefs found, using defaults:', error.message || error);
       }
-      
-      validNotifications.push({
-        id: item.id,
-        text: item.text,
-        type: item.type as 'info' | 'success' | 'warning' | 'alert',
-        read: item.read,
-        timestamp: item.created_at ? new Date(item.created_at).getTime() : now,
-        metadata: item.metadata,
-        expiresAt: expiresTime
-      });
+      return DEFAULT_NOTIFICATION_SETTINGS;
     }
     
-    return validNotifications;
-    
+    return data;
   } catch (error) {
-    console.error('❌ Error in getUserNotifications:', error);
-    return [];
+    console.error('Error fetching notification prefs:', error);
+    return DEFAULT_NOTIFICATION_SETTINGS;
   }
 };
 
@@ -2616,26 +2699,27 @@ export const getNotificationPreferences = async (username: string): Promise<any>
       .eq('username', username)
       .single();
     
-    if (!userData) return null;
+    if (!userData) return DEFAULT_NOTIFICATION_SETTINGS;
     
-    const { data: preferences } = await supabase
+    const { data: preferences, error } = await supabase
       .from('notification_preferences')
       .select('*')
       .eq('user_id', userData.id)
-      .single();
+      .maybeSingle();
     
-    return preferences || {
-      course_updates: true,
-      new_assessments: true,
-      leaderboard_updates: true,
-      submission_graded: true,
-      topic_completed: true,
-      teacher_announcements: true,
-      admin_alerts: false
-    };
+    if (error) {
+      if (error.code === '406') {
+        console.warn('notification_preferences missing or not accessible (406). Using defaults.');
+        return DEFAULT_NOTIFICATION_SETTINGS;
+      }
+      console.warn('No notification prefs found, using defaults:', error.message || error);
+      return DEFAULT_NOTIFICATION_SETTINGS;
+    }
+
+    return preferences || DEFAULT_NOTIFICATION_SETTINGS;
   } catch (error) {
     console.error('Error getting preferences:', error);
-    return null;
+    return DEFAULT_NOTIFICATION_SETTINGS;
   }
 };
 

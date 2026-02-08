@@ -552,6 +552,10 @@ const App: React.FC = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  if (initializing) {
+    return <LoadingScreen />;
+  }
+
   // Handle scroll lock for mobile menu
   useEffect(() => {
     if (mobileMenuOpen) {

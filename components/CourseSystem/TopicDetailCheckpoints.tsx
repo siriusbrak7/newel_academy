@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCheckpointQuestions } from '../../services/checkpointService';
 import { User, Material, Question } from '../../types';
+import ErrorBoundary from '../ErrorBoundary';
 import { 
   getStoredSession, 
   getTopicCheckpoints,
@@ -98,7 +99,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
   useEffect(() => {
     const loadEssentialData = async () => {
       if (!subject || !topicId) {
-        navigate('/courses');
+        setError('Missing topic parameters. Please return to Courses and try again.');
+        setLoading(prev => ({ ...prev, essential: false }));
         return;
       }
 
@@ -134,7 +136,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
         
         if (!topicData) {
           console.error('Topic not found:', decodedSubject, decodedTopicId);
-          navigate('/courses');
+          setError('Topic not found. Please return to Courses and try again.');
+          setLoading(prev => ({ ...prev, essential: false }));
           return;
         }
         setResolvedTopicId(actualTopicId);
@@ -596,7 +599,8 @@ export const TopicDetailCheckpoints: React.FC = () => {
   // MAIN RENDER
   // =====================================================
   return (
-    <div className="max-w-6xl mx-auto pb-20 relative">
+    <ErrorBoundary onReset={() => navigate('/courses')}>
+      <div className="max-w-6xl mx-auto pb-20 relative">
       {/* Checkpoint Quiz Modal */}
       {activeCheckpoint && user && (
         <CheckpointQuiz
@@ -610,7 +614,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           onClose={() => setActiveCheckpoint(null)}
           username={user.username}
           checkpoint={activeCheckpoint}
-          topicId={topicId!}
+          topicId={resolvedTopicId || topicId!}
         />
       )}
 
@@ -639,7 +643,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           onClose={() => setShowReviewForCheckpoint(null)}
           username={user.username}
           checkpoint={checkpoints.find(cp => cp.id === showReviewForCheckpoint)!}
-          topicId={topicId!}
+          topicId={resolvedTopicId || topicId!}
           mode="review"
           reviewResults={checkpointResults[showReviewForCheckpoint]}
         />
@@ -1095,6 +1099,7 @@ export const TopicDetailCheckpoints: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };

@@ -205,6 +205,10 @@ export interface Assessment {
   targetGrade: string;
   createdBy: string;
   dueDate?: number;
+  // Optional lightweight metadata (when questions are lazy-loaded)
+  questionCount?: number;
+  mcqCount?: number;
+  theoryCount?: number;
 }
 
 // =======================
